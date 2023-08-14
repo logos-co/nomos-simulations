@@ -1,0 +1,11 @@
+overlay,nodes,committees_or_depth
+tree,100,3
+tree,500,7
+tree,1000,11
+tree,5000,33
+tree,10000,57
+branch,1764,7
+branch,2256,8
+branch,2880,9
+branch,3590,10
+branch,4378,11

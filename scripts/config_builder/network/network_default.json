@@ -1,0 +1,20 @@
+{
+	"network_settings": {
+		"network_behaviors": {
+			"north america:north america": "10ms",
+			"north america:europe": "150ms",
+			"north america:asia": "250ms",
+			"europe:europe": "10ms",
+			"europe:asia": "200ms",
+			"europe:north america": "150ms",
+			"asia:north america": "250ms",
+			"asia:europe": "200ms",
+			"asia:asia": "10ms"
+		},
+		"regions": {
+			"north america": 0.4,
+			"europe": 0.3,
+			"asia": 0.3
+		}
+	}
+}
