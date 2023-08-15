@@ -20,7 +20,7 @@
 	"overlay_settings": {},
 	"node_settings": {
 		"network_capacity_kbps": 10000024,
-		"timeout": "1000ms"
+		"timeout": "10000ms"
 	},
 	"step_time": "100ms",
 	"runner_settings": "Sync",
@@ -32,7 +32,14 @@
 	"leaders_count": 1,
 	"seed": 0,
 	"wards": [
-		{"max_view": 1}
+		{"max_view": 1},
+		{
+			"stalled_view": {
+				"consecutive_viewed_checkpoint": null,
+				"criterion": 0,
+				"threshold": 10
+			}
+        }
 	],
 	"record_settings": {}
 }
