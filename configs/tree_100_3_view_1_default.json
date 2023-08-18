@@ -27,7 +27,8 @@
     "step_time": "100ms",
     "runner_settings": "Sync",
     "stream_settings": {
-        "path": "output/tree_100_3_view_1_default.json"
+        "path": "output/tree_100_3_view_1_default.json",
+        "format": "json"
     },
     "node_count": 100,
     "views_count": 10,
@@ -41,7 +42,7 @@
             "stalled_view": {
                 "consecutive_viewed_checkpoint": null,
                 "criterion": 0,
-                "threshold": 10
+                "threshold": 100
             }
         }
     ],
