@@ -26,7 +26,7 @@
 	"runner_settings": "Sync",
 	"stream_settings": {
 		"path": "output/100_3_33_1_view_1.json",
-		"format": "json"
+		"format": "csv"
 	},
 	"node_count": 100,
 	"views_count": 10,
