@@ -1,11 +1,10 @@
-overlay,nodes,committees_or_depth
-tree,100,3
-tree,500,7
-tree,1000,11
-tree,5000,33
-tree,10000,57
-branch,1764,7
-branch,2256,8
-branch,2880,9
-branch,3590,10
-branch,4378,11
+overlay,nodes,committees_or_depth,description
+tree,1620,3,simulates 1620 nodes; simulates 540 per 3 committees + 0 USED remainder; probability: 0.000017345841920257676;committee_sizes.py params - nodes: 1620; failure_threshold: 0.0001; carnot_adversary_threshold_per_committee: 0.3333333333333333; carnot_network_adversary_threshold: 0.25;
+tree,5000,9,simulates 5000 nodes; simulates 555 per 9 committees + 5 USED remainder; probability: 0.00004252906900892306
+tree,10000,17,simulates 10000 nodes; simulates 588 per 17 committees + 4 USED remainder; probability: 0.00004237745769197776
+branch,3105,5,simulates 39160 nodes; simulates 621 per 63 committees + 37 UNUSED remainder; probability: 0.00009024947242197712;committee_sizes.py params - nodes: 39160; failure_threshold: 0.0001; carnot_adversary_threshold_per_committee: 0.3333333333333333; carnot_network_adversary_threshold: 0.25
+branch,3924,6,simulates 83116 nodes; simulates 654 per 127 committees + 58 UNUSED remainder; probability: 0.0000985621691587113;committee_sizes.py params - nodes: 83116; failure_threshold: 0.0001; carnot_adversary_threshold_per_committee: 0.3333333333333333; carnot_network_adversary_threshold: 0.25
+branch,4872,7,simulates 177511 nodes; simulates 696 per 255 committees + 31 UNUSED remainder; probability: 0.00008888668427209367;committee_sizes.py params - nodes: 177511; failure_threshold: 0.0001; carnot_adversary_threshold_per_committee: 0.3333333333333333; carnot_network_adversary_threshold: 0.25
+branch,5824,8,simulates 372511 nodes; simulates 728 per 511 committees + 503 UNUSED remainder; probability: 0.00009728747293380469;committee_sizes.py params - nodes: 372511; failure_threshold: 0.0001; carnot_adversary_threshold_per_committee: 0.3333333333333333; carnot_network_adversary_threshold: 0.25
+branch,6993,9,simulates 795631 nodes; simulates 777 per 1023 committees + 760 UNUSED remainder; probability: 0.0000896362694714492
+branch,8180,10,simulates 1676225 nodes; simulates 818 per 2047 committees + 1779 UNUSED remainder; probability: 0.00008043611783115079
