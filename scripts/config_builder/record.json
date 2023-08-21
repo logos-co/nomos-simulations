@@ -1,5 +1,6 @@
 {
 	"record_settings": { 
+		"node_id": true,
 		"current_view": true,
 		"highest_voted_view": true,
 		"local_high_qc": true,

@@ -11,7 +11,7 @@ def build_cases(csv_path):
         reader = csv.reader(csv_file)
         
         for row in reader:
-            overlay_type, node_count, committees = row
+            overlay_type, node_count, committees, desc = row
             
             if overlay_type == "overlay":
                 continue
