@@ -51,6 +51,9 @@ def views(ctx: typer.Context,
     axes.set_xticks([x + 1  for x in range(max(views_df.astype(int)))])
     axes.set_yticks([x + 1 for x in range(max(steps_df.astype(int)))])
 
+
+    # TODO: all nodes' current view change. currently we do only the earliest
+
     axes.plot(views_df, steps_df, linestyle='--', marker='o')
     plt.show()
     plt.savefig(f'{oprefix}-view-installion-times.pdf', format="pdf", bbox_inches="tight")
