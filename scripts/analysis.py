@@ -9,6 +9,7 @@ import logging as log
 from pathlib import Path
 import matplotlib.pyplot as plt
 from os import walk
+from collections import defaultdict
 
 def read_json(fname):
     with open(fname) as f:
@@ -42,6 +43,8 @@ def compute_view_finalisation_times(df, conf, oprefix, tag="tag", plot=False, ep
         log.debug(f'{start_view}({start_idx}), {end_view}({end_idx}) : {end_step} - {start_step} = {view2fin_time[start_view]}')
 
     if not plot:
+        if not view2fin_time:
+            return conf["views_count"]
         return sum(view2fin_time.values())/len(view2fin_time.values())
 
     fig, axes = plt.subplots(1, 1, layout='constrained', sharey=False)
@@ -87,16 +90,23 @@ def views(ctx: typer.Context,
                 help="Set the output prefix for the plots")
         ):
 
-    fin = []
+    tag2vfins = {}
     conf_fnames = next(walk(f'{path}/configs'), (None, None, []))[2]  # [] if no file
     for conf in conf_fnames:
-        prefix = os.path.splitext(os.path.basename(conf))[0]
-        conf = read_json(f'{path}/configs/{conf}')
-        df = read_csv(f'{path}/output/{prefix}.csv')
-        res = compute_view_finalisation_times(df, conf, oprefix, tag, plot=True, epoch=True)
-        fin.append(res)
+        tag = os.path.splitext(os.path.basename(conf))[0]
+        tag2vfins[tag] = {}
+        conf, df = read_json(f'{path}/configs/{conf}'), read_csv(f'{path}/output/output/{tag}.csv')
+        simtype = conf["stream_settings"]["path"].split("/")[1].split("_")[0]
 
-
+        res = compute_view_finalisation_times(df, conf, oprefix, tag, plot=False, epoch=True)
+        if simtype == "tree":
+            num_nodes = conf["node_count"]
+            tag2vfins[tag][num_nodes] = res
+        else:
+            max_depth = conf["overlay_settings"]["branch_depth"]
+            tag2vfins[tag][max_depth] = res
+        print(tag, res)
+    print(tag2vfins)
 
 @app.command()
 def other_commands():
