@@ -1,4 +1,6 @@
 import os
+import sys
+import math
 import typer
 import json
 import pandas as pd
@@ -21,42 +23,69 @@ def read_csv(fname):
 def write_csv(df, fname):
     df.to_csv(fname)
 
+def compute_view_finalisation_times(df, conf, oprefix, tag="tag", plot=False, epoch=True):
+    num_nodes = conf["node_count"]
+    two3rd = math.floor(num_nodes * 2/3) + 1
 
-app = typer.Typer()
+    views, view2fin_time = df.current_view.unique()[:-2], {}
+    log.debug(f'views: {views}')
 
-@app.command()
-def views(ctx: typer.Context,
-        data_file: Path = typer.Option("simout.csv",
-                exists=True, file_okay=True, readable=True,
-                help="Set the simulation data file"),
-        oprefix: str = typer.Option("output",
-                help="Set the output prefix for the plots"),
-        debug: bool = typer.Option(True,
-                help="Set debug")
-        ):
-    log.basicConfig(level=log.INFO)
-    tag = os.path.splitext(os.path.basename(data_file))[0]
+    for start_view in views:
+        end_view = start_view + 2
+        start_idx = df.index[(df['current_view'] == start_view)][0]
+        end_idx = df.index[(df['current_view'] == end_view)][two3rd-1]
+        start_step = df.iloc[start_idx].step_id
+        end_step = df.iloc[end_idx].step_id
+        view2fin_time[start_view] =  end_step - start_step
+        log.debug(f'{start_view}({start_idx}), {end_view}({end_idx}) : {end_step} - {start_step} = {view2fin_time[start_view]}')
 
-    df = read_csv(data_file)
-    steps_df = data=df.drop_duplicates('current_view').step_id.diff().values[1:]
-    views_df  = df['current_view'].unique()[1:]
+    if not plot:
+        return sum(view2fin_time.values())/len(view2fin_time.values())
 
     fig, axes = plt.subplots(1, 1, layout='constrained', sharey=False)
     fig.set_figwidth(12)
     fig.set_figheight(10)
 
-    fig.suptitle(f'View installation times :: {tag}')
-    axes.set_ylabel("Number of Epochs")
+    fig.suptitle(f'View Finalisation Times - {tag}')
+    axes.set_ylabel("Number of Epochs to Finalise a View")
     axes.set_xlabel("Views")
-    axes.set_xticks([x + 1  for x in range(max(views_df.astype(int)))])
-    axes.set_yticks([x + 1 for x in range(max(steps_df.astype(int)))])
+    axes.set_xticks([x for x in view2fin_time.keys()])
+    axes.set_yticks([x for x in range(0, max(view2fin_time.values())+2)])
 
-
-    # TODO: all nodes' current view change. currently we do only the earliest
-
-    axes.plot(views_df, steps_df, linestyle='--', marker='o')
+    axes.plot(view2fin_time.keys(), view2fin_time.values(), linestyle='--', marker='o')
     plt.show()
-    plt.savefig(f'{oprefix}-view-installion-times.pdf', format="pdf", bbox_inches="tight")
+    plt.savefig(f'{oprefix}-view-finalisation-times.pdf', format="pdf", bbox_inches="tight")
+
+app = typer.Typer()
+
+@app.command()
+def views(ctx: typer.Context,
+        data_file: Path = typer.Option("config.json",
+                exists=True, file_okay=True, readable=True,
+                help="Set the simulation config file"),
+        config_file: Path = typer.Option("simout.csv",
+                exists=True, file_okay=True, readable=True,
+                help="Set the simulation data file"),
+        oprefix: str = typer.Option("output",
+                help="Set the output prefix for the plots"),
+        ):
+    log.basicConfig(level=log.INFO)
+
+    tag = os.path.splitext(os.path.basename(data_file))[0]
+    conf = read_json(config_file)
+    df = read_csv(data_file)
+    compute_view_finalisation_times(df, conf, oprefix, tag, plot=True, epoch=True)
+
+def view_batch(ctx: typer.Context,
+        path: Path = typer.Option("./",
+                exists=True, dir_okay=True, readable=True,
+                help="Set the simulation config file"),
+        oprefix: str = typer.Option("output",
+                help="Set the output prefix for the plots")
+        ):
+
+    pass
+
 
 
 @app.command()
