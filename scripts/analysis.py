@@ -16,6 +16,12 @@ def read_json(fname):
         cdata = json.load(f)
     return cdata
 
+def write_json(dic, fname):
+    print(dic, fname)
+    dic_str = {str(k): str(v) for k,v in dic.items()}
+    jdump = json.dumps(dic_str, indent=4, sort_keys=True)
+    with open(fname, 'w') as f:
+        f.write(jdump)
 
 def read_csv(fname):
     df = pd.read_csv(fname, header=0,  comment='#', skipinitialspace = True )
@@ -26,7 +32,7 @@ def write_csv(df, fname):
     df.to_csv(fname)
 
 
-def compute_view_finalisation_times(df, conf, oprefix, tag="tag", plot=False, epoch=True):
+def compute_view_finalisation_times(df, conf, oprefix, tag="tag", plot=False):
     num_nodes = conf["node_count"]
     two3rd = math.floor(num_nodes * 2/3) + 1
 
@@ -43,9 +49,7 @@ def compute_view_finalisation_times(df, conf, oprefix, tag="tag", plot=False, ep
         log.debug(f'{start_view}({start_idx}), {end_view}({end_idx}) : {end_step} - {start_step} = {view2fin_time[start_view]}')
 
     if not plot:
-        if not view2fin_time:
-            return conf["views_count"]
-        return sum(view2fin_time.values())/len(view2fin_time.values())
+        return view2fin_time
 
     fig, axes = plt.subplots(1, 1, layout='constrained', sharey=False)
     fig.set_figwidth(12)
@@ -79,7 +83,7 @@ def view(ctx: typer.Context,
 
     tag = os.path.splitext(os.path.basename(data_file))[0]
     conf, df = read_json(config_file), read_csv(data_file)
-    compute_view_finalisation_times(df, conf, oprefix, tag, plot=True, epoch=True)
+    compute_view_finalisation_times(df, conf, oprefix, tag, plot=True)
 
 @app.command()
 def views(ctx: typer.Context,
@@ -90,23 +94,25 @@ def views(ctx: typer.Context,
                 help="Set the output prefix for the plots")
         ):
 
-    tag2vfins = {}
-    conf_fnames = next(walk(f'{path}/configs'), (None, None, []))[2]  # [] if no file
+    log.basicConfig(level=log.INFO)
+
+    tag2vfins, conf_fnames = {}, next(walk(f'{path}/configs'), (None, None, []))[2]
     for conf in conf_fnames:
         tag = os.path.splitext(os.path.basename(conf))[0]
         tag2vfins[tag] = {}
-        conf, df = read_json(f'{path}/configs/{conf}'), read_csv(f'{path}/output/output/{tag}.csv')
+        cfile, dfile =  f'{path}/configs/{conf}', f'{path}/output/output/{tag}.csv'
+        conf, df = read_json(cfile), read_csv(dfile)
         simtype = conf["stream_settings"]["path"].split("/")[1].split("_")[0]
-
-        res = compute_view_finalisation_times(df, conf, oprefix, tag, plot=False, epoch=True)
+        view2fin = compute_view_finalisation_times(df, conf, oprefix, tag, plot=False)
         if simtype == "tree":
             num_nodes = conf["node_count"]
-            tag2vfins[tag][num_nodes] = res
+            tag2vfins[tag][num_nodes] = view2fin
         else:
             max_depth = conf["overlay_settings"]["branch_depth"]
-            tag2vfins[tag][max_depth] = res
-        print(tag, res)
+            tag2vfins[tag][max_depth] = view2fin
+        print(f'{tag}\t:\t{view2fin}')
     print(tag2vfins)
+    write_json(tag2vfins, f'{oprefix}-viewtimes.json')
 
 @app.command()
 def other_commands():
