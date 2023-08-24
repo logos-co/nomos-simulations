@@ -17,11 +17,18 @@ def read_json(fname):
     return cdata
 
 def write_json(dic, fname):
-    print(dic, fname)
     dic_str = {str(k): str(v) for k,v in dic.items()}
     jdump = json.dumps(dic_str, indent=4, sort_keys=True)
     with open(fname, 'w') as f:
         f.write(jdump)
+
+def read_dict(fname):
+    with open(fname, 'r') as f:
+        return eval(f.read())
+
+def write_dict(dic, fname):
+    with open(fname, 'w') as f:
+        return f.write(str(dic))
 
 def read_csv(fname):
     df = pd.read_csv(fname, header=0,  comment='#', skipinitialspace = True )
@@ -30,7 +37,6 @@ def read_csv(fname):
 
 def write_csv(df, fname):
     df.to_csv(fname)
-
 
 def compute_view_finalisation_times(df, conf, oprefix, tag="tag", plot=False):
     num_nodes = conf["node_count"]
@@ -65,6 +71,28 @@ def compute_view_finalisation_times(df, conf, oprefix, tag="tag", plot=False):
     plt.show()
     plt.savefig(f'{oprefix}-view-finalisation-times.pdf', format="pdf", bbox_inches="tight")
 
+def compute_view_lengths(path, oprefix):
+    pathlen2vfins = {}
+    conf_fnames = next(walk(f'{path}/configs'), (None, None, []))[2]
+    for conf in conf_fnames:
+        tag = os.path.splitext(os.path.basename(conf))[0]
+        cfile, dfile =  f'{path}/configs/{conf}', f'{path}/output/output/{tag}.csv'
+        conf, df = read_json(cfile), read_csv(dfile)
+        simtype = conf["stream_settings"]["path"].split("/")[1].split("_")[0]
+        view2fin = compute_view_finalisation_times(df, conf, oprefix, tag, plot=False)
+        if not view2fin:  # < 2 views
+            continue
+        num_nodes = conf["node_count"]
+        if simtype == "branch":
+            max_depth = conf["overlay_settings"]["branch_depth"]
+        else:
+            max_depth =  math.log(num_nodes + 1, 2) - 1
+        if num_nodes in pathlen2vfins:
+            pathlen2vfins[num_nodes].append((simtype, max_depth, view2fin, tag))
+        else:
+            pathlen2vfins[num_nodes] = [(simtype, max_depth, view2fin, tag)]
+    return pathlen2vfins
+
 
 app = typer.Typer()
 
@@ -95,24 +123,41 @@ def views(ctx: typer.Context,
         ):
 
     log.basicConfig(level=log.INFO)
+    #pathlen2vfins = compute_view_lengths(path, oprefix)
+    #write_json(pathlen2vfins, f'{oprefix}-viewtimes.json')
+    #write_dict(pathlen2vfins, f'{oprefix}-viewtimes.dict')
 
-    tag2vfins, conf_fnames = {}, next(walk(f'{path}/configs'), (None, None, []))[2]
-    for conf in conf_fnames:
-        tag = os.path.splitext(os.path.basename(conf))[0]
-        tag2vfins[tag] = {}
-        cfile, dfile =  f'{path}/configs/{conf}', f'{path}/output/output/{tag}.csv'
-        conf, df = read_json(cfile), read_csv(dfile)
-        simtype = conf["stream_settings"]["path"].split("/")[1].split("_")[0]
-        view2fin = compute_view_finalisation_times(df, conf, oprefix, tag, plot=False)
-        if simtype == "tree":
-            num_nodes = conf["node_count"]
-            tag2vfins[tag][num_nodes] = view2fin
-        else:
-            max_depth = conf["overlay_settings"]["branch_depth"]
-            tag2vfins[tag][max_depth] = view2fin
-        print(f'{tag}\t:\t{view2fin}')
-    print(tag2vfins)
-    write_json(tag2vfins, f'{oprefix}-viewtimes.json')
+    pathlen2vfins = read_dict(f'{oprefix}-viewtimes.dict')
+    data, log4, log5 = [[], []], [], []
+    print("READ FROM FILE", pathlen2vfins)
+    for n in sorted(list(map(int, pathlen2vfins.keys()))):
+        vfin = pathlen2vfins[n]
+        for  run in vfin:
+            if "default" in run[3] and "tree" in run[0]:
+                data[0].append(n)
+                data[1].append(int(run[2][0]))
+                log4.append(int(run[1])*1)
+                log5.append(int(run[1])*2)
+
+    fig, axes = plt.subplots(1, 1, layout='constrained', sharey=False)
+    fig.set_figwidth(12)
+    fig.set_figheight(10)
+
+    fig.suptitle(f'View Finalisation Times')
+    axes.set_ylabel("Number of Epochs")
+    axes.set_xlabel("Number of Nodes")
+
+    l1 = axes.plot(data[0], data[1], linestyle='-', marker='o', label='Carnot')
+    l2 = axes.plot(data[0], log4, linestyle='--', marker='x', label='1 * log(#nodes)')
+    l3 = axes.plot(data[0], log5, linestyle='--', marker='x', label='2 * log(#nodes)')
+    l = l1 + l2 + l3
+
+    labels = [curve.get_label() for curve in l]
+    axes.legend(l, labels, loc="lower right")
+
+    plt.show()
+    plt.savefig(f'{oprefix}-output.pdf', format="pdf", bbox_inches="tight")
+
 
 @app.command()
 def other_commands():
