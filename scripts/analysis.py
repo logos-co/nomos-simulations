@@ -149,31 +149,22 @@ def plot_view_times(pathlen2vfins, simtype, oprefix):
     plt.clf()
     plt.cla()
     plt.close()
+    return data
 
+def plot_tree_vs_branch(tree, branch, oprefix):
 
-def plot_tree_vs_branch(pathlen2vfins,oprefix):
-    data = [[], []]
-    print("READ FROM FILE", pathlen2vfins)
-    for n in sorted(list(map(int, pathlen2vfins.keys()))):
-        vfin = pathlen2vfins[n]
-        for  run in vfin:
-            if "default" not in run[3]:
-                continue
-            if "tree" in run[0]:
-                data[0].append(int(run[2][0]))
-            elif:
-                data[1].append(int(run[2][0]))
-
-    print(data)
+    print(tree, branch)
     fig, axes = plt.subplots(1, 1, layout='constrained', sharey=False)
     fig.set_figwidth(12)
     fig.set_figheight(10)
 
-    fig.suptitle(f'View Finalisation Times - {simtype}')
-    axes.set_ylabel("Number of Epochs")
-    axes.set_xlabel("Number of Nodes")
+    fig.suptitle(f'View Finalisation Times - Tree vs Branch')
+    axes.set_xlabel("Number of Epochs - Tree")
+    axes.set_ylabel("Number of Epochs - Branch")
 
-    l1 = axes.plot(data[0], data[1], linestyle='-', marker='o', label='Carnot')
+    axes.scatter(tree[0], tree[1], label="Tree")
+    axes.scatter(branch[0], branch[1], label="Branch")
+    axes.legend( loc="upper right")
 
     plt.show()
     plt.savefig(f'{oprefix}-scatter.pdf', format="pdf", bbox_inches="tight")
@@ -217,8 +208,10 @@ def views(ctx: typer.Context,
     #write_dict(pathlen2vfins, f'{oprefix}-{simtype}-viewtimes.dict')
 
     pathlen2vfins = read_dict(f'{oprefix}-{simtype}-viewtimes.dict')
-    plot_view_times(pathlen2vfins, "branch", oprefix)
-    plot_view_times(pathlen2vfins, "tree", oprefix)
+    tree = plot_view_times(pathlen2vfins, "tree", oprefix)
+    branch = plot_view_times(pathlen2vfins, "branch", oprefix)
+
+    plot_tree_vs_branch(tree, branch, oprefix)
 
 @app.command()
 def other_commands():
