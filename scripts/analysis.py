@@ -204,8 +204,8 @@ def views(ctx: typer.Context,
         ):
 
     log.basicConfig(level=log.INFO)
-    #pathlen2vfins = compute_view_times(path, oprefix)
-    #write_dict(pathlen2vfins, f'{oprefix}-{simtype}-viewtimes.dict')
+    pathlen2vfins = compute_view_times(path, oprefix)
+    write_dict(pathlen2vfins, f'{oprefix}-{simtype}-viewtimes.dict')
 
     pathlen2vfins = read_dict(f'{oprefix}-{simtype}-viewtimes.dict')
     tree = plot_view_times(pathlen2vfins, "tree", oprefix)
