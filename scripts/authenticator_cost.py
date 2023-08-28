@@ -42,7 +42,7 @@ def main():
     verify_time = verify_signatures(committee_size, depth)
     aggregate_time = aggregate_signatures(committee_size,3)
 
-    print(f"Time to verify {depth * committee_size} signatures: {verify_time:.6f} seconds")
+    print(f"Time to verify signatures of a tree of depth {depth} and committee size {committee_size} : {verify_time:.6f} seconds")
     print(f"Time to aggregate {3 * committee_size} signatures: {aggregate_time:.6f} seconds")
 
 if __name__ == "__main__":
