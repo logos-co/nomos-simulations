@@ -35,3 +35,15 @@ def aggregate_signatures(committee_size, root_members):
     elapsed_time = end_time - start_time
     return elapsed_time
 
+def main():
+    committee_size = int(input("Enter committee size: "))
+    depth = int(input("Enter depth: "))
+
+    verify_time = verify_signatures(committee_size, depth)
+    aggregate_time = aggregate_signatures(committee_size,3)
+
+    print(f"Time to verify {depth * committee_size} signatures: {verify_time:.6f} seconds")
+    print(f"Time to aggregate {3 * committee_size} signatures: {aggregate_time:.6f} seconds")
+
+if __name__ == "__main__":
+    main()
