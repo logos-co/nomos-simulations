@@ -1,0 +1,10 @@
+{
+	"network_settings": {
+		"network_behaviors": {
+			"europe:europe": "100ms"
+		},
+		"regions": {
+			"europe": 1.0
+		}
+	}
+}
