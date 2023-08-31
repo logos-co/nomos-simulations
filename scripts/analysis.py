@@ -50,7 +50,7 @@ def compute_view_finalisation_times(df, conf, oprefix, simtype, tag="tag", plot=
     two3rd = math.floor(conf["node_count"] * 2/3) + 1
 
     views, view2fin_time = df.current_view.unique()[:-2], {}
-    log.debug(f'views: {views}')
+    log.info(f'views: {conf["stream_settings"]["path"]} {views},  {df.current_view.unique()}')
 
     for start_view in views:
         end_view = start_view + 2
@@ -79,7 +79,7 @@ def compute_view_finalisation_times(df, conf, oprefix, simtype, tag="tag", plot=
     plt.savefig(f'{oprefix}-view-finalisation-times.pdf', format="pdf", bbox_inches="tight")
 
 def compute_view_times(path, oprefix):
-    pathlen2vfins = {}
+    nwsize2vfins = {}
     conf_fnames = next(walk(f'{path}/configs'), (None, None, []))[2]
     for conf in conf_fnames:
         tag = os.path.splitext(os.path.basename(conf))[0]
@@ -100,32 +100,37 @@ def compute_view_times(path, oprefix):
             max_depth = conf["overlay_settings"]["branch_depth"]
         else:
             max_depth =  math.log(num_nodes + 1, 2) - 1
-        if num_nodes in pathlen2vfins:
-            pathlen2vfins[num_nodes].append((simtype, max_depth, view2fin, tag))
+        if num_nodes in nwsize2vfins:
+            nwsize2vfins[num_nodes].append((simtype, max_depth, view2fin, tag))
         else:
-            pathlen2vfins[num_nodes] = [(simtype, max_depth, view2fin, tag)]
-    return pathlen2vfins
+            nwsize2vfins[num_nodes] = [(simtype, max_depth, view2fin, tag)]
+    return nwsize2vfins
 
-def plot_view_times(pathlen2vfins, simtype, oprefix):
+def plot_view_times(nwsize2vfins, simtype, oprefix):
     logbands = {}
     logbands[simtype] = {}
     logbands[simtype]["low"] = []
     logbands[simtype]["high"] = []
 
     if simtype == "branch":
-        low, high = 5, 7
+        low, high = 4, 8
     else:
         low, high = 1, 2
     data = [[], []]
-    print("READ FROM FILE", pathlen2vfins)
-    for n in sorted(list(map(int, pathlen2vfins.keys()))):
-        vfin = pathlen2vfins[n]
+    print("READ FROM FILE", nwsize2vfins)
+    for n in sorted(list(map(int, nwsize2vfins.keys()))):
+        vfin = nwsize2vfins[n]
+        #print(f"{simtype} {nwsize2vfins[n]}",  end=' == ')
         for  run in vfin:
             if "default" in run[3] and simtype in run[0]:
                 data[0].append(n)
                 data[1].append(int(run[2][0]))
-                logbands[simtype]["low"].append(int(run[1])*low)
-                logbands[simtype]["high"].append(int(run[1])*high)
+                print(f"IF: {simtype}={run[0]} :  {n} {run[3]}")
+                logbands[simtype]["low"].append(math.log(n, 2)*low)
+                logbands[simtype]["high"].append(math.log(n, 2)*high)
+            else:
+                print(f"ELSE: {simtype}!={run[0]} :  {n} {run[3]}")
+
 
     print(data)
     fig, axes = plt.subplots(1, 1, layout='constrained', sharey=False)
@@ -159,8 +164,9 @@ def plot_tree_vs_branch(tree, branch, oprefix):
     fig.set_figheight(10)
 
     fig.suptitle(f'View Finalisation Times - Tree vs Branch')
-    axes.set_xlabel("Number of Epochs - Tree")
-    axes.set_ylabel("Number of Epochs - Branch")
+    axes.set_xlabel("Number of Nodes")
+    axes.set_ylabel("Number of Epochs")
+
 
     axes.scatter(tree[0], tree[1], label="Tree")
     axes.scatter(branch[0], branch[1], label="Branch")
@@ -203,13 +209,15 @@ def views(ctx: typer.Context,
                 help="Set the type of the simulation")
         ):
 
+    print("here 1 ")
     log.basicConfig(level=log.INFO)
-    pathlen2vfins = compute_view_times(path, oprefix)
-    write_dict(pathlen2vfins, f'{oprefix}-{simtype}-viewtimes.dict')
+    nwsize2vfins = compute_view_times(path, oprefix)
+    print("here writing ")
+    write_dict(nwsize2vfins, f'{oprefix}-{simtype}-viewtimes.dict')
 
-    pathlen2vfins = read_dict(f'{oprefix}-{simtype}-viewtimes.dict')
-    tree = plot_view_times(pathlen2vfins, "tree", oprefix)
-    branch = plot_view_times(pathlen2vfins, "branch", oprefix)
+    nwsize2vfins = read_dict(f'{oprefix}-{simtype}-viewtimes.dict')
+    tree = plot_view_times(nwsize2vfins, "tree", oprefix)
+    branch = plot_view_times(nwsize2vfins, "branch", oprefix)
 
     plot_tree_vs_branch(tree, branch, oprefix)
 
