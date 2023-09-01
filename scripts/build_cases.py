@@ -18,7 +18,7 @@ def build_case(overlay, committees, nodes, config_name, max_view=1, network='def
             f.seek(0)
             json.dump(data, f)
             f.truncate()
-        print((config_name, modified_name))
+        print(f"config clash: renaming {config_name} to {modified_name}")
         config_name = modified_name
     shutil.move(f"{config_name}.json", "../configs/")
 
