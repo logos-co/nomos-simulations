@@ -113,16 +113,15 @@ def plot_view_times(nwsize2vfins, simtype, oprefix):
     logbands[simtype]["high"] = []
 
     if simtype == "branch":
-        low, high = 4, 8
+        low, high = 0.75, 1.5
     else:
-        low, high = 1, 2
+        low, high = 0.75, 1.5
     data = [[], []]
-    print("READ FROM FILE", nwsize2vfins)
     for n in sorted(list(map(int, nwsize2vfins.keys()))):
         vfin = nwsize2vfins[n]
-        #print(f"{simtype} {nwsize2vfins[n]}",  end=' == ')
+        print(f"{simtype} {nwsize2vfins[n]}",  end=' == ')
         for  run in vfin:
-            if "default" in run[3] and simtype in run[0]:
+            if "nolat" in run[3] and simtype in run[0]:
                 data[0].append(n)
                 data[1].append(int(run[2][0]))
                 print(f"IF: {simtype}={run[0]} :  {n} {run[3]}")
@@ -164,13 +163,26 @@ def plot_tree_vs_branch(tree, branch, oprefix):
     fig.set_figheight(10)
 
     fig.suptitle(f'View Finalisation Times - Tree vs Branch')
+    axes.set_xlabel("Tree")
+    axes.set_ylabel("Branch")
+
+
+    #print("\nT, B:", tree[1], branch[1])
+    branch[1].insert(0, 6)
+    print("\nT, B:", tree[1], branch[1])
+    axes.scatter(tree[1], branch[1])
+
+    axes.plot([0, 1], [0, 1],  linestyle='dashed', transform=axes.transAxes)
+
+    '''
+    fig.suptitle(f'View Finalisation Times - Tree vs Branch')
     axes.set_xlabel("Number of Nodes")
     axes.set_ylabel("Number of Epochs")
 
 
     axes.scatter(tree[0], tree[1], label="Tree")
     axes.scatter(branch[0], branch[1], label="Branch")
-    axes.legend( loc="upper right")
+    '''
 
     plt.show()
     plt.savefig(f'{oprefix}-scatter.pdf', format="pdf", bbox_inches="tight")
@@ -204,18 +216,16 @@ def views(ctx: typer.Context,
                 exists=True, dir_okay=True, readable=True,
                 help="Set the simulation config file"),
         oprefix: str = typer.Option("output",
-                help="Set the output prefix for the plots"),
-        simtype: str = typer.Option("tree",
-                help="Set the type of the simulation")
+                help="Set the output prefix for the plots")
         ):
 
     print("here 1 ")
     log.basicConfig(level=log.INFO)
-    nwsize2vfins = compute_view_times(path, oprefix)
-    print("here writing ")
-    write_dict(nwsize2vfins, f'{oprefix}-{simtype}-viewtimes.dict')
+    #nwsize2vfins = compute_view_times(path, oprefix)
+    #write_dict(nwsize2vfins, f'{oprefix}-viewtimes.dict')
 
-    nwsize2vfins = read_dict(f'{oprefix}-{simtype}-viewtimes.dict')
+    print("reading ")
+    nwsize2vfins = read_dict(f'{oprefix}-viewtimes.dict')
     tree = plot_view_times(nwsize2vfins, "tree", oprefix)
     branch = plot_view_times(nwsize2vfins, "branch", oprefix)
 
