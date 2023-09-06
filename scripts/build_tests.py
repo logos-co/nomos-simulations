@@ -73,14 +73,12 @@ def main(ctx: typer.Context,
                     failure_threshold,
                     CARNOT_ADVERSARY_THRESHOLD_PER_COMMITTEE,
                     CARNOT_NETWORK_ADVERSARY_THRESHOLD)
-    tree_depth= int(math.log(num_comm, 2)) if num_comm > 1 else 1
+    tree_depth= math.ceil(math.log(num_comm, 2)) if num_comm > 1 else 1
     num_nodes_branch= tree_depth * comm_size
-    '''
     print(
         f"num_nodes={num_nodes}, "
         f"total_tree_nodes={num_comm}, comm_size={comm_size}, remainder={remainder}, computed={prob:f}(req={failure_threshold:f}), depth={tree_depth}"
         )
-    '''
     tree_spec = f"tree,{num_nodes},{comm_size},"
     branch_spec = f"branch,{num_nodes_branch},{tree_depth},"
 

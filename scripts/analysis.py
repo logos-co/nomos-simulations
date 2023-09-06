@@ -219,10 +219,9 @@ def views(ctx: typer.Context,
                 help="Set the output prefix for the plots")
         ):
 
-    print("here 1 ")
     log.basicConfig(level=log.INFO)
-    #nwsize2vfins = compute_view_times(path, oprefix)
-    #write_dict(nwsize2vfins, f'{oprefix}-viewtimes.dict')
+    nwsize2vfins = compute_view_times(path, oprefix)
+    write_dict(nwsize2vfins, f'{oprefix}-viewtimes.dict')
 
     print("reading ")
     nwsize2vfins = read_dict(f'{oprefix}-viewtimes.dict')

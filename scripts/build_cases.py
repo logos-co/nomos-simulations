@@ -8,19 +8,19 @@ from build_config import build_config
 def build_case(overlay, committees, nodes, config_name, max_view=1, network='default'):
     build_config(overlay, committees, nodes, config_name, max_view, network)
     # rename the runs with same configs 
+    modified_name = config_name
     if os.path.exists(f"../configs/{config_name}.json"):
         tail = random.randint(1, 10000)
         modified_name = f"{config_name}_{tail}"
-        os.rename(f"{config_name}.json", f"{modified_name}.json")
-        with open(f"{modified_name}.json", "r+") as f:
-            data = json.load(f)
-            data["stream_settings"]["path"] = f"{modified_name}.json"
-            f.seek(0)
-            json.dump(data, f)
-            f.truncate()
-        print(f"config clash: renaming {config_name} to {modified_name}")
-        config_name = modified_name
-    shutil.move(f"{config_name}.json", "../configs/")
+        print(f"name clash: renaming {config_name}.json to {modified_name}.json")
+    with open(f"{config_name}.json", "r+") as f:
+        data = json.load(f)
+        data["stream_settings"]["path"] = f"output/{modified_name}.csv"
+        f.seek(0)
+        json.dump(data, f, indent=4)
+        f.truncate()
+    os.rename(f"{config_name}.json", f"{modified_name}.json")
+    shutil.move(f"{modified_name}.json", "../configs/")
 
 def build_cases(csv_path):
     with open(csv_path, 'r') as csv_file:
