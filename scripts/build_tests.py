@@ -65,7 +65,9 @@ def main(ctx: typer.Context,
          num_nodes: int = typer.Option(1024,
              help="Set the number of nodes",),
         failure_threshold: float = typer.Option(0.5,
-             help="Set the failure probability")
+             help="Set the failure probability"),
+        debug: bool = typer.Option(False,
+             help="To debug or debug")
         ):
 
     num_comm, comm_size, remainder, prob = compute_optimal_number_of_committees_and_committee_size(
@@ -76,14 +78,13 @@ def main(ctx: typer.Context,
     tree_depth = 1 + int(math.log(num_comm, 2)) if num_comm > 1 else 1
     num_nodes_branch= tree_depth * comm_size
 
-    '''print(
-        f"num_nodes={num_nodes}, "
-        f"total_tree_nodes={num_comm}, comm_size={comm_size}, remainder={remainder}, computed={prob:f}(req={failure_threshold:f}), depth={tree_depth}"
-        )
-    '''
+    debug_str =  (  f" #num_nodes={num_nodes},"
+                    f" total_tree_nodes={num_comm}, comm_size={comm_size}, remainder={remainder},"
+                    f" computed={prob:f}(req={failure_threshold:f}), depth={tree_depth}"
+                ) if debug else ""
 
-    tree_spec = f"tree,{num_nodes},{comm_size},"
-    branch_spec = f"branch,{num_nodes_branch},{tree_depth},"
+    tree_spec = f"tree,{num_nodes},{comm_size},{debug_str}"
+    branch_spec = f"branch,{num_nodes_branch},{tree_depth},{debug_str}"
     print(tree_spec)
     print(branch_spec)
 
