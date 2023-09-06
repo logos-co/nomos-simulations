@@ -16,7 +16,7 @@ do
   echo "overlay,nodes,committees_or_depth,description" >  $dir$prefix"_"$p".csv"
   for i in $network_sizes
   do
-  python3 build_tests.py --num-nodes $i --failure-threshold $p >> $dir$prefix"_"$p".csv"
+  python3 build_tests.py --num-nodes $i --failure-threshold $p --debug >> $dir$prefix"_"$p".csv"
   echo "num-nodes = $i, failure-threshold = $p"
   done
 done

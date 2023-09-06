@@ -78,9 +78,9 @@ def main(ctx: typer.Context,
     tree_depth = 1 + int(math.log(num_comm, 2)) if num_comm > 1 else 1
     num_nodes_branch= tree_depth * comm_size
 
-    debug_str =  (  f" #num_nodes={num_nodes},"
+    debug_str =  (  f"\"num_nodes={num_nodes},"
                     f" total_tree_nodes={num_comm}, comm_size={comm_size}, remainder={remainder},"
-                    f" computed={prob:f}(req={failure_threshold:f}), depth={tree_depth}"
+                    f" computed={prob:f}(req={failure_threshold:f}), depth={tree_depth}\""
                 ) if debug else ""
 
     tree_spec = f"tree,{num_nodes},{comm_size},{debug_str}"
