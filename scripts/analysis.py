@@ -2,6 +2,7 @@ import os
 import sys
 import math
 import typer
+import glob
 import json
 import pandas as pd
 import numpy as np
@@ -41,16 +42,18 @@ def write_csv(df, fname):
 def compute_view_finalisation_times(df, conf, oprefix, simtype, tag="tag", plot=False):
     if simtype == "tree":
         num_nodes = conf["node_count"]
+        log.info(f'num nodes: tree: {num_nodes} - - {conf["stream_settings"]["path"]}')
     else:
-        num_tree_nodes = 2 ** (conf["overlay_settings"]["branch_depth"]) - 1
-        num_committees = int (conf["node_count"]/conf["overlay_settings"]["branch_depth"])
-        num_nodes = num_tree_nodes * num_committees
-        log.debug(f"num nodes: {num_nodes, num_tree_nodes, num_committees}")
+        committee_size = int (conf["node_count"]/conf["overlay_settings"]["branch_depth"])
+        num_tree_nodes = 2 ** (conf["overlay_settings"]["branch_depth"] - 1) - 1
+        num_nodes = num_tree_nodes * committee_size
+        log.info(f'num nodes: branch: {num_nodes} = {num_tree_nodes}*{committee_size} - {conf["overlay_settings"]["branch_depth"], conf["stream_settings"]["path"]}')
 
     two3rd = math.floor(conf["node_count"] * 2/3) + 1
+    #two3rd = math.floor(conf["node_count"] * 3/3)
 
     views, view2fin_time = df.current_view.unique()[:-2], {}
-    log.info(f'views: {conf["stream_settings"]["path"]} {views},  {df.current_view.unique()}')
+    log.debug(f'views: {conf["stream_settings"]["path"]} {views},  {df.current_view.unique()}')
 
     for start_view in views:
         end_view = start_view + 2
@@ -78,12 +81,14 @@ def compute_view_finalisation_times(df, conf, oprefix, simtype, tag="tag", plot=
     plt.show()
     plt.savefig(f'{oprefix}-view-finalisation-times.pdf', format="pdf", bbox_inches="tight")
 
-def compute_view_times(path, oprefix):
+def compute_view_times(path, oprefix, otype):
     nwsize2vfins = {}
-    conf_fnames = next(walk(f'{path}/configs'), (None, None, []))[2]
+    #conf_fnames = next(walk(f'{path}/configs'), (None, None, []))[2]
+    conf_fnames = glob.glob(f'{path}/configs/*_{otype}.json')
     for conf in conf_fnames:
         tag = os.path.splitext(os.path.basename(conf))[0]
-        cfile, dfile =  f'{path}/configs/{conf}', f'{path}/output/{tag}.csv'
+        #cfile, dfile =  f'{path}/configs/{conf}', f'{path}/output/{tag}.csv'
+        cfile, dfile =  f'{conf}', f'{path}/output/{tag}.csv'
         conf, df = read_json(cfile), read_csv(dfile)
         simtype = conf["stream_settings"]["path"].split("/")[1].split("_")[0]
         view2fin = compute_view_finalisation_times(df, conf, oprefix, simtype, tag, plot=False)
@@ -91,22 +96,25 @@ def compute_view_times(path, oprefix):
             continue
         if simtype == "tree":
             num_nodes = conf["node_count"]
+            max_depth  = math.ceil(math.log(conf["overlay_settings"]["number_of_committees"], 2))
         else:
             num_tree_nodes = 2 ** (conf["overlay_settings"]["branch_depth"]) - 1
             num_committees = int (conf["node_count"]/conf["overlay_settings"]["branch_depth"])
             num_nodes = num_tree_nodes * num_committees
-        #num_nodes = conf["node_count"]
-        if simtype == "branch":
             max_depth = conf["overlay_settings"]["branch_depth"]
-        else:
-            max_depth =  math.log(num_nodes + 1, 2) - 1
+
+        print(f'depth = {max_depth}')
+        #if simtype == "branch":
+        #    max_depth = conf["overlay_settings"]["branch_depth"]
+        #else:
+        #    max_depth =  math.log(num_nodes + 1, 2) - 1
         if num_nodes in nwsize2vfins:
             nwsize2vfins[num_nodes].append((simtype, max_depth, view2fin, tag))
         else:
             nwsize2vfins[num_nodes] = [(simtype, max_depth, view2fin, tag)]
     return nwsize2vfins
 
-def plot_view_times(nwsize2vfins, simtype, oprefix):
+def plot_view_times(nwsize2vfins, simtype, oprefix, otype):
     logbands = {}
     logbands[simtype] = {}
     logbands[simtype]["low"] = []
@@ -116,19 +124,21 @@ def plot_view_times(nwsize2vfins, simtype, oprefix):
         low, high = 0.75, 1.5
     else:
         low, high = 0.75, 1.5
-    data = [[], []]
+    data = [[], [], []]
     for n in sorted(list(map(int, nwsize2vfins.keys()))):
         vfin = nwsize2vfins[n]
-        print(f"{simtype} {nwsize2vfins[n]}",  end=' == ')
+        #print(f"{simtype} {n} {nwsize2vfins[n]}",  end=' == ')
         for  run in vfin:
-            if "nolat" in run[3] and simtype in run[0]:
+            #print(run)
+            if otype in run[3] and simtype in run[0]:
                 data[0].append(n)
                 data[1].append(int(run[2][0]))
-                print(f"IF: {simtype}={run[0]} :  {n} {run[3]}")
+                data[2].append(int(run[1]))
+                log.debug(f"IF: {simtype}={run[0]} :  {n} {run[3]}")
                 logbands[simtype]["low"].append(math.log(n, 2)*low)
                 logbands[simtype]["high"].append(math.log(n, 2)*high)
             else:
-                print(f"ELSE: {simtype}!={run[0]} :  {n} {run[3]}")
+                log.debug(f"ELSE: {simtype}!={run[0]} :  {n} {run[3]}")
 
 
     print(data)
@@ -140,10 +150,11 @@ def plot_view_times(nwsize2vfins, simtype, oprefix):
     axes.set_ylabel("Number of Epochs")
     axes.set_xlabel("Number of Nodes")
 
-    l1 = axes.plot(data[0], data[1], linestyle='-', marker='o', label='Carnot')
-    l2 = axes.plot(data[0], logbands[simtype]["low"], linestyle='--', marker='x', label=f'{low} * log(#nodes)')
-    l3 = axes.plot(data[0], logbands[simtype]["high"], linestyle='--', marker='x', label=f'{high} * log(#nodes)')
-    l = l1 + l2 + l3
+    l1 = axes.plot(data[0], data[2], linestyle='-.', marker='o', label='Depth')
+    l2 = axes.plot(data[0], data[1], linestyle='-', marker='o', label='Carnot')
+    #l3 = axes.plot(data[0], logbands[simtype]["low"], linestyle='--', marker='x', label=f'{low} * log(#nodes)')
+    #l4 = axes.plot(data[0], logbands[simtype]["high"], linestyle='--', marker='x', label=f'{high} * log(#nodes)')
+    l = l1 + l2 #+ l3 + l4
 
     labels = [curve.get_label() for curve in l]
     axes.legend(l, labels, loc="lower right")
@@ -166,10 +177,8 @@ def plot_tree_vs_branch(tree, branch, oprefix):
     axes.set_xlabel("Tree")
     axes.set_ylabel("Branch")
 
-
-    #print("\nT, B:", tree[1], branch[1])
-    branch[1].insert(0, 6)
-    print("\nT, B:", tree[1], branch[1])
+    branch[1] = [6] + branch[1]
+    print("\nT, B:", f'({tree[1], len(tree[1])})', f'({branch[1], len(branch[1])})')
     axes.scatter(tree[1], branch[1])
 
     axes.plot([0, 1], [0, 1],  linestyle='dashed', transform=axes.transAxes)
@@ -216,17 +225,19 @@ def views(ctx: typer.Context,
                 exists=True, dir_okay=True, readable=True,
                 help="Set the simulation config file"),
         oprefix: str = typer.Option("output",
-                help="Set the output prefix for the plots")
+                help="Set the output prefix for the plots"),
+        otype: str = typer.Option("nolat",
+                help="Select the  for the plots")
         ):
 
     log.basicConfig(level=log.INFO)
-    nwsize2vfins = compute_view_times(path, oprefix)
-    write_dict(nwsize2vfins, f'{oprefix}-viewtimes.dict')
+    nwsize2vfins = compute_view_times(path, oprefix, otype)
+    #write_dict(nwsize2vfins, f'{oprefix}-viewtimes.dict')
 
-    print("reading ")
+    print("processed and wrote the dict. now reading...")
     nwsize2vfins = read_dict(f'{oprefix}-viewtimes.dict')
-    tree = plot_view_times(nwsize2vfins, "tree", oprefix)
-    branch = plot_view_times(nwsize2vfins, "branch", oprefix)
+    tree = plot_view_times(nwsize2vfins, "tree", oprefix, otype)
+    branch = plot_view_times(nwsize2vfins, "branch", oprefix, otype)
 
     plot_tree_vs_branch(tree, branch, oprefix)
 
