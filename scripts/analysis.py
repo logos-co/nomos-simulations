@@ -177,7 +177,7 @@ def plot_tree_vs_branch(tree, branch, oprefix):
     axes.set_xlabel("Tree")
     axes.set_ylabel("Branch")
 
-    branch[1] = [6] + branch[1]
+    #branch[1] = [6] + branch[1]
     print("\nT, B:", f'({tree[1], len(tree[1])})', f'({branch[1], len(branch[1])})')
     axes.scatter(tree[1], branch[1])
 
@@ -232,7 +232,7 @@ def views(ctx: typer.Context,
 
     log.basicConfig(level=log.INFO)
     nwsize2vfins = compute_view_times(path, oprefix, otype)
-    #write_dict(nwsize2vfins, f'{oprefix}-viewtimes.dict')
+    write_dict(nwsize2vfins, f'{oprefix}-viewtimes.dict')
 
     print("processed and wrote the dict. now reading...")
     nwsize2vfins = read_dict(f'{oprefix}-viewtimes.dict')
