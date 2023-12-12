@@ -12,33 +12,40 @@ import matplotlib.pyplot as plt
 from os import walk
 from collections import defaultdict
 
+# read a json and return the dict
 def read_json(fname):
     with open(fname) as f:
         cdata = json.load(f)
     return cdata
 
+# write the json from a dict
 def write_json(dic, fname):
     dic_str = {str(k): str(v) for k,v in dic.items()}
     jdump = json.dumps(dic_str, indent=4, sort_keys=True)
     with open(fname, 'w') as f:
         f.write(jdump)
 
+# read a serialised python dict
 def read_dict(fname):
     with open(fname, 'r') as f:
         return eval(f.read())
 
+# write a serialised python fict
 def write_dict(dic, fname):
     with open(fname, 'w') as f:
         return f.write(str(dic))
 
+# read the output csv and return a panadas dataframe
 def read_csv(fname):
     df = pd.read_csv(fname, header=0,  comment='#', skipinitialspace = True )
     return df
 
-
+# write pandas dataframe as csv
 def write_csv(df, fname):
     df.to_csv(fname)
 
+
+# compute the steps it took to compute the views, and tag the tree depth
 def compute_view_finalisation_times(df, conf, oprefix, simtype, tag="tag", plot=False):
     if simtype == "tree":
         num_nodes = conf["node_count"]
@@ -52,7 +59,7 @@ def compute_view_finalisation_times(df, conf, oprefix, simtype, tag="tag", plot=
     two3rd = math.floor(conf["node_count"] * 2/3) + 1
     #two3rd = math.floor(conf["node_count"] * 3/3)
 
-    # for k+i^th view, last two views will need to be omiiited
+    # for view_offset^th view, last view_offset  number of views will need to be omitted
     view_offset = 1
     #views, view2fin_time = df.current_view.unique()[:-2], {}
     views, view2fin_time = df.current_view.unique()[:-view_offset], {}
@@ -86,6 +93,8 @@ def compute_view_finalisation_times(df, conf, oprefix, simtype, tag="tag", plot=
     plt.show()
     plt.savefig(f'{oprefix}-view-finalisation-times.pdf', format="pdf", bbox_inches="tight")
 
+
+# iterate over the different networks/overlay type and collect view finalisation times
 def compute_view_times(path, oprefix, otype):
     nwsize2vfins = {}
     #conf_fnames = next(walk(f'{path}/configs'), (None, None, []))[2]
@@ -122,6 +131,8 @@ def compute_view_times(path, oprefix, otype):
             nwsize2vfins[num_nodes] = [(simtype, max_depth, view2fin, tag)]
     return nwsize2vfins
 
+
+# plot the view times, add log plots for comparison
 def plot_view_times(nwsize2vfins, simtype, oprefix, otype):
     logbands = {}
     logbands[simtype] = {}
@@ -174,6 +185,8 @@ def plot_view_times(nwsize2vfins, simtype, oprefix, otype):
     plt.close()
     return data
 
+
+# plot tree vs branch against the number of nodes; works only when #tree sims = # branch sims
 def plot_tree_vs_branch(tree, branch, oprefix):
 
     print(tree, branch)
@@ -210,6 +223,7 @@ def plot_tree_vs_branch(tree, branch, oprefix):
 
 app = typer.Typer()
 
+
 @app.command()
 def view(ctx: typer.Context,
         data_file: Path = typer.Option("config.json",
@@ -226,6 +240,7 @@ def view(ctx: typer.Context,
     tag = os.path.splitext(os.path.basename(data_file))[0]
     conf, df = read_json(config_file), read_csv(data_file)
     compute_view_finalisation_times(df, conf, oprefix, simtype, tag, plot=True)
+
 
 @app.command()
 def views(ctx: typer.Context,
@@ -248,6 +263,7 @@ def views(ctx: typer.Context,
     branch = plot_view_times(nwsize2vfins, "branch", oprefix, otype)
 
     plot_tree_vs_branch(tree, branch, oprefix)
+
 
 @app.command()
 def test():
