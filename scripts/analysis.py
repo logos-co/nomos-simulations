@@ -52,16 +52,21 @@ def compute_view_finalisation_times(df, conf, oprefix, simtype, tag="tag", plot=
     two3rd = math.floor(conf["node_count"] * 2/3) + 1
     #two3rd = math.floor(conf["node_count"] * 3/3)
 
-    views, view2fin_time = df.current_view.unique()[:-2], {}
+    # for k+i^th view, last two views will need to be omiiited
+    view_offset = 1
+    #views, view2fin_time = df.current_view.unique()[:-2], {}
+    views, view2fin_time = df.current_view.unique()[:-view_offset], {}
     log.debug(f'views: {conf["stream_settings"]["path"]} {views},  {df.current_view.unique()}')
 
+    print(df.current_view.unique(), df.step_id.unique(), df.columns)
     for start_view in views:
-        end_view = start_view + 2
+        end_view = start_view + view_offset
         start_idx = df.index[(df['current_view'] == start_view)][0]
         end_idx = df.index[(df['current_view'] == end_view)][two3rd-1]
         start_step = df.iloc[start_idx].step_id
         end_step = df.iloc[end_idx].step_id
         view2fin_time[start_view] =  end_step - start_step
+        #print(f'TEST {conf["stream_settings"]["path"]}, {view2fin_time[start_view]}, {(start_view, start_idx, start_step)}, {(end_idx, end_view, end_step)}')
         log.debug(f'{start_view}({start_idx}), {end_view}({end_idx}) : {end_step} - {start_step} = {view2fin_time[start_view]}')
 
     if not plot:
@@ -85,13 +90,16 @@ def compute_view_times(path, oprefix, otype):
     nwsize2vfins = {}
     #conf_fnames = next(walk(f'{path}/configs'), (None, None, []))[2]
     conf_fnames = glob.glob(f'{path}/configs/*_{otype}.json')
+    print(conf_fnames, otype)
     for conf in conf_fnames:
         tag = os.path.splitext(os.path.basename(conf))[0]
         #cfile, dfile =  f'{path}/configs/{conf}', f'{path}/output/{tag}.csv'
         cfile, dfile =  f'{conf}', f'{path}/output/{tag}.csv'
         conf, df = read_json(cfile), read_csv(dfile)
-        simtype = conf["stream_settings"]["path"].split("/")[1].split("_")[0]
+       # simtype = conf["stream_settings"]["path"].split("/")[1].split("_")[0]
+        simtype = conf["stream_settings"]["path"].split("_")[0].strip()
         view2fin = compute_view_finalisation_times(df, conf, oprefix, simtype, tag, plot=False)
+        print(f'SIM:{simtype}', view2fin)
         if not view2fin:  # < 2 views
             continue
         if simtype == "tree":
@@ -242,7 +250,7 @@ def views(ctx: typer.Context,
     plot_tree_vs_branch(tree, branch, oprefix)
 
 @app.command()
-def other_commands():
+def test():
     pass
 
 
