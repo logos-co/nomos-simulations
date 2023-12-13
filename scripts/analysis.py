@@ -60,7 +60,7 @@ def compute_view_finalisation_times(df, conf, oprefix, simtype, tag="tag", plot=
     #two3rd = math.floor(conf["node_count"] * 3/3)
 
     # for view_offset^th view, last view_offset  number of views will need to be omitted
-    view_offset = 1
+    view_offset = 2
     #views, view2fin_time = df.current_view.unique()[:-2], {}
     views, view2fin_time = df.current_view.unique()[:-view_offset], {}
     log.debug(f'views: {conf["stream_settings"]["path"]} {views},  {df.current_view.unique()}')
@@ -104,9 +104,10 @@ def compute_view_times(path, oprefix, otype):
         tag = os.path.splitext(os.path.basename(conf))[0]
         #cfile, dfile =  f'{path}/configs/{conf}', f'{path}/output/{tag}.csv'
         cfile, dfile =  f'{conf}', f'{path}/output/{tag}.csv'
+        max_depth, num_nodes = 0, 1
         conf, df = read_json(cfile), read_csv(dfile)
-       # simtype = conf["stream_settings"]["path"].split("/")[1].split("_")[0]
-        simtype = conf["stream_settings"]["path"].split("_")[0].strip()
+        simtype = conf["stream_settings"]["path"].split("/")[1].split("_")[0]
+       # simtype = conf["stream_settings"]["path"].split("_")[0].strip()
         view2fin = compute_view_finalisation_times(df, conf, oprefix, simtype, tag, plot=False)
         print(f'SIM:{simtype}', view2fin)
         if not view2fin:  # < 2 views
