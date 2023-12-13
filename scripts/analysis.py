@@ -113,7 +113,8 @@ def compute_view_times(path, oprefix, otype):
             continue
         if simtype == "tree":
             num_nodes = conf["node_count"]
-            max_depth  = math.ceil(math.log(conf["overlay_settings"]["number_of_committees"], 2))
+            #ceil((lg(N+1) - 1)) 
+            max_depth  = math.ceil(math.log(conf["overlay_settings"]["number_of_committees"]+1, 2)-1)
         else:
             num_tree_nodes = 2 ** (conf["overlay_settings"]["branch_depth"]) - 1
             num_committees = int (conf["node_count"]/conf["overlay_settings"]["branch_depth"])
