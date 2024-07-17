@@ -11,7 +11,7 @@
 - `cmd`: CLIs to run the simulation and analyze the results.
 - `sim`: Simulation that runs the NomMix defined in the `protocol` package.
 - `protocol`: Core NomMix protocol implementation, which is going to be moved to the [nomos-repos](https://github.com/logos-co/nomos-specs) repository once verified by simulations.
-- `framework`: Asynchronous framework that provides essential async functions for simulations and tests, implemented with various async libraries (asyncio, usim, etc.)
+- `framework`: Asynchronous framework that provides essential async functions for simulations and tests, implemented with various async libraries ([asyncio](https://docs.python.org/3/library/asyncio.html), [μSim](https://usim.readthedocs.io/en/latest/), etc.)
 
 ## Features
 
