@@ -33,14 +33,14 @@ class Config:
     def node_configs(self) -> list[NodeConfig]:
         return [
             NodeConfig(
-                self._gen_private_key(i),
+                self.__gen_private_key(i),
                 self.mix.mix_path.random_length(),
                 self.network.nomssip,
             )
             for i in range(self.network.num_nodes)
         ]
 
-    def _gen_private_key(self, node_idx: int) -> X25519PrivateKey:
+    def __gen_private_key(self, node_idx: int) -> X25519PrivateKey:
         return X25519PrivateKey.from_private_bytes(
             hashlib.sha256(node_idx.to_bytes(4, "big")).digest()[:32]
         )
