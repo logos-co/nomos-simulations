@@ -4,6 +4,7 @@ import random
 from dataclasses import dataclass, field
 from typing import List
 
+from pysphinx.node import X25519PublicKey
 from pysphinx.sphinx import Node as SphinxNode
 from pysphinx.sphinx import X25519PrivateKey
 

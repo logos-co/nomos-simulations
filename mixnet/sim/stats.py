@@ -1,7 +1,9 @@
 from collections import Counter, defaultdict
 
 import matplotlib.pyplot as plt
+import numpy
 import pandas
+from matplotlib.axes import Axes
 
 from protocol.node import Node
 from sim.connection import MeteredRemoteSimplexConnection
@@ -71,6 +73,7 @@ class ConnectionStats:
         Analyzes the inbound/outbound bandwidths consumed by each node (sum of all its connections).
         """
         _, axs = plt.subplots(nrows=2, ncols=1, figsize=(12, 6))
+        assert isinstance(axs, numpy.ndarray)
 
         for i, (_, (inbound_conns, outbound_conns)) in enumerate(
             self.conns_per_node.items()
