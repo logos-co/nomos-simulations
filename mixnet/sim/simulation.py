@@ -110,6 +110,6 @@ class Simulation:
         """
         lottery_config = self.config.logic.sender_lottery
         while True:
-            await (usim.time + lottery_config.interval_sec)
+            await self.framework.sleep(lottery_config.interval_sec)
             if lottery_config.seed.random() < lottery_config.probability:
                 await node.send_message(b"selected block")
