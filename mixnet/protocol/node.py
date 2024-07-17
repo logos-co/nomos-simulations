@@ -12,7 +12,7 @@ from framework import Framework, Queue
 from protocol.config import GlobalConfig, NodeConfig
 from protocol.connection import SimplexConnection
 from protocol.error import PeeringDegreeReached
-from protocol.nomssip import Nomssip
+from protocol.nomssip import Nomssip, NomssipConfig
 from protocol.sphinx import SphinxPacketBuilder
 
 BroadcastChannel = Queue[bytes]
@@ -34,9 +34,9 @@ class Node:
         self.global_config = global_config
         self.nomssip = Nomssip(
             framework,
-            Nomssip.Config(
+            NomssipConfig(
+                config.gossip.peering_degree,
                 global_config.transmission_rate_per_sec,
-                config.nomssip.peering_degree,
                 self.__calculate_message_size(global_config),
             ),
             self.__process_msg,

@@ -8,6 +8,8 @@ from pysphinx.node import X25519PublicKey
 from pysphinx.sphinx import Node as SphinxNode
 from pysphinx.sphinx import X25519PrivateKey
 
+from protocol.gossip import GossipConfig
+
 
 @dataclass
 class GlobalConfig:
@@ -29,13 +31,7 @@ class NodeConfig:
 
     private_key: X25519PrivateKey
     mix_path_length: int
-    nomssip: NomssipConfig
-
-
-@dataclass
-class NomssipConfig:
-    # Expected number of peers each node must connect to if there are enough peers available in the network.
-    peering_degree: int
+    gossip: GossipConfig
 
 
 @dataclass

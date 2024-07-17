@@ -1,3 +1,7 @@
+import json
+from dataclasses import asdict, dataclass
+from typing import Self
+
 import usim
 from matplotlib import pyplot
 

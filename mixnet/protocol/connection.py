@@ -41,7 +41,7 @@ class DuplexConnection:
     This is to mimic duplex communication in a real network (such as TCP or QUIC).
     """
 
-    def __init__(self, inbound: SimplexConnection, outbound: MixSimplexConnection):
+    def __init__(self, inbound: SimplexConnection, outbound: SimplexConnection):
         self.inbound = inbound
         self.outbound = outbound
 
@@ -52,7 +52,7 @@ class DuplexConnection:
         await self.outbound.send(packet)
 
 
-class MixSimplexConnection:
+class MixSimplexConnection(SimplexConnection):
     """
     Wraps a SimplexConnection to add a transmission rate and noise to the connection.
     """
@@ -82,5 +82,8 @@ class MixSimplexConnection:
                 msg = await self.queue.get()
             await self.conn.send(msg)
 
-    async def send(self, msg: bytes):
-        await self.queue.put(msg)
+    async def send(self, data: bytes) -> None:
+        await self.queue.put(data)
+
+    async def recv(self) -> bytes:
+        return await self.conn.recv()

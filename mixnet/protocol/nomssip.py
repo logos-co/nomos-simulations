@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from enum import Enum
-from typing import Awaitable, Callable, Self
+from typing import Awaitable, Callable, Self, override
 
 from framework import Framework
 from protocol.connection import (
@@ -12,48 +12,36 @@ from protocol.connection import (
     SimplexConnection,
 )
 from protocol.error import PeeringDegreeReached
+from protocol.gossip import Gossip, GossipConfig
 
 
-class Nomssip:
+@dataclass
+class NomssipConfig(GossipConfig):
+    transmission_rate_per_sec: int
+    msg_size: int
+
+
+class Nomssip(Gossip):
     """
-    A NomMix gossip channel that broadcasts messages to all connected peers.
-    Peers are connected via DuplexConnection.
+    A NomMix gossip channel that extends the Gossip channel
+    by adding global transmission rate and noise generation.
     """
-
-    @dataclass
-    class Config:
-        transmission_rate_per_sec: int
-        peering_degree: int
-        msg_size: int
 
     def __init__(
         self,
         framework: Framework,
-        config: Config,
+        config: NomssipConfig,
         handler: Callable[[bytes], Awaitable[None]],
     ):
-        self.framework = framework
+        super().__init__(framework, config, handler)
         self.config = config
-        self.conns: list[DuplexConnection] = []
-        # A handler to process inbound messages.
-        self.handler = handler
-        self.packet_cache: set[bytes] = set()
-        # A set just for gathering a reference of tasks to prevent them from being garbage collected.
-        # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
-        self.tasks: set[Awaitable] = set()
 
-    def can_accept_conn(self) -> bool:
-        return len(self.conns) < self.config.peering_degree
-
+    @override
     def add_conn(self, inbound: SimplexConnection, outbound: SimplexConnection):
-        if not self.can_accept_conn():
-            # For simplicity of the spec, reject the connection if the peering degree is reached.
-            raise PeeringDegreeReached()
-
         noise_packet = FlaggedPacket(
             FlaggedPacket.Flag.NOISE, bytes(self.config.msg_size)
         ).bytes()
-        conn = DuplexConnection(
+        return super().add_conn(
             inbound,
             MixSimplexConnection(
                 self.framework,
@@ -63,25 +51,18 @@ class Nomssip:
             ),
         )
 
-        self.conns.append(conn)
-        task = self.framework.spawn(self.__process_inbound_conn(conn))
-        self.tasks.add(task)
+    @override
+    async def process_inbound_msg(self, msg: bytes):
+        packet = FlaggedPacket.from_bytes(msg)
+        match packet.flag:
+            case FlaggedPacket.Flag.NOISE:
+                # Drop noise packet
+                return
+            case FlaggedPacket.Flag.REAL:
+                await self.__gossip_flagged_packet(packet)
+                await self.handler(packet.message)
 
-    async def __process_inbound_conn(self, conn: DuplexConnection):
-        while True:
-            packet = await conn.recv()
-            if self.__check_update_cache(packet):
-                continue
-
-            packet = FlaggedPacket.from_bytes(packet)
-            match packet.flag:
-                case FlaggedPacket.Flag.NOISE:
-                    # Drop noise packet
-                    continue
-                case FlaggedPacket.Flag.REAL:
-                    await self.__gossip_flagged_packet(packet)
-                    await self.handler(packet.message)
-
+    @override
     async def gossip(self, msg: bytes):
         """
         Gossip a message to all connected peers with prepending a message flag
@@ -96,18 +77,7 @@ class Nomssip:
         """
         An internal method to send a flagged packet to all connected peers
         """
-        for conn in self.conns:
-            await conn.send(packet.bytes())
-
-    def __check_update_cache(self, packet: bytes) -> bool:
-        """
-        Add a message to the cache, and return True if the message was already in the cache.
-        """
-        hash = hashlib.sha256(packet).digest()
-        if hash in self.packet_cache:
-            return True
-        self.packet_cache.add(hash)
-        return False
+        await super().gossip(packet.bytes())
 
 
 class FlaggedPacket:

@@ -8,7 +8,8 @@ import dacite
 import yaml
 from pysphinx.sphinx import X25519PrivateKey
 
-from protocol.config import NodeConfig, NomssipConfig
+from protocol.config import NodeConfig
+from protocol.gossip import GossipConfig
 
 
 @dataclass
@@ -35,7 +36,7 @@ class Config:
             NodeConfig(
                 self.__gen_private_key(i),
                 self.mix.mix_path.random_length(),
-                self.network.nomssip,
+                self.network.gossip,
             )
             for i in range(self.network.num_nodes)
         ]
@@ -63,7 +64,7 @@ class NetworkConfig:
     # Total number of nodes in the entire network.
     num_nodes: int
     latency: LatencyConfig
-    nomssip: NomssipConfig
+    gossip: GossipConfig
 
     def __post_init__(self):
         assert self.num_nodes > 0
