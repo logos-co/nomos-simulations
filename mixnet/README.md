@@ -15,19 +15,21 @@
 
 ## Features
 
-- Simulate the NomMix protocol with the given parameters.
-- Measure the performance of the NomMix protocol.
+- NomMix protocol simulation
+- Performance measurements
   - Bandwidth usages
-- Analyze the privacy properties that the NomMix protocol provides.
+- Privacy property analysis
   - Message sizes
   - Node states and hamming distances
 
 ## Future Plans
 
-- Simulate more features of the NomMix protocol.
+- Performance measurements
+  - Message dissemination time
+- More NomMix features
   - Temporal mixing
   - Level-1 noise
-- Simulate possible adversarial attacks and measure the robustness of the NomMix protocol.
+- Adversary simulation to measure the robustness of NomMix
 
 ## Installation
 
