@@ -11,7 +11,10 @@ from protocol.test_utils import (
     init_mixnet_config,
 )
 from sim.config import LatencyConfig, NetworkConfig
-from sim.connection import MeteredRemoteSimplexConnection
+from sim.connection import (
+    MeteredRemoteSimplexConnection,
+    ObservedMeteredRemoteSimplexConnection,
+)
 from sim.state import NodeState, NodeStateTable
 
 
@@ -30,8 +33,6 @@ class TestMeteredRemoteSimplexConnection(IsolatedAsyncioTestCase):
                 ),
                 framework,
                 framework.now(),
-                node_state_table[0],
-                node_state_table[1],
             )
 
             # Send two messages without delay
@@ -46,6 +47,8 @@ class TestMeteredRemoteSimplexConnection(IsolatedAsyncioTestCase):
             self.assertEqual(b"world", await conn.recv())
             self.assertEqual(conn.latency, framework.now() - sent_time)
 
+
+class TestObservedMeteredRemoteSimplexConnection(IsolatedAsyncioTestCase):
     async def test_node_state(self):
         usim.run(self.__test_node_state())
 
@@ -54,7 +57,7 @@ class TestMeteredRemoteSimplexConnection(IsolatedAsyncioTestCase):
             framework = usimfw.Framework(scope)
             node_state_table = NodeStateTable(num_nodes=2, duration_sec=3)
             meter_start_time = framework.now()
-            conn = MeteredRemoteSimplexConnection(
+            conn = ObservedMeteredRemoteSimplexConnection(
                 LatencyConfig(
                     max_latency_sec=1,
                     seed=random.Random(),

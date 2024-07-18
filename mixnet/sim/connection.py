@@ -3,6 +3,7 @@ from collections import Counter
 from typing import Awaitable
 
 import pandas
+from typing_extensions import override
 
 from framework import Framework, Queue
 from protocol.connection import SimplexConnection
@@ -20,8 +21,6 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
         config: LatencyConfig,
         framework: Framework,
         meter_start_time: float,
-        send_node_states: list[NodeState],
-        recv_node_states: list[NodeState],
     ):
         self.framework = framework
         # A connection has a random constant latency
@@ -37,17 +36,10 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
         self.meter_start_time = meter_start_time
         self.send_meters: list[int] = []
         self.recv_meters: list[int] = []
-        # To measure node states over time
-        self.send_node_states = send_node_states
-        self.recv_node_states = recv_node_states
-        # To measure the size of messages sent via this connection
-        self.msg_sizes: Counter[int] = Counter()
 
     async def send(self, data: bytes) -> None:
         await self.send_queue.put((self.framework.now(), data))
-        self.__update_meter(self.send_meters, len(data))
-        self.__update_node_state(self.send_node_states, NodeState.SENDING)
-        self.msg_sizes.update([len(data)])
+        self.on_sending(data)
 
     async def recv(self) -> bytes:
         return await self.recv_queue.get()
@@ -65,11 +57,22 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
                 await self.framework.sleep(delay)
 
             # Relay msg to the recv_queue.
-            # Update meter & node_state before msg is read from recv_queue by the receiver
+            # Update related statistics before msg is read from recv_queue by the receiver
             # because the time at which enters the node is important when viewed from the outside.
-            self.__update_meter(self.recv_meters, len(data))
-            self.__update_node_state(self.recv_node_states, NodeState.RECEIVING)
+            self.on_receiving(data)
             await self.recv_queue.put(data)
+
+    def on_sending(self, data: bytes) -> None:
+        """
+        Update statistics when sending a message
+        """
+        self.__update_meter(self.send_meters, len(data))
+
+    def on_receiving(self, data: bytes) -> None:
+        """
+        Update statistics when receiving a message
+        """
+        self.__update_meter(self.recv_meters, len(data))
 
     def __update_meter(self, meters: list[int], size: int):
         """
@@ -81,16 +84,56 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
         meters.extend([0] * (slot - len(meters) + 1))
         meters[-1] += size
 
-    def __update_node_state(self, node_states: list[NodeState], state: NodeState):
-        # The time unit of node states is milliseconds
-        ms = math.floor(self.framework.now() * 1000)
-        node_states[ms] = state
-
     def sending_bandwidths(self) -> pandas.Series:
+        """
+        Returns the accumulated sending bandwidth usage over time
+        """
         return self.__bandwidths(self.send_meters)
 
     def receiving_bandwidths(self) -> pandas.Series:
+        """
+        Returns the accumulated receiving bandwidth usage over time
+        """
         return self.__bandwidths(self.recv_meters)
 
     def __bandwidths(self, meters: list[int]) -> pandas.Series:
         return pandas.Series(meters, name="bandwidth")
+
+
+class ObservedMeteredRemoteSimplexConnection(MeteredRemoteSimplexConnection):
+    """
+    An extension of MeteredRemoteSimplexConnection that is observed by passive observer.
+    The observer monitors the node states of the sender and receiver and message sizes.
+    """
+
+    def __init__(
+        self,
+        config: LatencyConfig,
+        framework: Framework,
+        meter_start_time: float,
+        send_node_states: list[NodeState],
+        recv_node_states: list[NodeState],
+    ):
+        super().__init__(config, framework, meter_start_time)
+
+        # To measure node states over time
+        self.send_node_states = send_node_states
+        self.recv_node_states = recv_node_states
+        # To measure the size of messages sent via this connection
+        self.msg_sizes: Counter[int] = Counter()
+
+    @override
+    def on_sending(self, data: bytes) -> None:
+        super().on_sending(data)
+        self.__update_node_state(self.send_node_states, NodeState.SENDING)
+        self.msg_sizes.update([len(data)])
+
+    @override
+    def on_receiving(self, data: bytes) -> None:
+        super().on_receiving(data)
+        self.__update_node_state(self.recv_node_states, NodeState.RECEIVING)
+
+    def __update_node_state(self, node_states: list[NodeState], state: NodeState):
+        # The time unit of node states is milliseconds
+        ms = math.floor(self.framework.now() * 1000)
+        node_states[ms] = state

@@ -6,7 +6,10 @@ from framework import Framework
 from protocol.config import GlobalConfig, MixMembership, NodeInfo
 from protocol.node import Node, PeeringDegreeReached
 from sim.config import Config
-from sim.connection import MeteredRemoteSimplexConnection
+from sim.connection import (
+    MeteredRemoteSimplexConnection,
+    ObservedMeteredRemoteSimplexConnection,
+)
 from sim.state import NodeState, NodeStateTable
 from sim.stats import ConnectionStats
 
@@ -97,8 +100,8 @@ class Simulation:
         meter_start_time: float,
         sender_states: list[NodeState],
         receiver_states: list[NodeState],
-    ) -> MeteredRemoteSimplexConnection:
-        return MeteredRemoteSimplexConnection(
+    ) -> ObservedMeteredRemoteSimplexConnection:
+        return ObservedMeteredRemoteSimplexConnection(
             self.config.network.latency,
             self.framework,
             meter_start_time,
