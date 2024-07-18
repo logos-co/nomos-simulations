@@ -41,7 +41,7 @@ class Nomssip(Gossip):
         noise_packet = FlaggedPacket(
             FlaggedPacket.Flag.NOISE, bytes(self.config.msg_size)
         ).bytes()
-        return super().add_conn(
+        super().add_conn(
             inbound,
             MixSimplexConnection(
                 self.framework,

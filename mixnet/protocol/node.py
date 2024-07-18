@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypeAlias
+from typing import Awaitable, Callable
 
 from pysphinx.sphinx import (
     ProcessedFinalHopPacket,
@@ -12,10 +12,9 @@ from framework import Framework, Queue
 from protocol.config import GlobalConfig, NodeConfig
 from protocol.connection import SimplexConnection
 from protocol.error import PeeringDegreeReached
+from protocol.gossip import Gossip
 from protocol.nomssip import Nomssip, NomssipConfig
 from protocol.sphinx import SphinxPacketBuilder
-
-BroadcastChannel = Queue[bytes]
 
 
 class Node:
@@ -27,7 +26,11 @@ class Node:
     """
 
     def __init__(
-        self, framework: Framework, config: NodeConfig, global_config: GlobalConfig
+        self,
+        framework: Framework,
+        config: NodeConfig,
+        global_config: GlobalConfig,
+        broadcasted_msg_handler: Callable[[bytes], Awaitable[None]],
     ):
         self.framework = framework
         self.config = config
@@ -41,7 +44,7 @@ class Node:
             ),
             self.__process_msg,
         )
-        self.broadcast_channel: BroadcastChannel = framework.queue()
+        self.broadcast = Gossip(framework, config.gossip, broadcasted_msg_handler)
 
     @staticmethod
     def __calculate_message_size(global_config: GlobalConfig) -> int:
@@ -57,7 +60,7 @@ class Node:
 
     async def __process_msg(self, msg: bytes) -> None:
         """
-        A handler to process messages received via gossip channel
+        A handler to process messages received via Nomssip channel
         """
         sphinx_packet = SphinxPacket.from_bytes(
             msg, self.global_config.max_mix_path_length
@@ -69,7 +72,7 @@ class Node:
                 await self.nomssip.gossip(result.bytes())
             case bytes():
                 # Broadcast the message fully recovered from Sphinx packets
-                await self.broadcast_channel.put(result)
+                await self.broadcast.gossip(result)
             case None:
                 return
 
@@ -90,22 +93,39 @@ class Node:
             # Return nothing, if it cannot be unwrapped by the private key of this node.
             return None
 
-    def connect(
+    def connect_mix(
         self,
         peer: Node,
+        inbound_conn: SimplexConnection,
+        outbound_conn: SimplexConnection,
+    ):
+        Node.__connect(self.nomssip, peer.nomssip, inbound_conn, outbound_conn)
+
+    def connect_broadcast(
+        self,
+        peer: Node,
+        inbound_conn: SimplexConnection,
+        outbound_conn: SimplexConnection,
+    ):
+        Node.__connect(self.broadcast, peer.broadcast, inbound_conn, outbound_conn)
+
+    @staticmethod
+    def __connect(
+        self_channel: Gossip,
+        peer_channel: Gossip,
         inbound_conn: SimplexConnection,
         outbound_conn: SimplexConnection,
     ):
         """
         Establish a duplex connection with a peer node.
         """
-        if not self.nomssip.can_accept_conn() or not peer.nomssip.can_accept_conn():
+        if not self_channel.can_accept_conn() or not peer_channel.can_accept_conn():
             raise PeeringDegreeReached()
 
         # Register a duplex connection for its own use
-        self.nomssip.add_conn(inbound_conn, outbound_conn)
+        self_channel.add_conn(inbound_conn, outbound_conn)
         # Register a duplex connection for the peer
-        peer.nomssip.add_conn(outbound_conn, inbound_conn)
+        peer_channel.add_conn(outbound_conn, inbound_conn)
 
     async def send_message(self, msg: bytes):
         """
