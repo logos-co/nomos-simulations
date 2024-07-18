@@ -15,7 +15,7 @@ from protocol.error import PeeringDegreeReached
 from protocol.nomssip import Nomssip
 from protocol.sphinx import SphinxPacketBuilder
 
-BroadcastChannel = Queue
+BroadcastChannel = Queue[bytes]
 
 
 class Node:
@@ -41,7 +41,7 @@ class Node:
             ),
             self.__process_msg,
         )
-        self.broadcast_channel = framework.queue()
+        self.broadcast_channel: BroadcastChannel = framework.queue()
 
     @staticmethod
     def __calculate_message_size(global_config: GlobalConfig) -> int:

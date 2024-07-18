@@ -4,8 +4,6 @@ import abc
 
 from framework import Framework, Queue
 
-NetworkPacketQueue = Queue
-
 
 class SimplexConnection(abc.ABC):
     """
@@ -28,7 +26,7 @@ class LocalSimplexConnection(SimplexConnection):
     """
 
     def __init__(self, framework: Framework):
-        self.queue = framework.queue()
+        self.queue: Queue[bytes] = framework.queue()
 
     async def send(self, data: bytes) -> None:
         await self.queue.put(data)
@@ -67,7 +65,7 @@ class MixSimplexConnection:
         noise_msg: bytes,
     ):
         self.framework = framework
-        self.queue = framework.queue()
+        self.queue: Queue[bytes] = framework.queue()
         self.conn = conn
         self.transmission_rate_per_sec = transmission_rate_per_sec
         self.noise_msg = noise_msg

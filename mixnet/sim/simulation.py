@@ -39,9 +39,7 @@ class Simulation:
         # Create a μSim scope and run the simulation
         async with usim.until(usim.time + self.config.simulation.duration_sec) as scope:
             self.framework = usimfw.Framework(scope)
-            nodes, conn_stats, node_state_table = self.__init_nodes(
-                node_state_table, conn_stats
-            )
+            nodes = self.__init_nodes(node_state_table, conn_stats)
             for node in nodes:
                 self.framework.spawn(self.__run_node_logic(node))
 
@@ -50,7 +48,7 @@ class Simulation:
 
     def __init_nodes(
         self, node_state_table: NodeStateTable, conn_stats: ConnectionStats
-    ) -> tuple[list[Node], ConnectionStats, NodeStateTable]:
+    ) -> list[Node]:
         # Initialize node/global configurations
         node_configs = self.config.node_configs()
         global_config = GlobalConfig(
@@ -73,6 +71,7 @@ class Simulation:
         ]
 
         # Connect nodes to each other
+        meter_start_time = self.framework.now()
         for i, node in enumerate(nodes):
             # For now, we only consider a simple ring topology for simplicity.
             peer_idx = (i + 1) % len(nodes)
@@ -83,22 +82,26 @@ class Simulation:
             # Create simplex inbound/outbound connections
             # and use them to connect node and peer.
             inbound_conn, outbound_conn = (
-                self.__create_conn(peer_states, node_states),
-                self.__create_conn(node_states, peer_states),
+                self.__create_conn(meter_start_time, peer_states, node_states),
+                self.__create_conn(meter_start_time, node_states, peer_states),
             )
             node.connect(peer, inbound_conn, outbound_conn)
             # Register the connections to the connection statistics
             conn_stats.register(node, inbound_conn, outbound_conn)
             conn_stats.register(peer, outbound_conn, inbound_conn)
 
-        return nodes, conn_stats, node_state_table
+        return nodes
 
     def __create_conn(
-        self, sender_states: list[NodeState], receiver_states: list[NodeState]
+        self,
+        meter_start_time: float,
+        sender_states: list[NodeState],
+        receiver_states: list[NodeState],
     ) -> MeteredRemoteSimplexConnection:
         return MeteredRemoteSimplexConnection(
-            self.config.network,
+            self.config.network.latency,
             self.framework,
+            meter_start_time,
             sender_states,
             receiver_states,
         )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, Awaitable, Coroutine
+from typing import Any, Awaitable, Coroutine, Generic, TypeVar
 
 from framework import framework
 
@@ -30,7 +30,10 @@ class Framework(framework.Framework):
         return asyncio.create_task(coroutine)
 
 
-class Queue(framework.Queue):
+T = TypeVar("T")
+
+
+class Queue(framework.Queue[T]):
     """
     An asyncio implementation of the Queue
     """
@@ -39,10 +42,10 @@ class Queue(framework.Queue):
         super().__init__()
         self._queue = asyncio.Queue()
 
-    async def put(self, data: bytes) -> None:
+    async def put(self, data: T) -> None:
         await self._queue.put(data)
 
-    async def get(self) -> bytes:
+    async def get(self) -> T:
         return await self._queue.get()
 
     def empty(self) -> bool:

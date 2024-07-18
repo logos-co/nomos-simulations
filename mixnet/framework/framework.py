@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import abc
-from typing import Any, Awaitable, Coroutine, TypeVar
+from typing import Any, Awaitable, Coroutine, Generic, TypeVar
 
 RT = TypeVar("RT")
 
@@ -29,17 +29,20 @@ class Framework(abc.ABC):
         pass
 
 
-class Queue(abc.ABC):
+T = TypeVar("T")
+
+
+class Queue(abc.ABC, Generic[T]):
     """
     An abstract class that provides asynchronous queue operations.
     """
 
     @abc.abstractmethod
-    async def put(self, data: bytes) -> None:
+    async def put(self, data: T) -> None:
         pass
 
     @abc.abstractmethod
-    async def get(self) -> bytes:
+    async def get(self) -> T:
         pass
 
     @abc.abstractmethod

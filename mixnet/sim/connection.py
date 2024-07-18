@@ -6,7 +6,7 @@ import pandas
 
 from framework import Framework, Queue
 from protocol.connection import SimplexConnection
-from sim.config import NetworkConfig
+from sim.config import LatencyConfig, NetworkConfig
 from sim.state import NodeState
 
 
@@ -17,26 +17,26 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
 
     def __init__(
         self,
-        config: NetworkConfig,
+        config: LatencyConfig,
         framework: Framework,
+        meter_start_time: float,
         send_node_states: list[NodeState],
         recv_node_states: list[NodeState],
     ):
         self.framework = framework
         # A connection has a random constant latency
-        self.latency = config.latency.random_latency()
-        # A queue where a sender puts messages to be sent
-        self.send_queue = framework.queue()
-        # A queue that connects send_queue and recv_queue (to measure bandwidths and simulate latency)
-        self.mid_queue = framework.queue()
+        self.latency = config.random_latency()
+        # A queue of tuple(timestamp, msg) where a sender puts messages to be sent
+        self.send_queue: Queue[tuple[float, bytes]] = framework.queue()
+        # A task that reads messages from send_queue, and puts them to recv_queue.
+        # Before putting messages to recv_queue, the task simulates network latency according to the timestamp of each message.
+        self.relayer = framework.spawn(self.__run_relayer())
         # A queue where a receiver gets messages
-        self.recv_queue = framework.queue()
-        # A task that reads messages from send_queue, updates bandwidth stats, and puts them to mid_queue
+        self.recv_queue: Queue[bytes] = framework.queue()
+        # To measure bandwidth usages
+        self.meter_start_time = meter_start_time
         self.send_meters: list[int] = []
-        self.send_task = framework.spawn(self.__run_send_task())
-        # A task that reads messages from mid_queue, simulates network latency, updates bandwidth stats, and puts them to recv_queue
         self.recv_meters: list[int] = []
-        self.recv_task = framework.spawn(self.__run_recv_task())
         # To measure node states over time
         self.send_node_states = send_node_states
         self.recv_node_states = recv_node_states
@@ -44,51 +44,47 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
         self.msg_sizes: Counter[int] = Counter()
 
     async def send(self, data: bytes) -> None:
-        await self.send_queue.put(data)
+        await self.send_queue.put((self.framework.now(), data))
+        self.__update_meter(self.send_meters, len(data))
+        self.__update_node_state(self.send_node_states, NodeState.SENDING)
         self.msg_sizes.update([len(data)])
-        # The time unit of node states is milliseconds
-        ms = math.floor(self.framework.now() * 1000)
-        self.send_node_states[ms] = NodeState.SENDING
 
     async def recv(self) -> bytes:
-        data = await self.recv_queue.get()
-        # The time unit of node states is milliseconds
-        ms = math.floor(self.framework.now() * 1000)
-        self.send_node_states[ms] = NodeState.RECEIVING
-        return data
+        return await self.recv_queue.get()
 
-    async def __run_send_task(self):
+    async def __run_relayer(self):
         """
-        A task that reads messages from send_queue, updates bandwidth stats, and puts them to mid_queue
+        A task that reads messages from send_queue, and puts them to recv_queue.
+        Before putting messages to recv_queue, the task simulates network latency according to the timestamp of each message.
         """
-        start_time = self.framework.now()
         while True:
-            data = await self.send_queue.get()
-            self.__update_meter(self.send_meters, len(data), start_time)
-            await self.mid_queue.put(data)
+            sent_time, data = await self.send_queue.get()
+            # Simulate network latency
+            delay = self.latency - (self.framework.now() - sent_time)
+            if delay > 0:
+                await self.framework.sleep(delay)
 
-    async def __run_recv_task(self):
-        """
-        A task that reads messages from mid_queue, simulates network latency, updates bandwidth stats, and puts them to recv_queue
-        """
-        start_time = self.framework.now()
-        while True:
-            data = await self.mid_queue.get()
-            if data is None:
-                break
-            await self.framework.sleep(self.latency)
-            self.__update_meter(self.recv_meters, len(data), start_time)
+            # Relay msg to the recv_queue.
+            # Update meter & node_state before msg is read from recv_queue by the receiver
+            # because the time at which enters the node is important when viewed from the outside.
+            self.__update_meter(self.recv_meters, len(data))
+            self.__update_node_state(self.recv_node_states, NodeState.RECEIVING)
             await self.recv_queue.put(data)
 
-    def __update_meter(self, meters: list[int], size: int, start_time: float):
+    def __update_meter(self, meters: list[int], size: int):
         """
         Accumulates the bandwidth usage in the current time slot (seconds).
         """
-        slot = math.floor(self.framework.now() - start_time)
+        slot = math.floor(self.framework.now() - self.meter_start_time)
         assert slot >= len(meters) - 1
         # Fill zeros for the empty time slots
         meters.extend([0] * (slot - len(meters) + 1))
         meters[-1] += size
+
+    def __update_node_state(self, node_states: list[NodeState], state: NodeState):
+        # The time unit of node states is milliseconds
+        ms = math.floor(self.framework.now() * 1000)
+        node_states[ms] = state
 
     def sending_bandwidths(self) -> pandas.Series:
         return self.__bandwidths(self.send_meters)

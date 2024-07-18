@@ -1,4 +1,4 @@
-from typing import Any, Awaitable, Coroutine
+from typing import Any, Awaitable, Coroutine, TypeVar
 
 import usim
 
@@ -36,7 +36,10 @@ class Framework(framework.Framework):
         return self._scope.do(coroutine)
 
 
-class Queue(framework.Queue):
+T = TypeVar("T")
+
+
+class Queue(framework.Queue[T]):
     """
     A usim implementation of the Queue for discrete-time simulation
     """
@@ -45,10 +48,10 @@ class Queue(framework.Queue):
         super().__init__()
         self._queue = usim.Queue()
 
-    async def put(self, data: bytes) -> None:
+    async def put(self, data: T) -> None:
         await self._queue.put(data)
 
-    async def get(self) -> bytes:
+    async def get(self) -> T:
         return await self._queue
 
     def empty(self) -> bool:
