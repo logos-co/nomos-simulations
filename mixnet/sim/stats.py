@@ -6,12 +6,15 @@ import pandas
 from matplotlib.axes import Axes
 
 from protocol.node import Node
-from sim.connection import MeteredRemoteSimplexConnection
+from sim.connection import ObservedMeteredRemoteSimplexConnection
 
 # A map of nodes to their inbound/outbound connections
 NodeConnectionsMap = dict[
     Node,
-    tuple[list[MeteredRemoteSimplexConnection], list[MeteredRemoteSimplexConnection]],
+    tuple[
+        list[ObservedMeteredRemoteSimplexConnection],
+        list[ObservedMeteredRemoteSimplexConnection],
+    ],
 ]
 
 
@@ -22,8 +25,8 @@ class ConnectionStats:
     def register(
         self,
         node: Node,
-        inbound_conn: MeteredRemoteSimplexConnection,
-        outbound_conn: MeteredRemoteSimplexConnection,
+        inbound_conn: ObservedMeteredRemoteSimplexConnection,
+        outbound_conn: ObservedMeteredRemoteSimplexConnection,
     ):
         self.conns_per_node[node][0].append(inbound_conn)
         self.conns_per_node[node][1].append(outbound_conn)
