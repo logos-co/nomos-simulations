@@ -77,6 +77,7 @@ class Simulation:
         meter_start_time = self.framework.now()
         for i, node in enumerate(nodes):
             # For now, we only consider a simple ring topology for simplicity.
+            # TODO: Use a more realistic random (deterministic) topology.
             peer_idx = (i + 1) % len(nodes)
             peer = nodes[peer_idx]
             node_states = node_state_table[i]
