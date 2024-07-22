@@ -15,8 +15,8 @@ network:
     # Seed for the random number generator used to determine the network latencies.
     seed: 0
   nomssip:
-    # Target number of peers each node can connect to (both inbound and outbound).
-    peering_degree: 6
+    # Expected number of peers each node must connect to if there are enough peers available in the network.
+    peering_degree: 4
 
 mix:
   # Global constant transmission rate of each connection in messages per second.

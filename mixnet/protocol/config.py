@@ -34,7 +34,7 @@ class NodeConfig:
 
 @dataclass
 class NomssipConfig:
-    # The target number of peers a node should maintain in its p2p network
+    # Expected number of peers each node must connect to if there are enough peers available in the network.
     peering_degree: int
 
 
