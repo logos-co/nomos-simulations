@@ -18,14 +18,13 @@
 - NomMix protocol simulation
 - Performance measurements
   - Bandwidth usages
+  - Message dissemination time
 - Privacy property analysis
   - Message sizes
   - Node states and hamming distances
 
 ## Future Plans
 
-- Performance measurements
-  - Message dissemination time
 - More NomMix features
   - Temporal mixing
   - Level-1 noise
@@ -56,6 +55,31 @@ python -m cmd.main --config {config_path}
 All results are printed in the console as below.
 And, all plots are shown once all analysis is done.
 ```
+==========================================
+Message Dissemination Time (sec)
+==========================================
+[Mix Propagation Times]
+count    6.000000
+mean     0.814500
+std      0.401595
+min      0.457000
+25%      0.461250
+50%      0.729000
+75%      1.127250
+max      1.340000
+dtype: float64
+
+[Broadcast Dissemination Times]
+count    6.000000
+mean     0.132500
+std      0.016355
+min      0.105000
+25%      0.125000
+50%      0.140000
+75%      0.143750
+max      0.145000
+dtype: float64
+
 ==========================================
 Message Size Distribution
 ==========================================

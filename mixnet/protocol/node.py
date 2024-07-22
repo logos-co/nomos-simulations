@@ -30,7 +30,12 @@ class Node:
         framework: Framework,
         config: NodeConfig,
         global_config: GlobalConfig,
+        # A handler called when a node receives a broadcasted message originated from the last mix.
         broadcasted_msg_handler: Callable[[bytes], Awaitable[None]],
+        # An optional handler only for the simulation,
+        # which is called when a message is fully recovered by the last mix
+        # and returns a new message to be broadcasted.
+        recovered_msg_handler: Callable[[bytes], Awaitable[bytes]] | None = None,
     ):
         self.framework = framework
         self.config = config
@@ -45,6 +50,7 @@ class Node:
             self.__process_msg,
         )
         self.broadcast = Gossip(framework, config.gossip, broadcasted_msg_handler)
+        self.recovered_msg_handler = recovered_msg_handler
 
     @staticmethod
     def __calculate_message_size(global_config: GlobalConfig) -> int:
@@ -71,6 +77,8 @@ class Node:
                 # Gossip the next Sphinx packet
                 await self.nomssip.gossip(result.bytes())
             case bytes():
+                if self.recovered_msg_handler is not None:
+                    result = await self.recovered_msg_handler(result)
                 # Broadcast the message fully recovered from Sphinx packets
                 await self.broadcast.gossip(result)
             case None:
