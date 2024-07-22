@@ -7,6 +7,7 @@ from matplotlib.axes import Axes
 
 from protocol.node import Node
 from sim.connection import ObservedMeteredRemoteSimplexConnection
+from sim.message import Message
 
 # A map of nodes to their inbound/outbound connections
 NodeConnectionsMap = dict[
@@ -116,3 +117,36 @@ class ConnectionStats:
 
         plt.tight_layout()
         plt.draw()
+
+
+class DisseminationTime:
+    def __init__(self, num_nodes: int):
+        # A collection of time taken for a message to propagate through all mix nodes in its mix route
+        self.mix_propagation_times: list[float] = []
+        # A collection of time taken for a message to be broadcasted from the last mix to all nodes in the network
+        self.broadcast_dissemination_times: list[float] = []
+        # Data structures to check if a message has been broadcasted to all nodes
+        self.broadcast_status: Counter[Message] = Counter()
+        self.num_nodes: int = num_nodes
+
+    def add_mix_propagation_time(self, elapsed: float):
+        self.mix_propagation_times.append(elapsed)
+
+    def add_broadcasted_msg(self, msg: Message, elapsed: float):
+        assert self.broadcast_status[msg] < self.num_nodes
+        self.broadcast_status.update([msg])
+        if self.broadcast_status[msg] == self.num_nodes:
+            self.broadcast_dissemination_times.append(elapsed)
+
+    def analyze(self):
+        print("==========================================")
+        print("Message Dissemination Time")
+        print("==========================================")
+        print("[Mix Propagation Times]")
+        mix_propagation_times = pandas.Series(self.mix_propagation_times)
+        print(mix_propagation_times.describe())
+        print("")
+        print("[Broadcast Dissemination Times]")
+        broadcast_travel_times = pandas.Series(self.broadcast_dissemination_times)
+        print(broadcast_travel_times.describe())
+        print("")

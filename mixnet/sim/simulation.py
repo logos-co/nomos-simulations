@@ -13,8 +13,9 @@ from sim.connection import (
     MeteredRemoteSimplexConnection,
     ObservedMeteredRemoteSimplexConnection,
 )
+from sim.message import Message, UniqueMessageBuilder
 from sim.state import NodeState, NodeStateTable
-from sim.stats import ConnectionStats
+from sim.stats import ConnectionStats, DisseminationTime
 
 
 class Simulation:
@@ -24,10 +25,14 @@ class Simulation:
 
     def __init__(self, config: Config):
         self.config = config
+        self.msg_builder = UniqueMessageBuilder()
+        self.dissemination_time = DisseminationTime(self.config.network.num_nodes)
 
     async def run(self):
         # Run the simulation
         conn_stats, node_state_table = await self.__run()
+        # Analyze the dissemination times
+        self.dissemination_time.analyze()
         # Analyze the simulation results
         conn_stats.analyze()
         node_state_table.analyze()
@@ -77,6 +82,7 @@ class Simulation:
                 node_config,
                 global_config,
                 self.__process_broadcasted_msg,
+                self.__process_recovered_msg,
             )
             for node_config in node_configs
         ]
@@ -143,10 +149,27 @@ class Simulation:
         while True:
             await self.framework.sleep(lottery_config.interval_sec)
             if lottery_config.seed.random() < lottery_config.probability:
-                await node.send_message(b"selected block")
+                msg = self.msg_builder.next(self.framework.now(), b"selected block")
+                await node.send_message(bytes(msg))
 
     async def __process_broadcasted_msg(self, msg: bytes):
         """
-        Process a message broadcasted after being travelled through mix nodes.
+        Process a broadcasted message originated from the last mix.
         """
-        pass
+        message = Message.from_bytes(msg)
+        elapsed = self.framework.now() - message.created_at
+        self.dissemination_time.add_broadcasted_msg(message, elapsed)
+
+    async def __process_recovered_msg(self, msg: bytes) -> bytes:
+        """
+        Process a message fully recovered by the last mix
+        and returns a new message to be broadcasted.
+        """
+        message = Message.from_bytes(msg)
+        elapsed = self.framework.now() - message.created_at
+        self.dissemination_time.add_mix_propagation_time(elapsed)
+
+        # Update the timestamp and return the message to be broadcasted,
+        # so that the broadcast dissemination time can be calculated from now.
+        message.created_at = self.framework.now()
+        return bytes(message)
