@@ -10,6 +10,7 @@ from pysphinx.sphinx import X25519PrivateKey
 
 from protocol.config import NodeConfig
 from protocol.gossip import GossipConfig
+from protocol.temporalmix import TemporalMixConfig, TemporalMixType
 
 
 @dataclass
@@ -27,7 +28,11 @@ class Config:
             data_class=Config,
             data=data,
             config=dacite.Config(
-                type_hooks={random.Random: seed_to_random}, strict=True
+                type_hooks={
+                    random.Random: seed_to_random,
+                    TemporalMixType: str_to_temporal_mix_type,
+                },
+                strict=True,
             ),
         )
 
@@ -37,6 +42,7 @@ class Config:
                 self.__gen_private_key(i),
                 self.mix.mix_path.random_length(),
                 self.network.gossip,
+                self.mix.temporal_mix,
             )
             for i in range(self.network.num_nodes)
         ]
@@ -95,6 +101,7 @@ class MixConfig:
     # Maximum size of a message in bytes that can be encapsulated in a single Sphinx packet.
     max_message_size: int
     mix_path: MixPathConfig
+    temporal_mix: TemporalMixConfig
 
     def __post_init__(self):
         assert self.transmission_rate_per_sec > 0
@@ -140,3 +147,7 @@ class LotteryConfig:
 
 def seed_to_random(seed: int) -> random.Random:
     return random.Random(seed)
+
+
+def str_to_temporal_mix_type(val: str) -> TemporalMixType:
+    return TemporalMixType(val)

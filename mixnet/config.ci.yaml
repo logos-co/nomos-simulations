@@ -31,6 +31,14 @@ mix:
     max_length: 5
     # Seed for the random number generator used to determine the mix path.
     seed: 3
+  temporal_mix:
+    # none | pure-coin-flipping | pure-random-sampling | permuted-coin-flipping
+    mix_type: "pure-coin-flipping"
+    # The minimum size of queue to be mixed.
+    # If the queue size is less than this value, noise messages are added.
+    min_queue_size: 5
+    # Generate the seeds used to create the RNG for each queue that will be created.
+    seed_generator: 100
 
 logic:
   sender_lottery:

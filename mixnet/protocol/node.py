@@ -46,6 +46,7 @@ class Node:
                 config.gossip.peering_degree,
                 global_config.transmission_rate_per_sec,
                 self.__calculate_message_size(global_config),
+                config.temporal_mix,
             ),
             self.__process_msg,
         )
