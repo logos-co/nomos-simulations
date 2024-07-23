@@ -101,17 +101,19 @@ class MixConfig:
 
 @dataclass
 class MixPathConfig:
+    # Minimum number of mix nodes to be chosen for a Sphinx packet.
+    min_length: int
     # Maximum number of mix nodes to be chosen for a Sphinx packet.
     max_length: int
     # Seed for the random number generator used to determine the mix path.
     seed: random.Random
 
     def __post_init__(self):
-        assert self.max_length > 0
+        assert 0 < self.min_length <= self.max_length
         assert self.seed is not None
 
     def random_length(self) -> int:
-        return self.seed.randint(1, self.max_length)
+        return self.seed.randint(self.min_length, self.max_length)
 
 
 @dataclass

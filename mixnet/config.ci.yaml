@@ -24,6 +24,8 @@ mix:
   # Maximum size of a message in bytes that can be encapsulated in a single Sphinx packet.
   max_message_size: 1007
   mix_path:
+    # Minimum number of mix nodes to be chosen for a Sphinx packet.
+    min_length: 5
     # Maximum number of mix nodes to be chosen for a Sphinx packet.
     max_length: 5
     # Seed for the random number generator used to determine the mix path.
