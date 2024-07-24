@@ -28,6 +28,7 @@ class TestMeteredRemoteSimplexConnection(IsolatedAsyncioTestCase):
             node_state_table = NodeStateTable(num_nodes=2, duration_sec=3)
             conn = MeteredRemoteSimplexConnection(
                 LatencyConfig(
+                    min_latency_sec=0,
                     max_latency_sec=1,
                     seed=random.Random(),
                 ),
@@ -59,6 +60,7 @@ class TestObservedMeteredRemoteSimplexConnection(IsolatedAsyncioTestCase):
             meter_start_time = framework.now()
             conn = ObservedMeteredRemoteSimplexConnection(
                 LatencyConfig(
+                    min_latency_sec=0,
                     max_latency_sec=1,
                     seed=random.Random(),
                 ),

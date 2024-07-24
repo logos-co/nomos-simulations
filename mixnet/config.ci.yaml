@@ -9,8 +9,9 @@ network:
   # Total number of nodes in the entire network.
   num_nodes: 5
   latency:
-    # Maximum network latency between nodes in seconds.
-    # A constant latency will be chosen randomly for each connection within the range [0, max_latency_sec].
+    # Minimum/maximum network latency between nodes in seconds.
+    # A constant latency will be chosen randomly for each connection within the range [min_latency_sec, max_latency_sec].
+    min_latency_sec: 0
     max_latency_sec: 0.1
     # Seed for the random number generator used to determine the network latencies.
     seed: 0

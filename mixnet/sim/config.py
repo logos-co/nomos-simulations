@@ -71,19 +71,20 @@ class NetworkConfig:
 
 @dataclass
 class LatencyConfig:
-    # Maximum network latency between nodes in seconds.
-    # A constant latency will be chosen randomly for each connection within the range [0, max_latency_sec].
+    # Minimum/maximum network latency between nodes in seconds.
+    # A constant latency will be chosen randomly for each connection within the range [min_latency_sec, max_latency_sec].
+    min_latency_sec: float
     max_latency_sec: float
     # Seed for the random number generator used to determine the network latencies.
     seed: random.Random
 
     def __post_init__(self):
-        assert self.max_latency_sec > 0
+        assert 0 <= self.min_latency_sec <= self.max_latency_sec
         assert self.seed is not None
 
     def random_latency(self) -> float:
         # round to milliseconds to make analysis not too heavy
-        return int(self.seed.random() * self.max_latency_sec * 1000) / 1000
+        return round(self.seed.uniform(self.min_latency_sec, self.max_latency_sec), 3)
 
 
 @dataclass
