@@ -26,5 +26,5 @@ jobs:
         run: python -m unittest -v
       - name: Run a short mixnet simulation
         working-directory: mixnet
-        run: python -m cmd.main --config config.ci.yaml
+        run: python -m cmd.main --config sim/config.ci.yaml
 

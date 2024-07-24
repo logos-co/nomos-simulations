@@ -22,6 +22,9 @@ class NomssipConfig(GossipConfig):
     transmission_rate_per_sec: int
     msg_size: int
     temporal_mix: TemporalMixConfig
+    # OPTIMIZATION ONLY FOR EXPERIMENTS WITHOUT BANDWIDTH MEASUREMENT
+    # If True, skip sending a noise even if it's time to send one.
+    skip_sending_noise: bool = False
 
 
 class Nomssip(Gossip):
@@ -52,6 +55,7 @@ class Nomssip(Gossip):
                 self.config.transmission_rate_per_sec,
                 noise_packet,
                 self.config.temporal_mix,
+                self.config.skip_sending_noise,
             ),
         )
 
@@ -72,7 +76,7 @@ class Nomssip(Gossip):
         Gossip a message to all connected peers with prepending a message flag
         """
         # The message size must be fixed.
-        assert len(msg) == self.config.msg_size
+        assert len(msg) == self.config.msg_size, f"{len(msg)} != {self.config.msg_size}"
 
         packet = FlaggedPacket(FlaggedPacket.Flag.REAL, msg)
         await self.__gossip_flagged_packet(packet)

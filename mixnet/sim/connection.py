@@ -1,4 +1,5 @@
 import math
+from abc import abstractmethod
 from collections import Counter
 from typing import Awaitable
 
@@ -11,17 +12,12 @@ from sim.config import LatencyConfig, NetworkConfig
 from sim.state import NodeState
 
 
-class MeteredRemoteSimplexConnection(SimplexConnection):
+class RemoteSimplexConnection(SimplexConnection):
     """
-    A simplex connection implementation that simulates network latency and measures bandwidth usages.
+    A simplex connection implementation that simulates network latency.
     """
 
-    def __init__(
-        self,
-        config: LatencyConfig,
-        framework: Framework,
-        meter_start_time: float,
-    ):
+    def __init__(self, config: LatencyConfig, framework: Framework):
         self.framework = framework
         # A connection has a random constant latency
         self.latency = config.random_latency()
@@ -32,10 +28,6 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
         self.relayer = framework.spawn(self.__run_relayer())
         # A queue where a receiver gets messages
         self.recv_queue: Queue[bytes] = framework.queue()
-        # To measure bandwidth usages
-        self.meter_start_time = meter_start_time
-        self.send_meters: list[int] = []
-        self.recv_meters: list[int] = []
 
     async def send(self, data: bytes) -> None:
         await self.send_queue.put((self.framework.now(), data))
@@ -57,17 +49,45 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
                 await self.framework.sleep(delay)
 
             # Relay msg to the recv_queue.
-            # Update related statistics before msg is read from recv_queue by the receiver
+            # Call on_receiving (e.g. for updating stats) before msg is read from recv_queue by the receiver
             # because the time at which enters the node is important when viewed from the outside.
             self.on_receiving(data)
             await self.recv_queue.put(data)
 
+    def on_sending(self, data: bytes) -> None:
+        # Should be overridden by subclass
+        pass
+
+    def on_receiving(self, data: bytes) -> None:
+        # Should be overridden by subclass
+        pass
+
+
+class MeteredRemoteSimplexConnection(RemoteSimplexConnection):
+    """
+    An extension of RemoteSimplexConnection that measures bandwidth usages.
+    """
+
+    def __init__(
+        self,
+        config: LatencyConfig,
+        framework: Framework,
+        meter_start_time: float,
+    ):
+        super().__init__(config, framework)
+        # To measure bandwidth usages
+        self.meter_start_time = meter_start_time
+        self.send_meters: list[int] = []
+        self.recv_meters: list[int] = []
+
+    @override
     def on_sending(self, data: bytes) -> None:
         """
         Update statistics when sending a message
         """
         self.__update_meter(self.send_meters, len(data))
 
+    @override
     def on_receiving(self, data: bytes) -> None:
         """
         Update statistics when receiving a message

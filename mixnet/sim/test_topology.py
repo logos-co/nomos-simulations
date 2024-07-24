@@ -6,8 +6,8 @@ from sim.topology import are_all_nodes_connected, build_full_random_topology
 
 class TestTopology(TestCase):
     def test_full_random(self):
-        num_nodes = 100
-        peering_degree = 6
+        num_nodes = 10000
+        peering_degree = 16
         topology = build_full_random_topology(
             random.Random(0), num_nodes, peering_degree
         )

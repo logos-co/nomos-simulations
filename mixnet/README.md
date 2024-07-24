@@ -43,7 +43,7 @@ pip install -r requirements.txt
 
 ## Getting Started
 
-Copy the [`config.ci.yaml`](./config.ci.yaml) file and adjust the parameters to your needs.
+Copy the [`sim/config.ci.yaml`](./sim/config.ci.yaml) file and adjust the parameters to your needs.
 Each parameter is explained in the config file.
 For more details, please refer to the [documentation](https://www.notion.so/NomMix-Sim-Getting-Started-ee0e2191f4e7437e93976aff2627d7ce?pvs=4).
 

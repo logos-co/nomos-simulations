@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import random
 from collections import defaultdict
 
@@ -43,16 +45,18 @@ def build_full_random_topology(
 
 
 def are_all_nodes_connected(topology: Topology) -> bool:
-    visited = set()
-
-    def dfs(topology: Topology, node: int) -> None:
-        if node in visited:
-            return
-        visited.add(node)
-        for peer in topology[node]:
-            dfs(topology, peer)
-
-    # Start DFS from the first node
-    dfs(topology, next(iter(topology)))
-
+    visited = dfs(topology, next(iter(topology)))
     return len(visited) == len(topology)
+
+
+def dfs(topology: Topology, start_node: int) -> set[int]:
+    visited: set[int] = set()
+    stack = [start_node]
+
+    while stack:
+        node = stack.pop()
+        if node not in visited:
+            visited.add(node)
+            stack.extend(peer for peer in topology[node] if peer not in visited)
+
+    return visited

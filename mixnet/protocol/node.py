@@ -108,7 +108,7 @@ class Node:
         inbound_conn: SimplexConnection,
         outbound_conn: SimplexConnection,
     ):
-        Node.__connect(self.nomssip, peer.nomssip, inbound_conn, outbound_conn)
+        connect_nodes(self.nomssip, peer.nomssip, inbound_conn, outbound_conn)
 
     def connect_broadcast(
         self,
@@ -116,25 +116,7 @@ class Node:
         inbound_conn: SimplexConnection,
         outbound_conn: SimplexConnection,
     ):
-        Node.__connect(self.broadcast, peer.broadcast, inbound_conn, outbound_conn)
-
-    @staticmethod
-    def __connect(
-        self_channel: Gossip,
-        peer_channel: Gossip,
-        inbound_conn: SimplexConnection,
-        outbound_conn: SimplexConnection,
-    ):
-        """
-        Establish a duplex connection with a peer node.
-        """
-        if not self_channel.can_accept_conn() or not peer_channel.can_accept_conn():
-            raise PeeringDegreeReached()
-
-        # Register a duplex connection for its own use
-        self_channel.add_conn(inbound_conn, outbound_conn)
-        # Register a duplex connection for the peer
-        peer_channel.add_conn(outbound_conn, inbound_conn)
+        connect_nodes(self.broadcast, peer.broadcast, inbound_conn, outbound_conn)
 
     async def send_message(self, msg: bytes):
         """
@@ -148,3 +130,21 @@ class Node:
             self.config.mix_path_length,
         )
         await self.nomssip.gossip(sphinx_packet.bytes())
+
+
+def connect_nodes(
+    self_channel: Gossip,
+    peer_channel: Gossip,
+    inbound_conn: SimplexConnection,
+    outbound_conn: SimplexConnection,
+):
+    """
+    Establish a duplex connection with a peer node.
+    """
+    if not self_channel.can_accept_conn() or not peer_channel.can_accept_conn():
+        raise PeeringDegreeReached()
+
+    # Register a duplex connection for its own use
+    self_channel.add_conn(inbound_conn, outbound_conn)
+    # Register a duplex connection for the peer
+    peer_channel.add_conn(outbound_conn, inbound_conn)

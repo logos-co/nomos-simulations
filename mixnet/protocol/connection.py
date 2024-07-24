@@ -66,6 +66,9 @@ class MixSimplexConnection(SimplexConnection):
         transmission_rate_per_sec: int,
         noise_msg: bytes,
         temporal_mix_config: TemporalMixConfig,
+        # OPTIMIZATION ONLY FOR EXPERIMENTS WITHOUT BANDWIDTH MEASUREMENT
+        # If True, skip sending a noise even if it's time to send one.
+        skip_sending_noise: bool,
     ):
         self.framework = framework
         self.queue: Queue[bytes] = TemporalMix.queue(
@@ -73,12 +76,16 @@ class MixSimplexConnection(SimplexConnection):
         )
         self.conn = conn
         self.transmission_rate_per_sec = transmission_rate_per_sec
+        self.noise_msg = noise_msg
+        self.skip_sending_noise = skip_sending_noise
         self.task = framework.spawn(self.__run())
 
     async def __run(self):
         while True:
             await self.framework.sleep(1 / self.transmission_rate_per_sec)
             msg = await self.queue.get()
+            if self.skip_sending_noise and msg == self.noise_msg:
+                continue
             await self.conn.send(msg)
 
     async def send(self, data: bytes) -> None:

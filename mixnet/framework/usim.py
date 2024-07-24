@@ -1,6 +1,7 @@
 from typing import Any, Awaitable, Coroutine, TypeVar
 
 import usim
+from usim._primitives.task import Task, TaskCancelled
 
 from framework import framework
 
@@ -19,6 +20,7 @@ class Framework(framework.Framework):
         # Because of the way μSim works, the scope must be created using `async with` syntax
         # and be passed to this constructor.
         self._scope = scope
+        self._tasks: list[Task] = []
 
     def queue(self) -> framework.Queue:
         return Queue()
@@ -33,7 +35,13 @@ class Framework(framework.Framework):
     def spawn(
         self, coroutine: Coroutine[Any, Any, framework.RT]
     ) -> Awaitable[framework.RT]:
-        return self._scope.do(coroutine)
+        task = self._scope.do(coroutine)
+        self._tasks.append(task)
+        return task
+
+    def stop_tasks(self) -> None:
+        for task in self._tasks:
+            task.cancel()
 
 
 T = TypeVar("T")
