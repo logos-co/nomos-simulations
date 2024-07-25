@@ -12,6 +12,7 @@ class TemporalMixType(Enum):
     PURE_COIN_FLIPPING = "pure-coin-flipping"
     PURE_RANDOM_SAMPLING = "pure-random-sampling"
     PERMUTED_COIN_FLIPPING = "permuted-coin-flipping"
+    NOISY_COIN_FLIPPING = "noisy-coin-flipping"
 
 
 @dataclass
@@ -57,6 +58,11 @@ class TemporalMix:
                     random.Random(config.seed_generator.random()),
                     noise_msg,
                 )
+            case TemporalMixType.NOISY_COIN_FLIPPING:
+                return NoisyCoinFlippingQueue(
+                    random.Random(config.seed_generator.random()),
+                    noise_msg,
+                )
             case _:
                 raise ValueError(f"Unknown mix type: {config.mix_type}")
 
@@ -83,28 +89,37 @@ class NonMixQueue(Queue[T]):
         return self.__queue.empty()
 
 
-class MinSizeMixQueue(Queue[T]):
-    def __init__(self, min_pool_size: int, rng: random.Random, noise_msg: T):
+class MixQueue(Queue[T]):
+    def __init__(self, rng: random.Random, noise_msg: T):
         super().__init__()
         # Assuming that simulations run in a single thread
         self._queue: list[T] = []
-        self.__mix_pool_size = min_pool_size
         self._rng = rng
-        self.__noise_msg = noise_msg
+        self._noise_msg = noise_msg
 
     async def put(self, data: T) -> None:
         self._queue.append(data)
 
     @abstractmethod
     async def get(self) -> T:
-        while len(self._queue) < self.__mix_pool_size:
-            self._queue.append(self.__noise_msg)
-
-        # Subclass must implement this method
         pass
 
     def empty(self) -> bool:
         return len(self._queue) == 0
+
+
+class MinSizeMixQueue(MixQueue[T]):
+    def __init__(self, min_pool_size: int, rng: random.Random, noise_msg: T):
+        super().__init__(rng, noise_msg)
+        self._mix_pool_size = min_pool_size
+
+    @abstractmethod
+    async def get(self) -> T:
+        while len(self._queue) < self._mix_pool_size:
+            self._queue.append(self._noise_msg)
+
+        # Subclass must implement this method
+        pass
 
 
 class PureCoinFlipppingQueue(MinSizeMixQueue[T]):
@@ -143,3 +158,20 @@ class PermutedCoinFlipppingQueue(MinSizeMixQueue[T]):
                     # After removing a message from the position `i`, we don't fill up the position.
                     # Instead, the queue is always filled from the back.
                     return self._queue.pop(i)
+
+
+class NoisyCoinFlippingQueue(MixQueue[T]):
+    async def get(self) -> T:
+        if len(self._queue) == 0:
+            return self._noise_msg
+
+        while True:
+            for i in range(len(self._queue)):
+                # coin-flipping
+                if self._rng.randint(0, 1) == 1:
+                    # After removing a message from the position `i`, we don't fill up the position.
+                    # Instead, the queue is always filled from the back.
+                    return self._queue.pop(i)
+                else:
+                    if i == 0:
+                        return self._noise_msg
