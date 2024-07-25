@@ -21,7 +21,12 @@ def build_full_random_topology(
             # Filter nodes that can be connected to the current node.
             others = []
             for other in nodes[:node] + nodes[node + 1 :]:
-                if len(topology[other]) < peering_degree:
+                # Check if the other node is not already connected to the current node
+                # and the other node has not reached the peering degree.
+                if (
+                    other not in topology[node]
+                    and len(topology[other]) < peering_degree
+                ):
                     others.append(other)
             # How many more connections the current node needs
             n_needs = peering_degree - len(topology[node])
