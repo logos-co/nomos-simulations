@@ -9,6 +9,7 @@ from pysphinx.sphinx import Node as SphinxNode
 from pysphinx.sphinx import X25519PrivateKey
 
 from protocol.gossip import GossipConfig
+from protocol.temporalmix import TemporalMixConfig
 
 
 @dataclass
@@ -32,6 +33,7 @@ class NodeConfig:
     private_key: X25519PrivateKey
     mix_path_length: int
     gossip: GossipConfig
+    temporal_mix: TemporalMixConfig
 
 
 @dataclass

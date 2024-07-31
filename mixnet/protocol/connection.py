@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import abc
+import random
 
 from framework import Framework, Queue
+from protocol.temporalmix import PureCoinFlipppingQueue, TemporalMix, TemporalMixConfig
 
 
 class SimplexConnection(abc.ABC):
@@ -63,23 +65,20 @@ class MixSimplexConnection(SimplexConnection):
         conn: SimplexConnection,
         transmission_rate_per_sec: int,
         noise_msg: bytes,
+        temporal_mix_config: TemporalMixConfig,
     ):
         self.framework = framework
-        self.queue: Queue[bytes] = framework.queue()
+        self.queue: Queue[bytes] = TemporalMix.queue(
+            temporal_mix_config, framework, noise_msg
+        )
         self.conn = conn
         self.transmission_rate_per_sec = transmission_rate_per_sec
-        self.noise_msg = noise_msg
         self.task = framework.spawn(self.__run())
 
     async def __run(self):
         while True:
             await self.framework.sleep(1 / self.transmission_rate_per_sec)
-            # TODO: temporal mixing
-            if self.queue.empty():
-                # To guarantee GTR, send noise if there is no message to send
-                msg = self.noise_msg
-            else:
-                msg = await self.queue.get()
+            msg = await self.queue.get()
             await self.conn.send(msg)
 
     async def send(self, data: bytes) -> None:

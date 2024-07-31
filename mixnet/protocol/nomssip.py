@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import random
 from dataclasses import dataclass
 from enum import Enum
 from typing import Awaitable, Callable, Self, override
@@ -13,12 +14,14 @@ from protocol.connection import (
 )
 from protocol.error import PeeringDegreeReached
 from protocol.gossip import Gossip, GossipConfig
+from protocol.temporalmix import TemporalMixConfig
 
 
 @dataclass
 class NomssipConfig(GossipConfig):
     transmission_rate_per_sec: int
     msg_size: int
+    temporal_mix: TemporalMixConfig
 
 
 class Nomssip(Gossip):
@@ -48,6 +51,7 @@ class Nomssip(Gossip):
                 outbound,
                 self.config.transmission_rate_per_sec,
                 noise_packet,
+                self.config.temporal_mix,
             ),
         )
 

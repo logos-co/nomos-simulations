@@ -1,3 +1,5 @@
+import random
+
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
 from protocol.config import (
@@ -7,6 +9,8 @@ from protocol.config import (
     NodeInfo,
 )
 from protocol.gossip import GossipConfig
+from protocol.nomssip import TemporalMixConfig
+from protocol.temporalmix import TemporalMixType
 
 
 def init_mixnet_config(
@@ -16,7 +20,12 @@ def init_mixnet_config(
 ) -> tuple[GlobalConfig, list[NodeConfig], dict[bytes, X25519PrivateKey]]:
     gossip_config = GossipConfig(peering_degree=6)
     node_configs = [
-        NodeConfig(X25519PrivateKey.generate(), max_mix_path_length, gossip_config)
+        NodeConfig(
+            X25519PrivateKey.generate(),
+            max_mix_path_length,
+            gossip_config,
+            TemporalMixConfig(TemporalMixType.PURE_COIN_FLIPPING, 3, random.Random()),
+        )
         for _ in range(num_nodes)
     ]
     global_config = GlobalConfig(
