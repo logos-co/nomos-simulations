@@ -1,4 +1,5 @@
 from dataclasses import asdict, dataclass
+from pprint import pprint
 from typing import Self
 
 import usim
@@ -99,6 +100,9 @@ class Simulation:
             len(nodes),
             self.config.network.gossip.peering_degree,
         )
+        print("Topology:")
+        pprint(topology)
+
         meter_start_time = self.framework.now()
         # Sort the topology by node index for the connection RULE defined below.
         for node_idx, peer_indices in sorted(topology.items()):
