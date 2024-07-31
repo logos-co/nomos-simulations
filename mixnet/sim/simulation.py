@@ -1,3 +1,6 @@
+from dataclasses import asdict, dataclass
+from typing import Self
+
 import usim
 from matplotlib import pyplot
 
@@ -69,7 +72,12 @@ class Simulation:
 
         # Initialize Node instances
         nodes = [
-            Node(self.framework, node_config, global_config)
+            Node(
+                self.framework,
+                node_config,
+                global_config,
+                self.__process_broadcasted_msg,
+            )
             for node_config in node_configs
         ]
 
@@ -83,20 +91,26 @@ class Simulation:
             node_states = node_state_table[i]
             peer_states = node_state_table[peer_idx]
 
-            # Create simplex inbound/outbound connections
-            # and use them to connect node and peer.
+            # Connect the node and peer for Nomssip
             inbound_conn, outbound_conn = (
-                self.__create_conn(meter_start_time, peer_states, node_states),
-                self.__create_conn(meter_start_time, node_states, peer_states),
+                self.__create_observed_conn(meter_start_time, peer_states, node_states),
+                self.__create_observed_conn(meter_start_time, node_states, peer_states),
             )
-            node.connect(peer, inbound_conn, outbound_conn)
+            node.connect_mix(peer, inbound_conn, outbound_conn)
             # Register the connections to the connection statistics
             conn_stats.register(node, inbound_conn, outbound_conn)
             conn_stats.register(peer, outbound_conn, inbound_conn)
 
+            # Connect the node and peer for broadcasting.
+            node.connect_broadcast(
+                peer,
+                self.__create_conn(meter_start_time),
+                self.__create_conn(meter_start_time),
+            )
+
         return nodes
 
-    def __create_conn(
+    def __create_observed_conn(
         self,
         meter_start_time: float,
         sender_states: list[NodeState],
@@ -110,6 +124,16 @@ class Simulation:
             receiver_states,
         )
 
+    def __create_conn(
+        self,
+        meter_start_time: float,
+    ) -> MeteredRemoteSimplexConnection:
+        return MeteredRemoteSimplexConnection(
+            self.config.network.latency,
+            self.framework,
+            meter_start_time,
+        )
+
     async def __run_node_logic(self, node: Node):
         """
         Runs the lottery periodically to check if the node is selected to send a block.
@@ -120,3 +144,9 @@ class Simulation:
             await self.framework.sleep(lottery_config.interval_sec)
             if lottery_config.seed.random() < lottery_config.probability:
                 await node.send_message(b"selected block")
+
+    async def __process_broadcasted_msg(self, msg: bytes):
+        """
+        Process a message broadcasted after being travelled through mix nodes.
+        """
+        pass

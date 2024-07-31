@@ -5,8 +5,8 @@ from protocol.config import (
     MixMembership,
     NodeConfig,
     NodeInfo,
-    NomssipConfig,
 )
+from protocol.gossip import GossipConfig
 
 
 def init_mixnet_config(
@@ -14,7 +14,7 @@ def init_mixnet_config(
     max_message_size: int = 512,
     max_mix_path_length: int = 3,
 ) -> tuple[GlobalConfig, list[NodeConfig], dict[bytes, X25519PrivateKey]]:
-    gossip_config = NomssipConfig(peering_degree=6)
+    gossip_config = GossipConfig(peering_degree=6)
     node_configs = [
         NodeConfig(X25519PrivateKey.generate(), max_mix_path_length, gossip_config)
         for _ in range(num_nodes)

@@ -1,6 +1,7 @@
 from unittest import IsolatedAsyncioTestCase
 
 import framework.asyncio as asynciofw
+from framework.framework import Queue
 from protocol.connection import LocalSimplexConnection
 from protocol.node import Node
 from protocol.test_utils import (
@@ -12,12 +13,24 @@ class TestNode(IsolatedAsyncioTestCase):
     async def test_node(self):
         framework = asynciofw.Framework()
         global_config, node_configs, _ = init_mixnet_config(10)
+
+        queue: Queue[bytes] = framework.queue()
+
+        async def broadcasted_msg_handler(msg: bytes) -> None:
+            await queue.put(msg)
+
         nodes = [
-            Node(framework, node_config, global_config) for node_config in node_configs
+            Node(framework, node_config, global_config, broadcasted_msg_handler)
+            for node_config in node_configs
         ]
         for i, node in enumerate(nodes):
             try:
-                node.connect(
+                node.connect_mix(
+                    nodes[(i + 1) % len(nodes)],
+                    LocalSimplexConnection(framework),
+                    LocalSimplexConnection(framework),
+                )
+                node.connect_broadcast(
                     nodes[(i + 1) % len(nodes)],
                     LocalSimplexConnection(framework),
                     LocalSimplexConnection(framework),
@@ -27,20 +40,19 @@ class TestNode(IsolatedAsyncioTestCase):
 
         await nodes[0].send_message(b"block selection")
 
+        # Wait for all nodes to receive the broadcast
+        num_nodes_received_broadcast = 0
         timeout = 15
         for _ in range(timeout):
-            broadcasted_msgs = []
-            for node in nodes:
-                if not node.broadcast_channel.empty():
-                    broadcasted_msgs.append(await node.broadcast_channel.get())
+            await framework.sleep(1)
 
-            if len(broadcasted_msgs) == 0:
-                await framework.sleep(1)
-            else:
-                # We expect only one node to broadcast the message.
-                assert len(broadcasted_msgs) == 1
-                self.assertEqual(b"block selection", broadcasted_msgs[0])
-                return
-        self.fail("timeout")
+            while not queue.empty():
+                self.assertEqual(b"block selection", await queue.get())
+                num_nodes_received_broadcast += 1
+
+            if num_nodes_received_broadcast == len(nodes):
+                break
+
+        self.assertEqual(len(nodes), num_nodes_received_broadcast)
 
     # TODO: check noise
