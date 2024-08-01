@@ -55,71 +55,74 @@ python -m cmd.main --config {config_path}
 All results are printed in the console as below.
 And, all plots are shown once all analysis is done.
 ```
+Spawning node-0 with 3 conns
+Spawning node-1 with 3 conns
+Spawning node-2 with 3 conns
+Spawning node-3 with 3 conns
+Spawning node-4 with 3 conns
+Spawning node-5 with 3 conns
 ==========================================
-Message Dissemination Time (sec)
+Message Dissemination Time
 ==========================================
 [Mix Propagation Times]
-count    6.000000
-mean     0.814500
-std      0.401595
-min      0.457000
-25%      0.461250
-50%      0.729000
-75%      1.127250
-max      1.340000
+count    7.000000
+mean     1.122000
+std      0.106276
+min      1.009000
+25%      1.024500
+50%      1.157000
+75%      1.174500
+max      1.290000
 dtype: float64
 
 [Broadcast Dissemination Times]
-count    6.000000
-mean     0.132500
-std      0.016355
-min      0.105000
-25%      0.125000
-50%      0.140000
-75%      0.143750
-max      0.145000
+count    7.000000
+mean     0.118429
+std      0.004353
+min      0.111000
+25%      0.116000
+50%      0.120000
+75%      0.121500
+max      0.123000
 dtype: float64
 
 ==========================================
 Message Size Distribution
 ==========================================
-   msg_size  count
-0      1405  99990
+   msg_size   count
+0      1405  179982
 
 ==========================================
 Node States of All Nodes over Time
 SENDING:-1, IDLE:0, RECEIVING:1
 ==========================================
-        Node-0  Node-1  Node-2  Node-3  Node-4
-0            0       0       0       0       0
-1            0       0       0       0       0
-2            0       0       0       0       0
-3            0       0       0       0       0
-4            0       0       0       0       0
-...        ...     ...     ...     ...     ...
-999995       0       0       0       0       0
-999996       0       0       0       0       0
-999997       0       0       0       0       0
-999998       0       0       0       0       0
-999999       0       0       0       0       0
+        Node-0  Node-1  Node-2  Node-3  Node-4  Node-5
+0            0       0       0       0       0       0
+1            0       0       0       0       0       0
+2            0       0       0       0       0       0
+3            0       0       0       0       0       0
+4            0       0       0       0       0       0
+...        ...     ...     ...     ...     ...     ...
+999995       0       0       0       0       0       0
+999996       0       0       0       0       0       1
+999997       0       0       0       0       0       0
+999998       0       0       0       1       0       0
+999999       0       0       0       0       0       0
 
-[1000000 rows x 5 columns]
+[1000000 rows x 6 columns]
 
-Saved DataFrame to all_node_states_2024-07-15T18:20:23.csv
+Saved DataFrame to all_node_states_2024-07-23T09:10:59.csv
 
 State Counts per Node:
-    Node-0  Node-1  Node-2  Node-3  Node-4
- 0  970003  970003  970003  970003  970003
- 1   19998   19998   19998   19998   19998
--1    9999    9999    9999    9999    9999
+    Node-0  Node-1  Node-2  Node-3  Node-4  Node-5
+ 0  960004  960004  960004  960004  960004  960004
+ 1   29997   29997   29997   29997   29997   29997
+-1    9999    9999    9999    9999    9999    9999
 
 Simulation complete!
 ```
 
 Please note that the result of node state analysis is saved as a CSV file, as printed in the console.
-```
-Saved DataFrame to all_node_states_2024-07-15T18:20:23.csv
-```
 
 If you run the simulation again with the different parameters and want to
 compare the results of two simulations,

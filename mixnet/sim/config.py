@@ -71,6 +71,7 @@ class NetworkConfig:
     num_nodes: int
     latency: LatencyConfig
     gossip: GossipConfig
+    topology: TopologyConfig
 
     def __post_init__(self):
         assert self.num_nodes > 0
@@ -92,6 +93,15 @@ class LatencyConfig:
     def random_latency(self) -> float:
         # round to milliseconds to make analysis not too heavy
         return round(self.seed.uniform(self.min_latency_sec, self.max_latency_sec), 3)
+
+
+@dataclass
+class TopologyConfig:
+    # Seed for the random number generator used to determine the network topology.
+    seed: random.Random
+
+    def __post_init__(self):
+        assert self.seed is not None
 
 
 @dataclass

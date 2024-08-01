@@ -1,4 +1,5 @@
 from dataclasses import asdict, dataclass
+from pprint import pprint
 from typing import Self
 
 import usim
@@ -16,6 +17,7 @@ from sim.connection import (
 from sim.message import Message, UniqueMessageBuilder
 from sim.state import NodeState, NodeStateTable
 from sim.stats import ConnectionStats, DisseminationTime
+from sim.topology import build_full_random_topology
 
 
 class Simulation:
@@ -50,16 +52,16 @@ class Simulation:
         # Create a μSim scope and run the simulation
         async with usim.until(usim.time + self.config.simulation.duration_sec) as scope:
             self.framework = usimfw.Framework(scope)
-            nodes = self.__init_nodes(node_state_table, conn_stats)
-            for node in nodes:
+            nodes = self.__init_nodes()
+            self.__connect_nodes(nodes, node_state_table, conn_stats)
+            for i, node in enumerate(nodes):
+                print(f"Spawning node-{i} with {len(node.nomssip.conns)} conns")
                 self.framework.spawn(self.__run_node_logic(node))
 
         # Return analysis tools once the μSim scope is done
         return conn_stats, node_state_table
 
-    def __init_nodes(
-        self, node_state_table: NodeStateTable, conn_stats: ConnectionStats
-    ) -> list[Node]:
+    def __init_nodes(self) -> list[Node]:
         # Initialize node/global configurations
         node_configs = self.config.node_configs()
         global_config = GlobalConfig(
@@ -75,8 +77,8 @@ class Simulation:
             self.config.mix.mix_path.max_length,
         )
 
-        # Initialize Node instances
-        nodes = [
+        # Initialize/return Node instances
+        return [
             Node(
                 self.framework,
                 node_config,
@@ -87,34 +89,55 @@ class Simulation:
             for node_config in node_configs
         ]
 
-        # Connect nodes to each other
+    def __connect_nodes(
+        self,
+        nodes: list[Node],
+        node_state_table: NodeStateTable,
+        conn_stats: ConnectionStats,
+    ):
+        topology = build_full_random_topology(
+            self.config.network.topology.seed,
+            len(nodes),
+            self.config.network.gossip.peering_degree,
+        )
+        print("Topology:")
+        pprint(topology)
+
         meter_start_time = self.framework.now()
-        for i, node in enumerate(nodes):
-            # For now, we only consider a simple ring topology for simplicity.
-            # TODO: Use a more realistic random (deterministic) topology.
-            peer_idx = (i + 1) % len(nodes)
-            peer = nodes[peer_idx]
-            node_states = node_state_table[i]
-            peer_states = node_state_table[peer_idx]
+        # Sort the topology by node index for the connection RULE defined below.
+        for node_idx, peer_indices in sorted(topology.items()):
+            for peer_idx in peer_indices:
+                # Since the topology is undirected, we only need to connect the two nodes once.
+                # RULE: the node with the smaller index establishes the connection.
+                assert node_idx != peer_idx
+                if node_idx > peer_idx:
+                    continue
 
-            # Connect the node and peer for Nomssip
-            inbound_conn, outbound_conn = (
-                self.__create_observed_conn(meter_start_time, peer_states, node_states),
-                self.__create_observed_conn(meter_start_time, node_states, peer_states),
-            )
-            node.connect_mix(peer, inbound_conn, outbound_conn)
-            # Register the connections to the connection statistics
-            conn_stats.register(node, inbound_conn, outbound_conn)
-            conn_stats.register(peer, outbound_conn, inbound_conn)
+                node = nodes[node_idx]
+                peer = nodes[peer_idx]
+                node_states = node_state_table[node_idx]
+                peer_states = node_state_table[peer_idx]
 
-            # Connect the node and peer for broadcasting.
-            node.connect_broadcast(
-                peer,
-                self.__create_conn(meter_start_time),
-                self.__create_conn(meter_start_time),
-            )
+                # Connect the node and peer for Nomos Gossip
+                inbound_conn, outbound_conn = (
+                    self.__create_observed_conn(
+                        meter_start_time, peer_states, node_states
+                    ),
+                    self.__create_observed_conn(
+                        meter_start_time, node_states, peer_states
+                    ),
+                )
+                node.connect_mix(peer, inbound_conn, outbound_conn)
+                # Register the connections to the connection statistics
+                conn_stats.register(node, inbound_conn, outbound_conn)
+                conn_stats.register(peer, outbound_conn, inbound_conn)
 
-        return nodes
+                # Connect the node and peer for broadcasting.
+                node.connect_broadcast(
+                    peer,
+                    self.__create_conn(meter_start_time),
+                    self.__create_conn(meter_start_time),
+                )
 
     def __create_observed_conn(
         self,
