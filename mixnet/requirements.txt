@@ -1,0 +1,6 @@
+usim==0.4.4
+pysphinx==0.0.5
+dacite==1.8.1
+pandas==2.2.2
+matplotlib==3.9.1
+PyYAML==6.0.1

@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - "*"
+  push:
+    branches: [master]
+
+jobs:
+  mixnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Set up Python 3.x
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install dependencies for mixnet
+        working-directory: mixnet
+        run: pip install -r requirements.txt
+      - name: Run unit tests
+        working-directory: mixnet
+        run: python -m unittest -v
+      - name: Run a short mixnet simulation
+        working-directory: mixnet
+        run: python -m cmd.main --config config.ci.yaml
+
