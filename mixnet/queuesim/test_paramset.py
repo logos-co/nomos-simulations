@@ -47,6 +47,7 @@ class TestParameterSet(TestCase):
             (ExperimentID.EXPERIMENT_3, SessionID.SESSION_1): pow(3, 5),
             (ExperimentID.EXPERIMENT_4, SessionID.SESSION_1): pow(3, 6),
             (ExperimentID.EXPERIMENT_1, SessionID.SESSION_2): pow(3, 4),
+            (ExperimentID.EXPERIMENT_4, SessionID.SESSION_2): pow(3, 6),
         }
         for queue_type in TemporalMixType:
             for (exp_id, session_id), expected_cnt in cases.items():
