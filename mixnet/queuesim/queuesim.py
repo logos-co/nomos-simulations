@@ -104,7 +104,10 @@ def run_session(
     future_map: dict[
         concurrent.futures.Future[list[float]], tuple[int, ParameterSet, int]
     ] = dict()
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+    total_cores = os.cpu_count()
+    assert total_cores is not None
+    max_workers = max(1, total_cores - 1)
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
         # Submit all iterations of all parameter sets to the ProcessPoolExecutor
         for paramset_idx, paramset in enumerate(paramsets):
             paramset_id = paramset_idx + 1
