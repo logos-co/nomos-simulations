@@ -186,6 +186,7 @@ def __build_session_2_parameter_sets(
         peering_degree_list = [4, 8, 16]
         min_queue_size_list = [10, 50, 100]
         transmission_rate_list = [1, 10, 100]
+        num_senders_list = [num_nodes // 10, num_nodes // 5, num_nodes // 2]
         num_iterations = 20
 
         match exp_id:
@@ -211,6 +212,35 @@ def __build_session_2_parameter_sets(
                             num_iterations=num_iterations,
                         )
                     )
+            case ExperimentID.EXPERIMENT_4:
+                for (
+                    peering_degree,
+                    min_queue_size,
+                    transmission_rate,
+                    num_senders,
+                ) in itertools.product(
+                    peering_degree_list,
+                    min_queue_size_list,
+                    transmission_rate_list,
+                    num_senders_list,
+                ):
+                    for num_sent_msgs in [
+                        min_queue_size // 2,
+                        min_queue_size,
+                        min_queue_size * 2,
+                    ]:
+                        sets.append(
+                            ParameterSet(
+                                num_nodes=num_nodes,
+                                peering_degree=peering_degree,
+                                min_queue_size=min_queue_size,
+                                transmission_rate=transmission_rate,
+                                num_sent_msgs=num_sent_msgs,
+                                num_senders=num_senders,
+                                queue_type=queue_type,
+                                num_iterations=num_iterations,
+                            )
+                        )
             case _:
                 raise NotImplementedError(
                     f"Experiment {exp_id} not implemented for session 2"
