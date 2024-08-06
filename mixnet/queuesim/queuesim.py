@@ -125,9 +125,18 @@ def run_session(
             try:
                 dissemination_times = future.result()
             except BaseException as e:
-                print(f"Error occurred in ParamSet-{paramset_id}, Iter-{iter_idx}: {e}")
+                msg = (
+                    f"Error occurred in ParamSet-{paramset_id}, IterIdx-{iter_idx}: {e}"
+                )
+                print(msg)
                 traceback.print_exc()
-                raise
+                with open(
+                    f"{outdir}/{subdir}/paramset_{paramset_id}_iteridx_{iter_idx}.err",
+                    "a",
+                ) as f:
+                    f.write(f"{msg}\n\n")
+                    traceback.print_exc(file=f)
+                continue  # skip the iteration failed
 
             paramset_results[paramset_id][0].add(iter_idx)
             paramset_results[paramset_id][1].extend(dissemination_times)
