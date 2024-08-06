@@ -1,7 +1,7 @@
 from typing import Any, Awaitable, Coroutine, TypeVar
 
 import usim
-from usim._primitives.task import Task, TaskCancelled
+from usim._primitives.task import Task
 
 from framework import framework
 

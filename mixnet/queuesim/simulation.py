@@ -1,7 +1,5 @@
-import random
 import struct
 from dataclasses import dataclass
-from random import Random
 from typing import Counter, Self
 
 import usim
@@ -9,11 +7,8 @@ import usim
 from framework.framework import Queue
 from framework.usim import Framework
 from protocol.connection import LocalSimplexConnection, SimplexConnection
-from protocol.nomssip import NomssipConfig
-from protocol.temporalmix import TemporalMixConfig, TemporalMixType
 from queuesim.config import Config
 from queuesim.node import Node
-from sim.config import LatencyConfig
 from sim.connection import RemoteSimplexConnection
 from sim.topology import build_full_random_topology
 

@@ -1,8 +1,8 @@
 import concurrent.futures
-import itertools
 import os
 import random
 import time
+import traceback
 from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime, timedelta
@@ -122,8 +122,15 @@ def run_session(
         paramsets_done: set[int] = set()
         for future in concurrent.futures.as_completed(future_map):
             paramset_id, paramset, iter_idx = future_map[future]
+            try:
+                dissemination_times = future.result()
+            except BaseException as e:
+                print(f"Error occurred in ParamSet-{paramset_id}, Iter-{iter_idx}: {e}")
+                traceback.print_exc()
+                raise
+
             paramset_results[paramset_id][0].add(iter_idx)
-            paramset_results[paramset_id][1].extend(future.result())
+            paramset_results[paramset_id][1].extend(dissemination_times)
             # If all iterations of the paramset are done, process the results
             if len(paramset_results[paramset_id][0]) == paramset.num_iterations:
                 paramsets_done.add(paramset_id)
@@ -204,9 +211,14 @@ def __run_iteration(cfg: Config) -> list[float]:
     Run a single iteration of a certain parameter set.
     The iteration uses the independent uSim instance.
     """
-    sim = Simulation(cfg)
-    usim.run(sim.run())
-    return sim.dissemination_times
+    try:
+        sim = Simulation(cfg)
+        usim.run(sim.run())
+        return sim.dissemination_times
+    except BaseException as e:
+        print(f"Error in running the iteration: {e}")
+        traceback.print_exc()
+        raise
 
 
 def __process_paramset_result(
