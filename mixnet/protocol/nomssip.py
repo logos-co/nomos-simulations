@@ -1,18 +1,14 @@
 from __future__ import annotations
 
-import hashlib
-import random
 from dataclasses import dataclass
 from enum import Enum
 from typing import Awaitable, Callable, Self, override
 
 from framework import Framework
 from protocol.connection import (
-    DuplexConnection,
     MixSimplexConnection,
     SimplexConnection,
 )
-from protocol.error import PeeringDegreeReached
 from protocol.gossip import Gossip, GossipConfig
 from protocol.temporalmix import TemporalMixConfig
 

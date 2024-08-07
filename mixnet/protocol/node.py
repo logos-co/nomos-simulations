@@ -8,7 +8,7 @@ from pysphinx.sphinx import (
     SphinxPacket,
 )
 
-from framework import Framework, Queue
+from framework import Framework
 from protocol.config import GlobalConfig, NodeConfig
 from protocol.connection import SimplexConnection
 from protocol.error import PeeringDegreeReached

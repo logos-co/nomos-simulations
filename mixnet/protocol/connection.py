@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import abc
-import random
 
 from framework import Framework, Queue
-from protocol.temporalmix import PureCoinFlipppingQueue, TemporalMix, TemporalMixConfig
+from protocol.temporalmix import TemporalMix, TemporalMixConfig
 
 
 class SimplexConnection(abc.ABC):
