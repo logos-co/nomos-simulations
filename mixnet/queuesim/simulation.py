@@ -1,3 +1,4 @@
+import csv
 import struct
 from dataclasses import dataclass
 from typing import Counter, Self
@@ -21,14 +22,14 @@ class Simulation:
     def __init__(self, config: Config):
         self.config = config
 
-    async def run(self):
+    async def run(self, out_csv_path: str):
         async with usim.Scope() as scope:
             self.framework = Framework(scope)
             self.message_builder = MessageBuilder(self.framework)
-            self.dissemination_times = await self.__run()
+            await self.__run(out_csv_path)
             self.framework.stop_tasks()
 
-    async def __run(self) -> list[float]:
+    async def __run(self, out_csv_path: str):
         self.received_msg_queue: Queue[tuple[float, bytes]] = self.framework.queue()
 
         # Run and connect nodes
@@ -40,24 +41,27 @@ class Simulation:
         for sender in senders:
             self.framework.spawn(self.__run_sender(sender))
 
-        # To count how many nodes have received each message
-        received_msg_counters: Counter[bytes] = Counter()
-        # To collect the dissemination times of each message.
-        dissemination_times: list[float] = []
-        # Wait until all messages are disseminated to the entire network.
-        while (
-            len(dissemination_times)
-            < self.config.num_sent_msgs * self.config.num_senders
-        ):
-            # Wait until a node notifies that it has received a new message.
-            received_time, msg = await self.received_msg_queue.get()
-            # If the message has been received by all nodes, calculate the dissemination time.
-            received_msg_counters.update([msg])
-            if received_msg_counters[msg] == len(nodes):
-                dissemination_times.append(
-                    received_time - Message.from_bytes(msg).sent_time
-                )
-        return dissemination_times
+        # Open the output CSV file
+        with open(out_csv_path, "w", newline="") as f:
+            # Use CSV writer which is less error-prone than manually writing rows to the file
+            writer = csv.writer(f)
+            # To count how many nodes have received each message
+            received_msg_counters: Counter[bytes] = Counter()
+            # To count how many results (dissemination time) have been collected so far
+            result_cnt = 0
+            # Wait until all messages are disseminated to the entire network.
+            while result_cnt < self.config.num_sent_msgs * self.config.num_senders:
+                # Wait until a node notifies that it has received a new message.
+                received_time, msg = await self.received_msg_queue.get()
+                # If the message has been received by all nodes, calculate the dissemination time.
+                received_msg_counters.update([msg])
+                if received_msg_counters[msg] == len(nodes):
+                    dissemination_time = (
+                        received_time - Message.from_bytes(msg).sent_time
+                    )
+                    # Use repr to convert a float to a string with as much precision as Python can provide
+                    writer.writerow([repr(dissemination_time)])
+                    result_cnt += 1
 
     def __run_nodes(self) -> list[Node]:
         return [
