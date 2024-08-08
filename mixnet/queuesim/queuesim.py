@@ -103,7 +103,7 @@ def run_session(
             os.makedirs(paramset_dir)
             __save_paramset_info(paramset_id, paramset, f"{paramset_dir}/paramset.csv")
             future_map.update(
-                __submit_iterations(paramset_id, paramset, executor, paramset_dir)
+                _submit_iterations(paramset_id, paramset, executor, paramset_dir)
             )
 
         # Wait until all parameter sets are done
@@ -163,7 +163,7 @@ def __save_paramset_info(paramset_id: int, paramset: ParameterSet, path: str):
     pd.DataFrame([info]).to_csv(path, mode="w", header=True, index=False)
 
 
-def __submit_iterations(
+def _submit_iterations(
     paramset_id: int,
     paramset: ParameterSet,
     executor: concurrent.futures.ProcessPoolExecutor,
@@ -195,7 +195,7 @@ def __submit_iterations(
         # Submit the iteration to the executor
         out_csv_path = f"{outdir}/iteration_{i}.csv"
         err_path = f"{outdir}/iteration_{i}.err"
-        future = executor.submit(__run_iteration, iter_cfg, out_csv_path, err_path)
+        future = executor.submit(_run_iteration, iter_cfg, out_csv_path, err_path)
         future_map[future] = IterationInfo(
             paramset_id, paramset, i, out_csv_path, err_path
         )
@@ -203,7 +203,7 @@ def __submit_iterations(
     return future_map
 
 
-def __run_iteration(cfg: Config, out_csv_path: str, err_path: str) -> bool:
+def _run_iteration(cfg: Config, out_csv_path: str, err_path: str) -> bool:
     """
     Run a single iteration of a certain parameter set.
     The iteration uses the independent uSim instance.
