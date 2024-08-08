@@ -12,7 +12,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--exp-id", type=int, required=True, help="Experiment ID (>=1)")
     parser.add_argument(
-        "--session-id", type=int, required=True, help="Session ID (>=1)"
+        "--session-id", type=float, required=True, help="Session ID (>=1)"
     )
     parser.add_argument(
         "--csv-path", type=str, required=True, help="input CSV file path"

@@ -18,6 +18,7 @@ class ExperimentID(Enum):
 class SessionID(Enum):
     SESSION_1 = 1
     SESSION_2 = 2
+    SESSION_2_1 = 2.1
 
 
 EXPERIMENT_TITLES: dict[ExperimentID, str] = {
@@ -57,6 +58,8 @@ def build_parameter_sets(
             return __build_session_1_parameter_sets(exp_id, queue_type)
         case SessionID.SESSION_2:
             return __build_session_2_parameter_sets(exp_id, queue_type)
+        case SessionID.SESSION_2_1:
+            return __build_session_2_1_parameter_sets(exp_id, queue_type)
         case _:
             raise ValueError(f"Unknown session ID: {session_id}")
 
@@ -241,6 +244,74 @@ def __build_session_2_parameter_sets(
                                 num_iterations=num_iterations,
                             )
                         )
+            case _:
+                raise NotImplementedError(
+                    f"Experiment {exp_id} not implemented for session 2"
+                )
+
+    return sets
+
+
+def __build_session_2_1_parameter_sets(
+    exp_id: ExperimentID, queue_type: TemporalMixType
+) -> list[ParameterSet]:
+    sets: list[ParameterSet] = []
+
+    for num_nodes in [20, 200, 2000]:
+        peering_degree_list = [4, 6, 8]
+        min_queue_size_list = [10, 50, 100]
+        transmission_rate_list = [1, 10, 100]
+        num_sent_msgs = 1000
+        num_senders_list = [num_nodes // 10, num_nodes // 5, num_nodes // 2]
+        num_iterations = 20
+
+        match exp_id:
+            case ExperimentID.EXPERIMENT_1:
+                for (
+                    peering_degree,
+                    min_queue_size,
+                    transmission_rate,
+                ) in itertools.product(
+                    peering_degree_list,
+                    min_queue_size_list,
+                    transmission_rate_list,
+                ):
+                    sets.append(
+                        ParameterSet(
+                            num_nodes=num_nodes,
+                            peering_degree=peering_degree,
+                            min_queue_size=min_queue_size,
+                            transmission_rate=transmission_rate,
+                            num_sent_msgs=1,
+                            num_senders=1,
+                            queue_type=queue_type,
+                            num_iterations=num_iterations,
+                        )
+                    )
+            case ExperimentID.EXPERIMENT_4:
+                for (
+                    peering_degree,
+                    min_queue_size,
+                    transmission_rate,
+                    num_senders,
+                ) in itertools.product(
+                    peering_degree_list,
+                    min_queue_size_list,
+                    transmission_rate_list,
+                    num_senders_list,
+                ):
+                    sets.append(
+                        ParameterSet(
+                            num_nodes=num_nodes,
+                            peering_degree=peering_degree,
+                            min_queue_size=min_queue_size,
+                            transmission_rate=transmission_rate,
+                            num_sent_msgs=num_sent_msgs,
+                            num_senders=num_senders,
+                            queue_type=queue_type,
+                            num_iterations=num_iterations,
+                        )
+                    )
             case _:
                 raise NotImplementedError(
                     f"Experiment {exp_id} not implemented for session 2"
