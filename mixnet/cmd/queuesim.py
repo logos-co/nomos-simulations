@@ -19,6 +19,7 @@ if __name__ == "__main__":
         required=True,
         help=f"Queue type: {' | '.join([t.value for t in TemporalMixType])}",
     )
+    parser.add_argument("--num-workers", type=int, required=True, help="num workers")
     parser.add_argument("--outdir", type=str, required=True, help="output directory")
     parser.add_argument(
         "--from-paramset",
@@ -33,6 +34,7 @@ if __name__ == "__main__":
         ExperimentID(args.exp_id),
         SessionID(args.session_id),
         TemporalMixType(args.queue_type),
+        args.num_workers,
         args.outdir,
         args.from_paramset,
     )

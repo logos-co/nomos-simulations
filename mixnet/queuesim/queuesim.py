@@ -71,6 +71,7 @@ def run_session(
     exp_id: ExperimentID,
     session_id: SessionID,
     queue_type: TemporalMixType,
+    num_workers: int,
     outdir: str,
     from_paramset: int = 1,
 ):
@@ -93,10 +94,7 @@ def run_session(
     future_map: dict[concurrent.futures.Future[tuple[bool, float]], IterationInfo] = (
         dict()
     )
-    total_cores = os.cpu_count()
-    assert total_cores is not None
-    max_workers = max(1, total_cores - 1)
-    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
         # Submit all iterations of all parameter sets to the ProcessPoolExecutor
         for paramset_idx, paramset in enumerate(paramsets):
             paramset_id = paramset_idx + 1
