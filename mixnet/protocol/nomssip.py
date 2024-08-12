@@ -6,6 +6,7 @@ from typing import Awaitable, Callable, Self, override
 
 from framework import Framework
 from protocol.connection import (
+    DuplexConnection,
     MixSimplexConnection,
     SimplexConnection,
 )
@@ -56,18 +57,18 @@ class Nomssip(Gossip):
         )
 
     @override
-    async def _process_inbound_msg(self, msg: bytes):
+    async def _process_inbound_msg(self, msg: bytes, received_from: DuplexConnection):
         packet = FlaggedPacket.from_bytes(msg)
         match packet.flag:
             case FlaggedPacket.Flag.NOISE:
                 # Drop noise packet
                 return
             case FlaggedPacket.Flag.REAL:
-                await self.__gossip_flagged_packet(packet)
+                await self.__gossip_flagged_packet(packet, [received_from])
                 await self.handler(packet.message)
 
     @override
-    async def _gossip(self, msg: bytes):
+    async def _gossip(self, msg: bytes, excludes: list[DuplexConnection] = []):
         """
         Gossip a message to all connected peers with prepending a message flag
         """
@@ -75,13 +76,15 @@ class Nomssip(Gossip):
         assert len(msg) == self.config.msg_size, f"{len(msg)} != {self.config.msg_size}"
 
         packet = FlaggedPacket(FlaggedPacket.Flag.REAL, msg)
-        await self.__gossip_flagged_packet(packet)
+        await self.__gossip_flagged_packet(packet, excludes)
 
-    async def __gossip_flagged_packet(self, packet: FlaggedPacket):
+    async def __gossip_flagged_packet(
+        self, packet: FlaggedPacket, excludes: list[DuplexConnection] = []
+    ):
         """
         An internal method to send a flagged packet to all connected peers
         """
-        await super()._gossip(packet.bytes())
+        await super()._gossip(packet.bytes(), excludes)
 
 
 class FlaggedPacket:

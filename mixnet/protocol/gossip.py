@@ -61,10 +61,10 @@ class Gossip:
             msg = await conn.recv()
             if self.__check_update_cache(msg):
                 continue
-            await self._process_inbound_msg(msg)
+            await self._process_inbound_msg(msg, conn)
 
-    async def _process_inbound_msg(self, msg: bytes):
-        await self._gossip(msg)
+    async def _process_inbound_msg(self, msg: bytes, received_from: DuplexConnection):
+        await self._gossip(msg, [received_from])
         await self.handler(msg)
 
     async def publish(self, msg: bytes):
@@ -82,12 +82,13 @@ class Gossip:
             # which means that we consider that this publisher node received the message.
             await self.handler(msg)
 
-    async def _gossip(self, msg: bytes):
+    async def _gossip(self, msg: bytes, excludes: list[DuplexConnection] = []):
         """
         Gossip a message to all peers connected to this node.
         """
         for conn in self.conns:
-            await conn.send(msg)
+            if conn not in excludes:
+                await conn.send(msg)
 
     def __check_update_cache(self, packet: bytes) -> bool:
         """
