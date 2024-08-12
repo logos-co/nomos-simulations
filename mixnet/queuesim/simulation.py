@@ -42,7 +42,7 @@ class Simulation:
             self.framework.spawn(self.__run_sender(sender))
 
         # Open the output CSV file
-        with open(out_csv_path, "w", newline="") as f:
+        with open(out_csv_path, "w", newline="", buffering=8192) as f:
             # Use CSV writer which is less error-prone than manually writing rows to the file
             writer = csv.writer(f)
             # To count how many nodes have received each message
