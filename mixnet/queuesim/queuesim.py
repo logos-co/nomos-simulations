@@ -100,7 +100,7 @@ def run_session(
             paramset_id = paramset_idx + 1
             if paramset_id < from_paramset:
                 continue
-            paramset_dir = f"{outdir}/{subdir}/paramset_{paramset_id}"
+            paramset_dir = f"{outdir}/{subdir}/__WIP__paramset_{paramset_id}"
             os.makedirs(paramset_dir)
             __save_paramset_info(paramset_id, paramset, f"{paramset_dir}/paramset.csv")
             future_map.update(
@@ -118,15 +118,28 @@ def run_session(
                 print("ITERATION FAILED: See the err file")
                 print(iter)
                 print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+            else:
+                # Rename the WIP iteration result file to the final name
+                new_iteration_csv_path = iter.out_csv_path.replace(
+                    "__WIP__iteration_", "iteration_"
+                )
+                assert not os.path.exists(new_iteration_csv_path)
+                os.rename(iter.out_csv_path, new_iteration_csv_path)
 
             iterations_done.update([iter.paramset_id])
+
             # If all iterations of the paramset are done, print a log
             if iterations_done[iter.paramset_id] == iter.paramset.num_iterations:
                 paramsets_done.add(iter.paramset_id)
+                paramset_dir = f"{outdir}/{subdir}/__WIP__paramset_{iter.paramset_id}"
+                new_paramset_dir = f"{outdir}/{subdir}/paramset_{iter.paramset_id}"
+                assert not os.path.exists(new_paramset_dir)
+                os.rename(paramset_dir, new_paramset_dir)
                 print("================================================")
                 print(
                     f"ParamSet-{iter.paramset_id} is done. Total {len(paramsets_done)+(from_paramset-1)}/{len(paramsets)} paramsets have been done so far."
                 )
+                print(f"Renamed the WIP directory to {new_paramset_dir}")
                 print("================================================")
 
     session_elapsed_time = time.time() - session_start_time
@@ -194,7 +207,7 @@ def _submit_iterations(
         iter_cfg.latency.seed = random.Random(i)
         iter_cfg.sender_generator = random.Random(i)
         # Submit the iteration to the executor
-        out_csv_path = f"{outdir}/iteration_{i}.csv"
+        out_csv_path = f"{outdir}/__WIP__iteration_{i}.csv"
         err_path = f"{outdir}/iteration_{i}.err"
         future = executor.submit(_run_iteration, iter_cfg, out_csv_path, err_path)
         future_map[future] = IterationInfo(
