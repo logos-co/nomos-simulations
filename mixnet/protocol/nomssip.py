@@ -56,7 +56,7 @@ class Nomssip(Gossip):
         )
 
     @override
-    async def process_inbound_msg(self, msg: bytes):
+    async def _process_inbound_msg(self, msg: bytes):
         packet = FlaggedPacket.from_bytes(msg)
         match packet.flag:
             case FlaggedPacket.Flag.NOISE:
@@ -67,7 +67,7 @@ class Nomssip(Gossip):
                 await self.handler(packet.message)
 
     @override
-    async def gossip(self, msg: bytes):
+    async def _gossip(self, msg: bytes):
         """
         Gossip a message to all connected peers with prepending a message flag
         """
@@ -81,7 +81,7 @@ class Nomssip(Gossip):
         """
         An internal method to send a flagged packet to all connected peers
         """
-        await super().gossip(packet.bytes())
+        await super()._gossip(packet.bytes())
 
 
 class FlaggedPacket:

@@ -76,12 +76,12 @@ class Node:
         match result:
             case SphinxPacket():
                 # Gossip the next Sphinx packet
-                await self.nomssip.gossip(result.bytes())
+                await self.nomssip.publish(result.bytes())
             case bytes():
                 if self.recovered_msg_handler is not None:
                     result = await self.recovered_msg_handler(result)
                 # Broadcast the message fully recovered from Sphinx packets
-                await self.broadcast.gossip(result)
+                await self.broadcast.publish(result)
             case None:
                 return
 
@@ -129,7 +129,7 @@ class Node:
             self.global_config,
             self.config.mix_path_length,
         )
-        await self.nomssip.gossip(sphinx_packet.bytes())
+        await self.nomssip.publish(sphinx_packet.bytes())
 
 
 def connect_nodes(

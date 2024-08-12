@@ -29,4 +29,4 @@ class Node:
         """
         Send the message via Nomos Gossip to all connected peers.
         """
-        await self.nomssip.gossip(msg)
+        await self.nomssip.publish(msg)

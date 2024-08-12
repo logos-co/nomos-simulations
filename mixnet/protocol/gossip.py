@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from enum import Enum
-from typing import Awaitable, Callable, Self
+from typing import Awaitable, Callable
 
 from framework import Framework
 from protocol.connection import (
     DuplexConnection,
-    MixSimplexConnection,
     SimplexConnection,
 )
 from protocol.error import PeeringDegreeReached
@@ -63,15 +61,30 @@ class Gossip:
             msg = await conn.recv()
             if self.__check_update_cache(msg):
                 continue
-            await self.process_inbound_msg(msg)
+            await self._process_inbound_msg(msg)
 
-    async def process_inbound_msg(self, msg: bytes):
-        await self.gossip(msg)
+    async def _process_inbound_msg(self, msg: bytes):
+        await self._gossip(msg)
         await self.handler(msg)
 
-    async def gossip(self, msg: bytes):
+    async def publish(self, msg: bytes):
         """
-        Gossip a message to all connected peers.
+        Publish a message to all nodes in the network.
+        """
+        # Don't publish the same message twice.
+        # Touching the cache here is necessary because this method is called by the user,
+        # even though we update the cache in the _process_inbound_msg method.
+        # It's because we don't want this publisher node to gossip the message again
+        # when it first receives the messages from one of its peers later.
+        if not self.__check_update_cache(msg):
+            await self._gossip(msg)
+            # With the same reason, call the handler here
+            # which means that we consider that this publisher node received the message.
+            await self.handler(msg)
+
+    async def _gossip(self, msg: bytes):
+        """
+        Gossip a message to all peers connected to this node.
         """
         for conn in self.conns:
             await conn.send(msg)
