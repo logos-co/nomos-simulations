@@ -114,13 +114,13 @@ class MinSizeMixQueue(MixQueue[T]):
         # Initialize the queue with noise messages
         # to ensure that the queue size is at least `min_pool_size`.
         self._queue = [self._noise_msg] * min_pool_size
-        self._mix_pool_size = min_pool_size
+        self._min_pool_size = min_pool_size
 
     @abstractmethod
     async def get(self) -> T:
-        if len(self._queue) < self._mix_pool_size:
+        if len(self._queue) < self._min_pool_size:
             self._queue.extend(
-                [self._noise_msg] * (self._mix_pool_size - len(self._queue))
+                [self._noise_msg] * (self._min_pool_size - len(self._queue))
             )
 
         # Subclass must implement this method
