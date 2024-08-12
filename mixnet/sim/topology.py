@@ -3,8 +3,6 @@ from __future__ import annotations
 import random
 from collections import defaultdict
 
-from protocol.node import Node
-
 Topology = dict[int, set[int]]
 
 

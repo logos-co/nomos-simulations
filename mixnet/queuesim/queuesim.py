@@ -209,15 +209,20 @@ def _submit_iterations(
         # Submit the iteration to the executor
         out_csv_path = f"{outdir}/__WIP__iteration_{i}.csv"
         err_path = f"{outdir}/iteration_{i}.err"
-        future = executor.submit(_run_iteration, iter_cfg, out_csv_path, err_path)
+        topology_path = f"{outdir}/iteration_{i}_topology.csv"
+        future = executor.submit(
+            _run_iteration, iter_cfg, out_csv_path, err_path, topology_path
+        )
         future_map[future] = IterationInfo(
-            paramset_id, paramset, i, out_csv_path, err_path
+            paramset_id, paramset, i, out_csv_path, err_path, topology_path
         )
 
     return future_map
 
 
-def _run_iteration(cfg: Config, out_csv_path: str, err_path: str) -> tuple[bool, float]:
+def _run_iteration(
+    cfg: Config, out_csv_path: str, err_path: str, topology_path: str
+) -> tuple[bool, float]:
     """
     Run a single iteration of a certain parameter set.
     The iteration uses the independent uSim instance.
@@ -226,7 +231,7 @@ def _run_iteration(cfg: Config, out_csv_path: str, err_path: str) -> tuple[bool,
     start_time = time.time()
     try:
         sim = Simulation(cfg)
-        usim.run(sim.run(out_csv_path))
+        usim.run(sim.run(out_csv_path, topology_path))
         return True, time.time() - start_time
     except BaseException as e:
         with open(err_path, "w") as f:
@@ -241,3 +246,4 @@ class IterationInfo:
     iteration_idx: int
     out_csv_path: str
     err_path: str
+    topology_path: str

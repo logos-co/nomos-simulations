@@ -3,6 +3,7 @@ import struct
 from dataclasses import dataclass
 from typing import Counter, Self
 
+import pandas as pd
 import usim
 
 from framework.framework import Queue
@@ -22,19 +23,19 @@ class Simulation:
     def __init__(self, config: Config):
         self.config = config
 
-    async def run(self, out_csv_path: str):
+    async def run(self, out_csv_path: str, topology_path: str):
         async with usim.Scope() as scope:
             self.framework = Framework(scope)
             self.message_builder = MessageBuilder(self.framework)
-            await self.__run(out_csv_path)
+            await self.__run(out_csv_path, topology_path)
             self.framework.stop_tasks()
 
-    async def __run(self, out_csv_path: str):
+    async def __run(self, out_csv_path: str, topology_path: str):
         self.received_msg_queue: Queue[tuple[float, bytes]] = self.framework.queue()
 
         # Run and connect nodes
         nodes = self.__run_nodes()
-        self.__connect_nodes(nodes)
+        self.__connect_nodes(nodes, topology_path)
 
         # Choose and start senders
         senders = self.config.sender_generator.sample(nodes, k=self.config.num_senders)
@@ -83,12 +84,17 @@ class Simulation:
         # The received time is also included in the notification.
         await self.received_msg_queue.put((self.framework.now(), msg))
 
-    def __connect_nodes(self, nodes: list[Node]):
+    def __connect_nodes(self, nodes: list[Node], topology_path: str):
         topology = build_full_random_topology(
             rng=self.config.topology.seed,
             num_nodes=len(nodes),
             peering_degree=self.config.nomssip.peering_degree,
         )
+        # Store the topology to a CSV file for later analysis
+        pd.DataFrame(
+            [(node, len(peers), list(peers)) for node, peers in topology.items()],
+            columns=pd.Series(["node", "num_peers", "peers"]),
+        ).to_csv(topology_path, index=False)
         # Sort the topology by node index for the connection RULE defined below.
         for node_idx, peer_indices in sorted(topology.items()):
             for peer_idx in peer_indices:
