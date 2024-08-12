@@ -44,8 +44,9 @@ def __calculate_paramset_stats(paramset_dir: str, session_result_path: str):
 
     series_list = []
     for iter_csv in glob.glob(f"{paramset_dir}/iteration_*.csv"):
-        df = pd.read_csv(iter_csv, header=None)
-        series_list.append(pd.Series(df.squeeze()))
+        df = pd.read_csv(iter_csv)
+        # The 1st column is the dissemination time
+        series_list.append(pd.Series(df.iloc[:, 0]))
 
     series = pd.concat(series_list, ignore_index=True)
     stats = series.describe()

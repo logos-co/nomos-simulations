@@ -45,6 +45,7 @@ class Simulation:
         with open(out_csv_path, "w", newline="", buffering=8192) as f:
             # Use CSV writer which is less error-prone than manually writing rows to the file
             writer = csv.writer(f)
+            writer.writerow(["dissemination_time", "sent_time", "all_received_time"])
             # To count how many nodes have received each message
             received_msg_counters: Counter[bytes] = Counter()
             # To count how many results (dissemination time) have been collected so far
@@ -56,11 +57,12 @@ class Simulation:
                 # If the message has been received by all nodes, calculate the dissemination time.
                 received_msg_counters.update([msg])
                 if received_msg_counters[msg] == len(nodes):
-                    dissemination_time = (
-                        received_time - Message.from_bytes(msg).sent_time
-                    )
+                    sent_time = Message.from_bytes(msg).sent_time
+                    dissemination_time = received_time - sent_time
                     # Use repr to convert a float to a string with as much precision as Python can provide
-                    writer.writerow([repr(dissemination_time)])
+                    writer.writerow(
+                        [repr(dissemination_time), repr(sent_time), repr(received_time)]
+                    )
                     result_cnt += 1
 
     def __run_nodes(self) -> list[Node]:
