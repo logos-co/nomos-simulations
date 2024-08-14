@@ -87,7 +87,6 @@ def run_session(
 
     # Prepare all parameter sets of the session
     paramsets = build_parameter_sets(exp_id, session_id, queue_type)
-    assert 1 <= from_paramset <= len(paramsets)
 
     # Run the simulations for each parameter set, using multi processes
     session_start_time = time.time()
@@ -96,16 +95,13 @@ def run_session(
     )
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
         # Submit all iterations of all parameter sets to the ProcessPoolExecutor
-        for paramset_idx, paramset in enumerate(paramsets):
-            paramset_id = paramset_idx + 1
-            if paramset_id < from_paramset:
+        for paramset in paramsets:
+            if paramset.id < from_paramset:
                 continue
-            paramset_dir = f"{outdir}/{subdir}/__WIP__paramset_{paramset_id}"
+            paramset_dir = f"{outdir}/{subdir}/__WIP__paramset_{paramset.id}"
             os.makedirs(paramset_dir)
-            __save_paramset_info(paramset_id, paramset, f"{paramset_dir}/paramset.csv")
-            future_map.update(
-                _submit_iterations(paramset_id, paramset, executor, paramset_dir)
-            )
+            __save_paramset_info(paramset, f"{paramset_dir}/paramset.csv")
+            future_map.update(_submit_iterations(paramset, executor, paramset_dir))
 
         # Wait until all parameter sets are done
         iterations_done: Counter[int] = Counter()  # per paramset_id
@@ -126,18 +122,18 @@ def run_session(
                 assert not os.path.exists(new_iteration_csv_path)
                 os.rename(iter.out_csv_path, new_iteration_csv_path)
 
-            iterations_done.update([iter.paramset_id])
+            iterations_done.update([iter.paramset.id])
 
             # If all iterations of the paramset are done, print a log
-            if iterations_done[iter.paramset_id] == iter.paramset.num_iterations:
-                paramsets_done.add(iter.paramset_id)
-                paramset_dir = f"{outdir}/{subdir}/__WIP__paramset_{iter.paramset_id}"
-                new_paramset_dir = f"{outdir}/{subdir}/paramset_{iter.paramset_id}"
+            if iterations_done[iter.paramset.id] == iter.paramset.num_iterations:
+                paramsets_done.add(iter.paramset.id)
+                paramset_dir = f"{outdir}/{subdir}/__WIP__paramset_{iter.paramset.id}"
+                new_paramset_dir = f"{outdir}/{subdir}/paramset_{iter.paramset.id}"
                 assert not os.path.exists(new_paramset_dir)
                 os.rename(paramset_dir, new_paramset_dir)
                 print("================================================")
                 print(
-                    f"ParamSet-{iter.paramset_id} is done. Total {len(paramsets_done)+(from_paramset-1)}/{len(paramsets)} paramsets have been done so far."
+                    f"ParamSet-{iter.paramset.id} is done. Total {len(paramsets_done)+(from_paramset-1)}/{len(paramsets)} paramsets have been done so far."
                 )
                 print(f"Renamed the WIP directory to {new_paramset_dir}")
                 print("================================================")
@@ -158,10 +154,10 @@ def run_session(
     print("******************************************************************")
 
 
-def __save_paramset_info(paramset_id: int, paramset: ParameterSet, path: str):
+def __save_paramset_info(paramset: ParameterSet, path: str):
     assert not os.path.exists(path)
     info = {
-        "paramset": paramset_id,
+        "paramset": paramset.id,
         "num_nodes": paramset.num_nodes,
         "peering_degree": paramset.peering_degree,
         "min_queue_size": paramset.min_queue_size,
@@ -176,7 +172,6 @@ def __save_paramset_info(paramset_id: int, paramset: ParameterSet, path: str):
 
 
 def _submit_iterations(
-    paramset_id: int,
     paramset: ParameterSet,
     executor: concurrent.futures.ProcessPoolExecutor,
     outdir: str,
@@ -192,7 +187,7 @@ def _submit_iterations(
     paramset.apply_to(cfg)
 
     print(
-        f"Scheduling {paramset.num_iterations} iterations for the paramset:{paramset_id}"
+        f"Scheduling {paramset.num_iterations} iterations for the paramset:{paramset.id}"
     )
 
     future_map: dict[concurrent.futures.Future[tuple[bool, float]], IterationInfo] = (
@@ -214,7 +209,7 @@ def _submit_iterations(
             _run_iteration, iter_cfg, out_csv_path, err_path, topology_path
         )
         future_map[future] = IterationInfo(
-            paramset_id, paramset, i, out_csv_path, err_path, topology_path
+            paramset, i, out_csv_path, err_path, topology_path
         )
 
     return future_map
@@ -241,7 +236,6 @@ def _run_iteration(
 
 @dataclass
 class IterationInfo:
-    paramset_id: int
     paramset: ParameterSet
     iteration_idx: int
     out_csv_path: str

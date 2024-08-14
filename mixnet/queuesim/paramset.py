@@ -31,6 +31,7 @@ EXPERIMENT_TITLES: dict[ExperimentID, str] = {
 
 @dataclass
 class ParameterSet:
+    id: int
     num_nodes: int
     peering_degree: int
     min_queue_size: int
@@ -69,6 +70,7 @@ def __build_session_1_parameter_sets(
 ) -> list[ParameterSet]:
     sets: list[ParameterSet] = []
 
+    id = 0  # must start from 1
     for num_nodes in [20, 40, 80]:
         peering_degree_list = [num_nodes // 5, num_nodes // 4, num_nodes // 2]
         min_queue_size_list = [num_nodes // 2, num_nodes, num_nodes * 2]
@@ -88,8 +90,16 @@ def __build_session_1_parameter_sets(
                     min_queue_size_list,
                     transmission_rate_list,
                 ):
+                    id += 1
+                    if (
+                        not _is_min_queue_size_applicable(queue_type)
+                        and min_queue_size != min_queue_size_list[0]
+                    ):
+                        continue
+
                     sets.append(
                         ParameterSet(
+                            id=id,
                             num_nodes=num_nodes,
                             peering_degree=peering_degree,
                             min_queue_size=min_queue_size,
@@ -112,8 +122,16 @@ def __build_session_1_parameter_sets(
                     transmission_rate_list,
                     num_sent_msgs_list,
                 ):
+                    id += 1
+                    if (
+                        not _is_min_queue_size_applicable(queue_type)
+                        and min_queue_size != min_queue_size_list[0]
+                    ):
+                        continue
+
                     sets.append(
                         ParameterSet(
+                            id=id,
                             num_nodes=num_nodes,
                             peering_degree=peering_degree,
                             min_queue_size=min_queue_size,
@@ -136,8 +154,16 @@ def __build_session_1_parameter_sets(
                     transmission_rate_list,
                     num_senders_list,
                 ):
+                    id += 1
+                    if (
+                        not _is_min_queue_size_applicable(queue_type)
+                        and min_queue_size != min_queue_size_list[0]
+                    ):
+                        continue
+
                     sets.append(
                         ParameterSet(
+                            id=id,
                             num_nodes=num_nodes,
                             peering_degree=peering_degree,
                             min_queue_size=min_queue_size,
@@ -162,8 +188,16 @@ def __build_session_1_parameter_sets(
                     num_sent_msgs_list,
                     num_senders_list,
                 ):
+                    id += 1
+                    if (
+                        not _is_min_queue_size_applicable(queue_type)
+                        and min_queue_size != min_queue_size_list[0]
+                    ):
+                        continue
+
                     sets.append(
                         ParameterSet(
+                            id=id,
                             num_nodes=num_nodes,
                             peering_degree=peering_degree,
                             min_queue_size=min_queue_size,
@@ -185,6 +219,7 @@ def __build_session_2_parameter_sets(
 ) -> list[ParameterSet]:
     sets: list[ParameterSet] = []
 
+    id = 0  # must start from 1
     for num_nodes in [100, 1000, 10000]:
         peering_degree_list = [4, 8, 16]
         min_queue_size_list = [10, 50, 100]
@@ -203,8 +238,16 @@ def __build_session_2_parameter_sets(
                     min_queue_size_list,
                     transmission_rate_list,
                 ):
+                    id += 1
+                    if (
+                        not _is_min_queue_size_applicable(queue_type)
+                        and min_queue_size != min_queue_size_list[0]
+                    ):
+                        continue
+
                     sets.append(
                         ParameterSet(
+                            id=id,
                             num_nodes=num_nodes,
                             peering_degree=peering_degree,
                             min_queue_size=min_queue_size,
@@ -232,8 +275,16 @@ def __build_session_2_parameter_sets(
                         min_queue_size,
                         min_queue_size * 2,
                     ]:
+                        id += 1
+                        if (
+                            not _is_min_queue_size_applicable(queue_type)
+                            and min_queue_size != min_queue_size_list[0]
+                        ):
+                            continue
+
                         sets.append(
                             ParameterSet(
+                                id=id,
                                 num_nodes=num_nodes,
                                 peering_degree=peering_degree,
                                 min_queue_size=min_queue_size,
@@ -257,10 +308,11 @@ def __build_session_2_1_parameter_sets(
 ) -> list[ParameterSet]:
     sets: list[ParameterSet] = []
 
+    id = 0  # must start from 1
     for num_nodes in [20, 200, 2000]:
         peering_degree_list = [4, 6, 8]
         min_queue_size_list = [10, 50, 100]
-        transmission_rate_list = [1, 10, 100]
+        transmission_rate = 1
         num_sent_msgs = 1000
         num_senders_list = [num_nodes // 10, num_nodes // 5, num_nodes // 2]
         num_iterations = 20
@@ -270,14 +322,20 @@ def __build_session_2_1_parameter_sets(
                 for (
                     peering_degree,
                     min_queue_size,
-                    transmission_rate,
                 ) in itertools.product(
                     peering_degree_list,
                     min_queue_size_list,
-                    transmission_rate_list,
                 ):
+                    id += 1
+                    if (
+                        not _is_min_queue_size_applicable(queue_type)
+                        and min_queue_size != min_queue_size_list[0]
+                    ):
+                        continue
+
                     sets.append(
                         ParameterSet(
+                            id=id,
                             num_nodes=num_nodes,
                             peering_degree=peering_degree,
                             min_queue_size=min_queue_size,
@@ -292,16 +350,22 @@ def __build_session_2_1_parameter_sets(
                 for (
                     peering_degree,
                     min_queue_size,
-                    transmission_rate,
                     num_senders,
                 ) in itertools.product(
                     peering_degree_list,
                     min_queue_size_list,
-                    transmission_rate_list,
                     num_senders_list,
                 ):
+                    id += 1
+                    if (
+                        not _is_min_queue_size_applicable(queue_type)
+                        and min_queue_size != min_queue_size_list[0]
+                    ):
+                        continue
+
                     sets.append(
                         ParameterSet(
+                            id=id,
                             num_nodes=num_nodes,
                             peering_degree=peering_degree,
                             min_queue_size=min_queue_size,
@@ -318,3 +382,11 @@ def __build_session_2_1_parameter_sets(
                 )
 
     return sets
+
+
+def _is_min_queue_size_applicable(queue_type: TemporalMixType) -> bool:
+    return queue_type in [
+        TemporalMixType.PURE_COIN_FLIPPING,
+        TemporalMixType.PURE_RANDOM_SAMPLING,
+        TemporalMixType.PERMUTED_COIN_FLIPPING,
+    ]

@@ -14,6 +14,7 @@ from queuesim.util import format_elapsed_time
 
 def benchmark(num_workers: int):
     paramset = ParameterSet(
+        id=1,
         num_nodes=100,
         peering_degree=4,
         min_queue_size=10,
@@ -34,9 +35,7 @@ def benchmark(num_workers: int):
             max_workers=num_workers
         ) as executor:
             future_map.update(
-                _submit_iterations(
-                    paramset_id=1, paramset=paramset, executor=executor, outdir=tmpdir
-                )
+                _submit_iterations(paramset=paramset, executor=executor, outdir=tmpdir)
             )
 
         # Wait until all iterations are done
