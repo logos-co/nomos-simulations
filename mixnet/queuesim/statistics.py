@@ -1,5 +1,6 @@
 import glob
 import os
+import re
 
 import pandas as pd
 
@@ -43,8 +44,10 @@ def __calculate_paramset_stats(paramset_dir: str, session_result_path: str):
     info = pd.read_csv(f"{paramset_dir}/paramset.csv")
 
     series_list = []
-    for iter_csv in glob.glob(f"{paramset_dir}/iteration_*.csv"):
-        df = pd.read_csv(iter_csv)
+    for iter_csv in [
+        f for f in os.listdir(paramset_dir) if re.match(r"iteration_\d+.csv", f)
+    ]:
+        df = pd.read_csv(f"{paramset_dir}/{iter_csv}")
         # The 1st column is the dissemination time
         series_list.append(pd.Series(df.iloc[:, 0]))
 
