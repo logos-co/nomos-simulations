@@ -74,7 +74,7 @@ class Nomssip(Gossip):
 
         packet = FlaggedPacket(FlaggedPacket.Flag.REAL, msg).bytes()
         # Please see comments in super().publish() for the reason of the following line.
-        if not self._check_update_cache(packet):
+        if not self._check_update_cache(packet, publishing=True):
             await self._gossip(packet)
             await self.handler(msg)
 
