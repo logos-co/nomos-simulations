@@ -64,27 +64,23 @@ class Nomssip(Gossip):
                 # Drop noise packet
                 return
             case FlaggedPacket.Flag.REAL:
-                await self.__gossip_flagged_packet(packet, [received_from])
+                self.assert_message_size(packet.message)
+                await super()._gossip(msg, [received_from])
                 await self.handler(packet.message)
 
     @override
-    async def _gossip(self, msg: bytes, excludes: list[DuplexConnection] = []):
-        """
-        Gossip a message to all connected peers with prepending a message flag
-        """
+    async def publish(self, msg: bytes):
+        self.assert_message_size(msg)
+
+        packet = FlaggedPacket(FlaggedPacket.Flag.REAL, msg).bytes()
+        # Please see comments in super().publish() for the reason of the following line.
+        if not self._check_update_cache(packet):
+            await self._gossip(packet)
+            await self.handler(msg)
+
+    def assert_message_size(self, msg: bytes):
         # The message size must be fixed.
         assert len(msg) == self.config.msg_size, f"{len(msg)} != {self.config.msg_size}"
-
-        packet = FlaggedPacket(FlaggedPacket.Flag.REAL, msg)
-        await self.__gossip_flagged_packet(packet, excludes)
-
-    async def __gossip_flagged_packet(
-        self, packet: FlaggedPacket, excludes: list[DuplexConnection] = []
-    ):
-        """
-        An internal method to send a flagged packet to all connected peers
-        """
-        await super()._gossip(packet.bytes(), excludes)
 
 
 class FlaggedPacket:

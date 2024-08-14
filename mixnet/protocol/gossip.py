@@ -59,7 +59,7 @@ class Gossip:
     async def __process_inbound_conn(self, conn: DuplexConnection):
         while True:
             msg = await conn.recv()
-            if self.__check_update_cache(msg):
+            if self._check_update_cache(msg):
                 continue
             await self._process_inbound_msg(msg, conn)
 
@@ -76,7 +76,7 @@ class Gossip:
         # even though we update the cache in the _process_inbound_msg method.
         # It's because we don't want this publisher node to gossip the message again
         # when it first receives the messages from one of its peers later.
-        if not self.__check_update_cache(msg):
+        if not self._check_update_cache(msg):
             await self._gossip(msg)
             # With the same reason, call the handler here
             # which means that we consider that this publisher node received the message.
@@ -90,7 +90,7 @@ class Gossip:
             if conn not in excludes:
                 await conn.send(msg)
 
-    def __check_update_cache(self, packet: bytes) -> bool:
+    def _check_update_cache(self, packet: bytes) -> bool:
         """
         Add a message to the cache, and return True if the message was already in the cache.
         """
