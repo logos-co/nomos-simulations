@@ -3,7 +3,6 @@ from collections import Counter, defaultdict
 import matplotlib.pyplot as plt
 import numpy
 import pandas
-from matplotlib.axes import Axes
 
 from protocol.node import Node
 from sim.connection import ObservedMeteredRemoteSimplexConnection
@@ -126,16 +125,18 @@ class DisseminationTime:
         # A collection of time taken for a message to be broadcasted from the last mix to all nodes in the network
         self.broadcast_dissemination_times: list[float] = []
         # Data structures to check if a message has been broadcasted to all nodes
-        self.broadcast_status: Counter[Message] = Counter()
+        # msg_id (int) is a key.
+        self.broadcast_status: Counter[int] = Counter()
         self.num_nodes: int = num_nodes
 
     def add_mix_propagation_time(self, elapsed: float):
         self.mix_propagation_times.append(elapsed)
 
     def add_broadcasted_msg(self, msg: Message, elapsed: float):
-        assert self.broadcast_status[msg] < self.num_nodes
-        self.broadcast_status.update([msg])
-        if self.broadcast_status[msg] == self.num_nodes:
+        id = msg.id()
+        assert self.broadcast_status[id] < self.num_nodes
+        self.broadcast_status.update([id])
+        if self.broadcast_status[id] == self.num_nodes:
             self.broadcast_dissemination_times.append(elapsed)
 
     def analyze(self):

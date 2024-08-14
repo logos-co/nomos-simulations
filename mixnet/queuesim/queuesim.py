@@ -16,6 +16,7 @@ import usim
 from protocol.nomssip import NomssipConfig
 from protocol.temporalmix import TemporalMixConfig, TemporalMixType
 from queuesim.config import Config
+from queuesim.message import MESSAGE_SIZE
 from queuesim.paramset import (
     EXPERIMENT_TITLES,
     ExperimentID,
@@ -32,7 +33,7 @@ DEFAULT_CONFIG = Config(
     nomssip=NomssipConfig(
         peering_degree=3,
         transmission_rate_per_sec=10,
-        msg_size=8,
+        msg_size=MESSAGE_SIZE,
         temporal_mix=TemporalMixConfig(
             mix_type=TemporalMixType.NONE,
             min_queue_size=10,

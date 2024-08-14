@@ -1,20 +1,19 @@
-from dataclasses import asdict, dataclass
 from pprint import pprint
-from typing import Self
 
 import usim
 from matplotlib import pyplot
 
 import framework.usim as usimfw
-from framework import Framework
 from protocol.config import GlobalConfig, MixMembership, NodeInfo
-from protocol.node import Node, PeeringDegreeReached
+from protocol.node import Node
+from protocol.nomssip import NomssipMessage
+from protocol.sphinx import SphinxPacketBuilder
 from sim.config import Config
 from sim.connection import (
     MeteredRemoteSimplexConnection,
     ObservedMeteredRemoteSimplexConnection,
 )
-from sim.message import Message, UniqueMessageBuilder
+from sim.message import InnerMessage, Message, UniqueInnerMessageBuilder
 from sim.state import NodeState, NodeStateTable
 from sim.stats import ConnectionStats, DisseminationTime
 from sim.topology import build_full_random_topology
@@ -27,7 +26,7 @@ class Simulation:
 
     def __init__(self, config: Config):
         self.config = config
-        self.msg_builder = UniqueMessageBuilder()
+        self.inner_msg_builder = UniqueInnerMessageBuilder()
         self.dissemination_time = DisseminationTime(self.config.network.num_nodes)
 
     async def run(self):
@@ -61,7 +60,7 @@ class Simulation:
         # Return analysis tools once the μSim scope is done
         return conn_stats, node_state_table
 
-    def __init_nodes(self) -> list[Node]:
+    def __init_nodes(self) -> list[Node[Message]]:
         # Initialize node/global configurations
         node_configs = self.config.node_configs()
         global_config = GlobalConfig(
@@ -78,20 +77,22 @@ class Simulation:
         )
 
         # Initialize/return Node instances
+        noise_msg = Message(bytes(SphinxPacketBuilder.size(global_config)))
         return [
-            Node(
+            Node[Message](
                 self.framework,
                 node_config,
                 global_config,
                 self.__process_broadcasted_msg,
                 self.__process_recovered_msg,
+                noise_msg,
             )
             for node_config in node_configs
         ]
 
     def __connect_nodes(
         self,
-        nodes: list[Node],
+        nodes: list[Node[Message]],
         node_state_table: NodeStateTable,
         conn_stats: ConnectionStats,
     ):
@@ -144,8 +145,8 @@ class Simulation:
         meter_start_time: float,
         sender_states: list[NodeState],
         receiver_states: list[NodeState],
-    ) -> ObservedMeteredRemoteSimplexConnection:
-        return ObservedMeteredRemoteSimplexConnection(
+    ) -> ObservedMeteredRemoteSimplexConnection[NomssipMessage[Message]]:
+        return ObservedMeteredRemoteSimplexConnection[NomssipMessage[Message]](
             self.config.network.latency,
             self.framework,
             meter_start_time,
@@ -156,14 +157,14 @@ class Simulation:
     def __create_conn(
         self,
         meter_start_time: float,
-    ) -> MeteredRemoteSimplexConnection:
-        return MeteredRemoteSimplexConnection(
+    ) -> MeteredRemoteSimplexConnection[Message]:
+        return MeteredRemoteSimplexConnection[Message](
             self.config.network.latency,
             self.framework,
             meter_start_time,
         )
 
-    async def __run_node_logic(self, node: Node):
+    async def __run_node_logic(self, node: Node[Message]):
         """
         Runs the lottery periodically to check if the node is selected to send a block.
         If the node is selected, creates a block and sends it through mix nodes.
@@ -172,27 +173,29 @@ class Simulation:
         while True:
             await self.framework.sleep(lottery_config.interval_sec)
             if lottery_config.seed.random() < lottery_config.probability:
-                msg = self.msg_builder.next(self.framework.now(), b"selected block")
-                await node.send_message(bytes(msg))
+                inner_msg = self.inner_msg_builder.next(
+                    self.framework.now(), b"selected block"
+                )
+                await node.send_message(Message(bytes(inner_msg)))
 
-    async def __process_broadcasted_msg(self, msg: bytes):
+    async def __process_broadcasted_msg(self, msg: Message):
         """
         Process a broadcasted message originated from the last mix.
         """
-        message = Message.from_bytes(msg)
-        elapsed = self.framework.now() - message.created_at
-        self.dissemination_time.add_broadcasted_msg(message, elapsed)
+        inner_msg = InnerMessage.from_bytes(msg.data)
+        elapsed = self.framework.now() - inner_msg.created_at
+        self.dissemination_time.add_broadcasted_msg(msg, elapsed)
 
-    async def __process_recovered_msg(self, msg: bytes) -> bytes:
+    async def __process_recovered_msg(self, msg: bytes) -> Message:
         """
         Process a message fully recovered by the last mix
         and returns a new message to be broadcasted.
         """
-        message = Message.from_bytes(msg)
-        elapsed = self.framework.now() - message.created_at
+        inner_msg = InnerMessage.from_bytes(Message.from_bytes(msg).data)
+        elapsed = self.framework.now() - inner_msg.created_at
         self.dissemination_time.add_mix_propagation_time(elapsed)
 
         # Update the timestamp and return the message to be broadcasted,
         # so that the broadcast dissemination time can be calculated from now.
-        message.created_at = self.framework.now()
-        return bytes(message)
+        inner_msg.created_at = self.framework.now()
+        return Message(bytes(inner_msg))

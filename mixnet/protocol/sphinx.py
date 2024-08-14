@@ -31,3 +31,15 @@ class SphinxPacketBuilder:
             max_plain_payload_size=global_config.max_message_size,
         )
         return (packet, route)
+
+    @staticmethod
+    def size(global_config: GlobalConfig) -> int:
+        """
+        Calculate the size of Sphinx packet, which depends on the maximum length of mix path.
+        """
+        sample_sphinx_packet, _ = SphinxPacketBuilder.build(
+            bytes(global_config.max_message_size),
+            global_config,
+            global_config.max_mix_path_length,
+        )
+        return len(sample_sphinx_packet.bytes())

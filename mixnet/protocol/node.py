@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Generic, Protocol, Self, Type, TypeVar
 
 from pysphinx.sphinx import (
     ProcessedFinalHopPacket,
@@ -13,11 +13,22 @@ from protocol.config import GlobalConfig, NodeConfig
 from protocol.connection import SimplexConnection
 from protocol.error import PeeringDegreeReached
 from protocol.gossip import Gossip
-from protocol.nomssip import Nomssip, NomssipConfig
+from protocol.nomssip import Nomssip, NomssipConfig, NomssipMessage
 from protocol.sphinx import SphinxPacketBuilder
 
 
-class Node:
+class HasIdAndLenAndBytes(Protocol):
+    def id(self) -> int: ...
+    def __len__(self) -> int: ...
+    def __bytes__(self) -> bytes: ...
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Self: ...
+
+
+T = TypeVar("T", bound=HasIdAndLenAndBytes)
+
+
+class Node(Generic[T]):
     """
     This represents any node in the network, which:
     - generates/gossips mix messages (Sphinx packets)
@@ -31,57 +42,53 @@ class Node:
         config: NodeConfig,
         global_config: GlobalConfig,
         # A handler called when a node receives a broadcasted message originated from the last mix.
-        broadcasted_msg_handler: Callable[[bytes], Awaitable[None]],
-        # An optional handler only for the simulation,
-        # which is called when a message is fully recovered by the last mix
+        broadcasted_msg_handler: Callable[[T], Awaitable[None]],
+        # A handler called when a message is fully recovered by the last mix
         # and returns a new message to be broadcasted.
-        recovered_msg_handler: Callable[[bytes], Awaitable[bytes]] | None = None,
+        recovered_msg_handler: Callable[[bytes], Awaitable[T]],
+        noise_msg: T,
     ):
         self.framework = framework
         self.config = config
         self.global_config = global_config
+        nomssip_config = NomssipConfig(
+            config.gossip.peering_degree,
+            global_config.transmission_rate_per_sec,
+            SphinxPacketBuilder.size(global_config),
+            config.temporal_mix,
+        )
         self.nomssip = Nomssip(
             framework,
-            NomssipConfig(
-                config.gossip.peering_degree,
-                global_config.transmission_rate_per_sec,
-                self.__calculate_message_size(global_config),
-                config.temporal_mix,
-            ),
+            nomssip_config,
             self.__process_msg,
+            noise_msg=NomssipMessage[T](NomssipMessage.Flag.NOISE, noise_msg),
         )
-        self.broadcast = Gossip(framework, config.gossip, broadcasted_msg_handler)
+        self.broadcast = Gossip[T](framework, config.gossip, broadcasted_msg_handler)
         self.recovered_msg_handler = recovered_msg_handler
 
-    @staticmethod
-    def __calculate_message_size(global_config: GlobalConfig) -> int:
-        """
-        Calculate the actual message size to be gossiped, which depends on the maximum length of mix path.
-        """
-        sample_sphinx_packet, _ = SphinxPacketBuilder.build(
-            bytes(global_config.max_message_size),
-            global_config,
-            global_config.max_mix_path_length,
-        )
-        return len(sample_sphinx_packet.bytes())
-
-    async def __process_msg(self, msg: bytes) -> None:
+    async def __process_msg(self, msg: NomssipMessage[T]) -> None:
         """
         A handler to process messages received via Nomssip channel
         """
+        assert msg.flag == NomssipMessage.Flag.REAL
+
         sphinx_packet = SphinxPacket.from_bytes(
-            msg, self.global_config.max_mix_path_length
+            bytes(msg.message), self.global_config.max_mix_path_length
         )
         result = await self.__process_sphinx_packet(sphinx_packet)
         match result:
             case SphinxPacket():
                 # Gossip the next Sphinx packet
-                await self.nomssip.publish(result.bytes())
+                t: Type[T] = type(msg.message)
+                await self.nomssip.publish(
+                    NomssipMessage[T](
+                        NomssipMessage.Flag.REAL,
+                        t.from_bytes(result.bytes()),
+                    )
+                )
             case bytes():
-                if self.recovered_msg_handler is not None:
-                    result = await self.recovered_msg_handler(result)
                 # Broadcast the message fully recovered from Sphinx packets
-                await self.broadcast.publish(result)
+                await self.broadcast.publish(await self.recovered_msg_handler(result))
             case None:
                 return
 
@@ -105,31 +112,36 @@ class Node:
     def connect_mix(
         self,
         peer: Node,
-        inbound_conn: SimplexConnection,
-        outbound_conn: SimplexConnection,
+        inbound_conn: SimplexConnection[NomssipMessage[T]],
+        outbound_conn: SimplexConnection[NomssipMessage[T]],
     ):
         connect_nodes(self.nomssip, peer.nomssip, inbound_conn, outbound_conn)
 
     def connect_broadcast(
         self,
         peer: Node,
-        inbound_conn: SimplexConnection,
-        outbound_conn: SimplexConnection,
+        inbound_conn: SimplexConnection[T],
+        outbound_conn: SimplexConnection[T],
     ):
         connect_nodes(self.broadcast, peer.broadcast, inbound_conn, outbound_conn)
 
-    async def send_message(self, msg: bytes):
+    async def send_message(self, msg: T):
         """
         Build a Sphinx packet and gossip it to all connected peers.
         """
         # Here, we handle the case in which a msg is split into multiple Sphinx packets.
         # But, in practice, we expect a message to be small enough to fit in a single Sphinx packet.
         sphinx_packet, _ = SphinxPacketBuilder.build(
-            msg,
+            bytes(msg),
             self.global_config,
             self.config.mix_path_length,
         )
-        await self.nomssip.publish(sphinx_packet.bytes())
+        t: Type[T] = type(msg)
+        await self.nomssip.publish(
+            NomssipMessage(
+                NomssipMessage.Flag.REAL, t.from_bytes(sphinx_packet.bytes())
+            )
+        )
 
 
 def connect_nodes(

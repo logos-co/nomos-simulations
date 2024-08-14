@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Generic, Protocol, TypeVar
 
 from framework import Framework
 from protocol.connection import (
@@ -18,7 +17,14 @@ class GossipConfig:
     peering_degree: int
 
 
-class Gossip:
+class HasId(Protocol):
+    def id(self) -> int: ...
+
+
+T = TypeVar("T", bound=HasId)
+
+
+class Gossip(Generic[T]):
     """
     A gossip channel that broadcasts messages to all connected peers.
     Peers are connected via DuplexConnection.
@@ -28,15 +34,15 @@ class Gossip:
         self,
         framework: Framework,
         config: GossipConfig,
-        handler: Callable[[bytes], Awaitable[None]],
+        handler: Callable[[T], Awaitable[None]],
     ):
         self.framework = framework
         self.config = config
-        self.conns: list[DuplexConnection] = []
+        self.conns: list[DuplexConnection[T]] = []
         # A handler to process inbound messages.
         self.handler = handler
-        # msg -> received_cnt
-        self.packet_cache: dict[bytes, int] = dict()
+        # msg_id -> received_cnt
+        self.packet_cache: dict[int, int] = dict()
         # A set just for gathering a reference of tasks to prevent them from being garbage collected.
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
         self.tasks: set[Awaitable] = set()
@@ -44,12 +50,12 @@ class Gossip:
     def can_accept_conn(self) -> bool:
         return len(self.conns) < self.config.peering_degree
 
-    def add_conn(self, inbound: SimplexConnection, outbound: SimplexConnection):
+    def add_conn(self, inbound: SimplexConnection[T], outbound: SimplexConnection[T]):
         if not self.can_accept_conn():
             # For simplicity of the spec, reject the connection if the peering degree is reached.
             raise PeeringDegreeReached()
 
-        conn = DuplexConnection(
+        conn = DuplexConnection[T](
             inbound,
             outbound,
         )
@@ -57,18 +63,18 @@ class Gossip:
         task = self.framework.spawn(self.__process_inbound_conn(conn))
         self.tasks.add(task)
 
-    async def __process_inbound_conn(self, conn: DuplexConnection):
+    async def __process_inbound_conn(self, conn: DuplexConnection[T]):
         while True:
             msg = await conn.recv()
             if self._check_update_cache(msg):
                 continue
             await self._process_inbound_msg(msg, conn)
 
-    async def _process_inbound_msg(self, msg: bytes, received_from: DuplexConnection):
+    async def _process_inbound_msg(self, msg: T, received_from: DuplexConnection[T]):
         await self._gossip(msg, [received_from])
         await self.handler(msg)
 
-    async def publish(self, msg: bytes):
+    async def publish(self, msg: T):
         """
         Publish a message to all nodes in the network.
         """
@@ -83,7 +89,7 @@ class Gossip:
             # which means that we consider that this publisher node received the message.
             await self.handler(msg)
 
-    async def _gossip(self, msg: bytes, excludes: list[DuplexConnection] = []):
+    async def _gossip(self, msg: T, excludes: list[DuplexConnection] = []):
         """
         Gossip a message to all peers connected to this node.
         """
@@ -91,26 +97,26 @@ class Gossip:
             if conn not in excludes:
                 await conn.send(msg)
 
-    def _check_update_cache(self, packet: bytes, publishing: bool = False) -> bool:
+    def _check_update_cache(self, msg: T, publishing: bool = False) -> bool:
         """
         Add a message to the cache, and return True if the message was already in the cache.
         """
-        hash = hashlib.sha256(packet).digest()
-        seen = hash in self.packet_cache
+        id = msg.id()
+        seen = id in self.packet_cache
 
         if publishing:
             if not seen:
                 # Put 0 when publishing, so that the publisher node doesn't gossip the message again
                 # even when it first receive the message from one of its peers later.
-                self.packet_cache[hash] = 0
+                self.packet_cache[id] = 0
         else:
             if not seen:
-                self.packet_cache[hash] = 1
+                self.packet_cache[id] = 1
             else:
-                self.packet_cache[hash] += 1
+                self.packet_cache[id] += 1
                 # Remove the message from the cache if it's received from all adjacent peers in the end
                 # to reduce the size of cache.
-                if self.packet_cache[hash] >= self.config.peering_degree:
-                    del self.packet_cache[hash]
+                if self.packet_cache[id] >= self.config.peering_degree:
+                    del self.packet_cache[id]
 
         return seen

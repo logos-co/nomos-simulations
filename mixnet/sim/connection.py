@@ -1,18 +1,19 @@
 import math
-from abc import abstractmethod
 from collections import Counter
-from typing import Awaitable
+from typing import Protocol, TypeVar
 
 import pandas
 from typing_extensions import override
 
 from framework import Framework, Queue
 from protocol.connection import SimplexConnection
-from sim.config import LatencyConfig, NetworkConfig
+from sim.config import LatencyConfig
 from sim.state import NodeState
 
+T = TypeVar("T")
 
-class RemoteSimplexConnection(SimplexConnection):
+
+class RemoteSimplexConnection(SimplexConnection[T]):
     """
     A simplex connection implementation that simulates network latency.
     """
@@ -22,18 +23,18 @@ class RemoteSimplexConnection(SimplexConnection):
         # A connection has a random constant latency
         self.latency = config.random_latency()
         # A queue of tuple(timestamp, msg) where a sender puts messages to be sent
-        self.send_queue: Queue[tuple[float, bytes]] = framework.queue()
+        self.send_queue: Queue[tuple[float, T]] = framework.queue()
         # A task that reads messages from send_queue, and puts them to recv_queue.
         # Before putting messages to recv_queue, the task simulates network latency according to the timestamp of each message.
         self.relayer = framework.spawn(self.__run_relayer())
         # A queue where a receiver gets messages
-        self.recv_queue: Queue[bytes] = framework.queue()
+        self.recv_queue: Queue[T] = framework.queue()
 
-    async def send(self, data: bytes) -> None:
+    async def send(self, data: T) -> None:
         await self.send_queue.put((self.framework.now(), data))
         self.on_sending(data)
 
-    async def recv(self) -> bytes:
+    async def recv(self) -> T:
         return await self.recv_queue.get()
 
     async def __run_relayer(self):
@@ -54,16 +55,23 @@ class RemoteSimplexConnection(SimplexConnection):
             self.on_receiving(data)
             await self.recv_queue.put(data)
 
-    def on_sending(self, data: bytes) -> None:
+    def on_sending(self, data: T) -> None:
         # Should be overridden by subclass
         pass
 
-    def on_receiving(self, data: bytes) -> None:
+    def on_receiving(self, data: T) -> None:
         # Should be overridden by subclass
         pass
 
 
-class MeteredRemoteSimplexConnection(RemoteSimplexConnection):
+class HasLen(Protocol):
+    def __len__(self) -> int: ...
+
+
+TL = TypeVar("TL", bound=HasLen)
+
+
+class MeteredRemoteSimplexConnection(RemoteSimplexConnection[TL]):
     """
     An extension of RemoteSimplexConnection that measures bandwidth usages.
     """
@@ -81,14 +89,14 @@ class MeteredRemoteSimplexConnection(RemoteSimplexConnection):
         self.recv_meters: list[int] = []
 
     @override
-    def on_sending(self, data: bytes) -> None:
+    def on_sending(self, data: TL) -> None:
         """
         Update statistics when sending a message
         """
         self.__update_meter(self.send_meters, len(data))
 
     @override
-    def on_receiving(self, data: bytes) -> None:
+    def on_receiving(self, data: TL) -> None:
         """
         Update statistics when receiving a message
         """
@@ -120,7 +128,7 @@ class MeteredRemoteSimplexConnection(RemoteSimplexConnection):
         return pandas.Series(meters, name="bandwidth")
 
 
-class ObservedMeteredRemoteSimplexConnection(MeteredRemoteSimplexConnection):
+class ObservedMeteredRemoteSimplexConnection(MeteredRemoteSimplexConnection[TL]):
     """
     An extension of MeteredRemoteSimplexConnection that is observed by passive observer.
     The observer monitors the node states of the sender and receiver and message sizes.
@@ -143,13 +151,13 @@ class ObservedMeteredRemoteSimplexConnection(MeteredRemoteSimplexConnection):
         self.msg_sizes: Counter[int] = Counter()
 
     @override
-    def on_sending(self, data: bytes) -> None:
+    def on_sending(self, data: TL) -> None:
         super().on_sending(data)
         self.__update_node_state(self.send_node_states, NodeState.SENDING)
         self.msg_sizes.update([len(data)])
 
     @override
-    def on_receiving(self, data: bytes) -> None:
+    def on_receiving(self, data: TL) -> None:
         super().on_receiving(data)
         self.__update_node_state(self.recv_node_states, NodeState.RECEIVING)
 

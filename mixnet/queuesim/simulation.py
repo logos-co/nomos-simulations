@@ -1,7 +1,5 @@
 import csv
-import struct
-from dataclasses import dataclass
-from typing import Counter, Self
+from typing import Counter
 
 import pandas as pd
 import usim
@@ -9,7 +7,9 @@ import usim
 from framework.framework import Queue
 from framework.usim import Framework
 from protocol.connection import LocalSimplexConnection, SimplexConnection
+from protocol.nomssip import NomssipMessage
 from queuesim.config import Config
+from queuesim.message import Message, MessageBuilder
 from queuesim.node import Node
 from sim.connection import RemoteSimplexConnection
 from sim.topology import build_full_random_topology
@@ -31,7 +31,7 @@ class Simulation:
             self.framework.stop_tasks()
 
     async def __run(self, out_csv_path: str, topology_path: str):
-        self.received_msg_queue: Queue[tuple[float, bytes]] = self.framework.queue()
+        self.received_msg_queue: Queue[tuple[float, Message]] = self.framework.queue()
 
         # Run and connect nodes
         nodes = self.__run_nodes()
@@ -48,7 +48,7 @@ class Simulation:
             writer = csv.writer(f)
             writer.writerow(["dissemination_time", "sent_time", "all_received_time"])
             # To count how many nodes have received each message
-            received_msg_counters: Counter[bytes] = Counter()
+            received_msg_counters: Counter[int] = Counter()
             # To count how many results (dissemination time) have been collected so far
             result_cnt = 0
             # Wait until all messages are disseminated to the entire network.
@@ -56,13 +56,16 @@ class Simulation:
                 # Wait until a node notifies that it has received a new message.
                 received_time, msg = await self.received_msg_queue.get()
                 # If the message has been received by all nodes, calculate the dissemination time.
-                received_msg_counters.update([msg])
-                if received_msg_counters[msg] == len(nodes):
-                    sent_time = Message.from_bytes(msg).sent_time
-                    dissemination_time = received_time - sent_time
+                received_msg_counters.update([msg.id()])
+                if received_msg_counters[msg.id()] == len(nodes):
+                    dissemination_time = received_time - msg.sent_time
                     # Use repr to convert a float to a string with as much precision as Python can provide
                     writer.writerow(
-                        [repr(dissemination_time), repr(sent_time), repr(received_time)]
+                        [
+                            repr(dissemination_time),
+                            repr(msg.sent_time),
+                            repr(received_time),
+                        ]
                     )
                     result_cnt += 1
 
@@ -76,13 +79,13 @@ class Simulation:
             for _ in range(self.config.num_nodes)
         ]
 
-    async def __process_msg(self, msg: bytes) -> None:
+    async def __process_msg(self, msg: NomssipMessage[Message]) -> None:
         """
         A handler to process messages received via Nomos Gossip channel
         """
         # Notify that a new message has been received by the node.
         # The received time is also included in the notification.
-        await self.received_msg_queue.put((self.framework.now(), msg))
+        await self.received_msg_queue.put((self.framework.now(), msg.message))
 
     def __connect_nodes(self, nodes: list[Node], topology_path: str):
         topology = build_full_random_topology(
@@ -127,30 +130,5 @@ class Simulation:
         for i in range(self.config.num_sent_msgs):
             if i > 0:
                 await self.framework.sleep(self.config.msg_interval_sec)
-            msg = bytes(self.message_builder.next())
+            msg = self.message_builder.next()
             await sender.send_message(msg)
-
-
-@dataclass
-class Message:
-    id: int
-    sent_time: float
-
-    def __bytes__(self) -> bytes:
-        return struct.pack("if", self.id, self.sent_time)
-
-    @classmethod
-    def from_bytes(cls, data: bytes) -> Self:
-        id, sent_from = struct.unpack("if", data)
-        return cls(id, sent_from)
-
-
-class MessageBuilder:
-    def __init__(self, framework: Framework):
-        self.framework = framework
-        self.next_id = 0
-
-    def next(self) -> Message:
-        msg = Message(self.next_id, self.framework.now())
-        self.next_id += 1
-        return msg
