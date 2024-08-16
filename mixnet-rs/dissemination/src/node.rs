@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::queue::{new_queue, Queue, QueueConfig};
 
@@ -7,7 +7,12 @@ pub type MessageId = u32;
 
 pub struct Node {
     queue_config: QueueConfig,
-    queues: HashMap<NodeId, Box<dyn Queue<MessageId>>>,
+    // To have the deterministic result, we use Vec instead of HashMap.
+    // Building `queues` is inefficient, but it's not a problem because it's done only once at the beginning.
+    // Instead, use `connected_peers` to build `queues` efficiently.
+    queues: Vec<(NodeId, Box<dyn Queue<MessageId>>)>,
+    connected_peers: HashSet<NodeId>,
+    // A cache to avoid relaying the same message multiple times.
     received_msgs: HashSet<MessageId>,
 }
 
@@ -15,19 +20,21 @@ impl Node {
     pub fn new(queue_config: QueueConfig) -> Self {
         Node {
             queue_config,
-            queues: HashMap::new(),
+            queues: Vec::new(),
+            connected_peers: HashSet::new(),
             received_msgs: HashSet::new(),
         }
     }
 
     pub fn connect(&mut self, peer_id: NodeId) {
-        self.queues
-            .entry(peer_id)
-            .or_insert(new_queue(&self.queue_config));
-    }
-
-    pub fn num_queues(&self) -> usize {
-        self.queues.len()
+        if self.connected_peers.insert(peer_id) {
+            let pos = self
+                .queues
+                .binary_search_by(|probe| probe.0.cmp(&peer_id))
+                .unwrap_or_else(|pos| pos);
+            self.queues
+                .insert(pos, (peer_id, new_queue(&self.queue_config)));
+        }
     }
 
     pub fn send(&mut self, msg: MessageId) {

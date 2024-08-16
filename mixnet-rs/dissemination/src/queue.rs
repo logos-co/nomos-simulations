@@ -87,7 +87,7 @@ impl<T: Copy> Queue<T> for NonMixQueue<T> {
 }
 
 struct MixQueue<T: Copy> {
-    queue: Vec<Option<T>>,
+    queue: Vec<Option<T>>, // None element means noise
     rng: StdRng,
 }
 
@@ -301,7 +301,11 @@ mod tests {
 
     #[test]
     fn test_non_mix_queue() {
-        let mut queue = new_queue(QueueType::NonMix, 0, 0);
+        let mut queue = new_queue(&QueueConfig {
+            queue_type: QueueType::NonMix,
+            seed: 0,
+            min_queue_size: 0,
+        });
 
         // Check if None (noise) is returned when queue is empty
         assert_eq!(queue.pop(), None);
@@ -335,7 +339,11 @@ mod tests {
     }
 
     fn test_mix_queue(queue_type: QueueType) {
-        let mut queue = new_queue(queue_type, 0, 4);
+        let mut queue = new_queue(&QueueConfig {
+            queue_type,
+            seed: 0,
+            min_queue_size: 4,
+        });
 
         // Check if None (noise) is returned when queue is empty
         assert_eq!(queue.pop(), None);

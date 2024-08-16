@@ -1,20 +1,18 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 
 use crate::node::NodeId;
 
-pub fn build_topology(
-    num_nodes: u16,
-    peering_degree: u16,
-    seed: u64,
-) -> HashMap<NodeId, HashSet<NodeId>> {
+pub type Topology = Vec<Vec<NodeId>>;
+
+pub fn build_topology(num_nodes: u16, peering_degree: u16, seed: u64) -> Topology {
     let mut rng = StdRng::seed_from_u64(seed);
 
     loop {
-        let mut topology: HashMap<NodeId, HashSet<NodeId>> = HashMap::new();
-        for node in 0..num_nodes {
-            topology.insert(node, HashSet::new());
+        let mut topology: Vec<HashSet<NodeId>> = Vec::new();
+        for _ in 0..num_nodes {
+            topology.push(HashSet::new());
         }
 
         for node in 0..num_nodes {
@@ -22,43 +20,48 @@ pub fn build_topology(
             for other in (0..node).chain(node + 1..num_nodes) {
                 // Check if the other node is not already connected to the current node
                 // and the other node has not reached the peering degree.
-                if !topology.get(&node).unwrap().contains(&other)
-                    && topology.get(&other).unwrap().len() < peering_degree as usize
+                if !topology[node as usize].contains(&other)
+                    && topology[other as usize].len() < peering_degree as usize
                 {
                     others.push(other);
                 }
             }
 
             // How many more connections the current node needs
-            let num_needs = peering_degree as usize - topology.get(&node).unwrap().len();
+            let num_needs = peering_degree as usize - topology[node as usize].len();
             // Smaple peers as many as possible and connect them to the current node
             let k = std::cmp::min(num_needs, others.len());
             others.as_mut_slice().shuffle(&mut rng);
             others.into_iter().take(k).for_each(|peer| {
-                topology.get_mut(&node).unwrap().insert(peer);
-                topology.get_mut(&peer).unwrap().insert(node);
+                topology[node as usize].insert(peer);
+                topology[peer as usize].insert(node);
             });
         }
 
         if are_all_nodes_connected(&topology) {
-            return topology;
+            let mut sorted_topology: Vec<Vec<NodeId>> = Vec::new();
+            for peers in topology.iter() {
+                let mut sorted_peers: Vec<NodeId> = peers.iter().copied().collect();
+                sorted_peers.sort();
+                sorted_topology.push(sorted_peers);
+            }
+            return sorted_topology;
         }
     }
 }
 
-fn are_all_nodes_connected(topology: &HashMap<NodeId, HashSet<NodeId>>) -> bool {
-    let start_node = topology.keys().next().unwrap();
-    let visited = dfs(topology, *start_node);
+fn are_all_nodes_connected(topology: &[HashSet<NodeId>]) -> bool {
+    let visited = dfs(topology, 0);
     visited.len() == topology.len()
 }
 
-fn dfs(topology: &HashMap<NodeId, HashSet<NodeId>>, start_node: NodeId) -> HashSet<NodeId> {
+fn dfs(topology: &[HashSet<NodeId>], start_node: NodeId) -> HashSet<NodeId> {
     let mut visited: HashSet<NodeId> = HashSet::new();
     let mut stack: Vec<NodeId> = Vec::new();
     stack.push(start_node);
     while let Some(node) = stack.pop() {
         visited.insert(node);
-        for peer in topology.get(&node).unwrap().iter() {
+        for peer in topology[node as usize].iter() {
             if !visited.contains(peer) {
                 stack.push(*peer);
             }
