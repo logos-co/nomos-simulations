@@ -1,0 +1,9 @@
+[package]
+name = "dissemination"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rand = "0.8.5"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
