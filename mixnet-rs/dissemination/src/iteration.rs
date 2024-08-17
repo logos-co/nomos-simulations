@@ -1,6 +1,7 @@
-use std::{collections::HashMap, error::Error};
+use std::error::Error;
 
 use rand::{rngs::StdRng, RngCore, SeedableRng};
+use rustc_hash::FxHashMap;
 
 use crate::{
     node::{MessageId, Node, NodeId},
@@ -44,7 +45,7 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, out_csv_path: &str, topology
     let mut next_msg_id: MessageId = 0;
     let total_num_msgs: u32 = paramset.num_senders as u32 * paramset.num_sent_msgs as u32;
     // To keep track of when each message was sent and how many nodes received it
-    let mut message_tracker: HashMap<MessageId, (f32, u16)> = HashMap::new();
+    let mut message_tracker: FxHashMap<MessageId, (f32, u16)> = FxHashMap::default();
     // To keep track of how many messages have been disseminated to all nodes
     let mut num_disseminated_msgs = 0;
 
@@ -104,7 +105,7 @@ fn send_messages(
     sender_ids: &[NodeId],
     nodes: &mut [Node],
     next_msg_id: &mut MessageId,
-    message_tracker: &mut HashMap<MessageId, (f32, u16)>,
+    message_tracker: &mut FxHashMap<MessageId, (f32, u16)>,
 ) {
     for &sender_id in sender_ids.iter() {
         nodes[sender_id as usize].send(*next_msg_id);
@@ -116,7 +117,7 @@ fn send_messages(
 fn relay_messages(
     vtime: f32,
     nodes: &mut [Node],
-    message_tracker: &mut HashMap<MessageId, (f32, u16)>,
+    message_tracker: &mut FxHashMap<MessageId, (f32, u16)>,
     num_disseminated_msgs: &mut usize,
     writer: &mut csv::Writer<std::fs::File>,
 ) {

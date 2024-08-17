@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::queue::{new_queue, Queue, QueueConfig};
 
@@ -7,13 +7,13 @@ pub type MessageId = u32;
 
 pub struct Node {
     queue_config: QueueConfig,
-    // To have the deterministic result, we use Vec instead of HashMap.
+    // To have the deterministic result, we use Vec instead of FxHashMap.
     // Building `queues` is inefficient, but it's not a problem because it's done only once at the beginning.
     // Instead, use `connected_peers` to build `queues` efficiently.
     queues: Vec<(NodeId, Box<dyn Queue<MessageId>>)>,
-    connected_peers: HashSet<NodeId>,
+    connected_peers: FxHashSet<NodeId>,
     // A cache to avoid relaying the same message multiple times.
-    received_msgs: HashMap<MessageId, u16>,
+    received_msgs: FxHashMap<MessageId, u16>,
     peering_degree: u16,
 }
 
@@ -22,8 +22,8 @@ impl Node {
         Node {
             queue_config,
             queues: Vec::new(),
-            connected_peers: HashSet::new(),
-            received_msgs: HashMap::new(),
+            connected_peers: FxHashSet::default(),
+            received_msgs: FxHashMap::default(),
             peering_degree,
         }
     }
