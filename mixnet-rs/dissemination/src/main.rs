@@ -73,6 +73,9 @@ fn main() {
         let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel::<(u16, u16)>();
 
         let mut waiting_iterations: HashMap<u16, (u16, String)> = HashMap::new();
+        let mut num_completed_paramsets = 0;
+        let num_paramsets = paramsets.len();
+
         for paramset in paramsets {
             let paramset_dir = format!("{outdir}/{subdir}/__WIP__paramset_{}", paramset.id);
             std::fs::create_dir_all(paramset_dir.as_str()).unwrap();
@@ -105,7 +108,14 @@ fn main() {
                 let new_paramset_dir = paramset_dir.replace("__WIP__paramset_", "paramset_");
                 std::fs::rename(&paramset_dir, &new_paramset_dir)
                     .expect("Failed to rename: {paramset_dir} -> {new_paramset_dir}: {e}");
-                tracing::info!("ParamSet:{} completed.", paramset_id);
+
+                num_completed_paramsets += 1;
+                tracing::info!(
+                    "ParamSet:{} completed. {}/{} paramsets have been done so far.",
+                    paramset_id,
+                    num_completed_paramsets,
+                    num_paramsets
+                );
             }
 
             // Exit loop if no more iterations are waiting
