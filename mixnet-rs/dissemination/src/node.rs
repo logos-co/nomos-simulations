@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::queue::{new_queue, Queue, QueueConfig};
 
@@ -13,16 +13,18 @@ pub struct Node {
     queues: Vec<(NodeId, Box<dyn Queue<MessageId>>)>,
     connected_peers: HashSet<NodeId>,
     // A cache to avoid relaying the same message multiple times.
-    received_msgs: HashSet<MessageId>,
+    received_msgs: HashMap<MessageId, u16>,
+    peering_degree: u16,
 }
 
 impl Node {
-    pub fn new(queue_config: QueueConfig) -> Self {
+    pub fn new(queue_config: QueueConfig, peering_degree: u16) -> Self {
         Node {
             queue_config,
             queues: Vec::new(),
             connected_peers: HashSet::new(),
-            received_msgs: HashSet::new(),
+            received_msgs: HashMap::new(),
+            peering_degree,
         }
     }
 
@@ -38,14 +40,14 @@ impl Node {
     }
 
     pub fn send(&mut self, msg: MessageId) {
-        assert!(self.received_msgs.insert(msg));
+        assert!(self.check_and_update_cache(msg, true));
         for (_, queue) in self.queues.iter_mut() {
             queue.push(msg);
         }
     }
 
     pub fn receive(&mut self, msg: MessageId, from: NodeId) -> bool {
-        let first_received = self.received_msgs.insert(msg);
+        let first_received = self.check_and_update_cache(msg, false);
         if first_received {
             for (node_id, queue) in self.queues.iter_mut() {
                 if *node_id != from {
@@ -64,5 +66,24 @@ impl Node {
             }
         }
         msgs_to_relay
+    }
+
+    fn check_and_update_cache(&mut self, msg: MessageId, sending: bool) -> bool {
+        let first_received = if let Some(count) = self.received_msgs.get_mut(&msg) {
+            *count += 1;
+            false
+        } else {
+            self.received_msgs.insert(msg, if sending { 0 } else { 1 });
+            true
+        };
+
+        // If the message have been received from all connected peers, remove it from the cache
+        // because there is no possibility that the message will be received again.
+        if self.received_msgs.get(&msg).unwrap() == &self.peering_degree {
+            tracing::debug!("Remove message from cache: {}", msg);
+            self.received_msgs.remove(&msg);
+        }
+
+        first_received
     }
 }

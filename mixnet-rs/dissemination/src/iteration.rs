@@ -14,11 +14,14 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, out_csv_path: &str, topology
     let mut nodes: Vec<Node> = Vec::new();
     let mut queue_seed_rng = StdRng::seed_from_u64(seed);
     for _ in 0..paramset.num_nodes {
-        nodes.push(Node::new(QueueConfig {
-            queue_type: paramset.queue_type,
-            seed: queue_seed_rng.next_u64(),
-            min_queue_size: paramset.min_queue_size,
-        }));
+        nodes.push(Node::new(
+            QueueConfig {
+                queue_type: paramset.queue_type,
+                seed: queue_seed_rng.next_u64(),
+                min_queue_size: paramset.min_queue_size,
+            },
+            paramset.peering_degree,
+        ));
     }
 
     // Connect nodes
@@ -39,7 +42,7 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, out_csv_path: &str, topology
     // To generate unique message IDs
     let mut next_msg_id: MessageId = 0;
     // To keep track of when each message was sent and how many nodes received it
-    let mut sent_msgs: HashMap<MessageId, (f32, u16)> = HashMap::new();
+    let mut message_tracker: HashMap<MessageId, (f32, u16)> = HashMap::new();
     // To keep track of how many messages have been disseminated to all nodes
     let mut num_disseminated_msgs = 0;
 
@@ -50,11 +53,10 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, out_csv_path: &str, topology
 
     loop {
         // Send new messages
-        assert!(sent_msgs.len() % (paramset.num_senders as usize) == 0);
-        if sent_msgs.len() / (paramset.num_senders as usize) < paramset.num_sent_msgs as usize {
+        if next_msg_id < (paramset.num_senders * paramset.num_sent_msgs) as MessageId {
             for &sender_id in sender_ids.iter() {
                 nodes[sender_id as usize].send(next_msg_id);
-                sent_msgs.insert(next_msg_id, (vtime, 1));
+                message_tracker.insert(next_msg_id, (vtime, 1));
                 next_msg_id += 1;
             }
         }
@@ -73,7 +75,7 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, out_csv_path: &str, topology
             .into_iter()
             .for_each(|(receiver_id, msg, sender_id)| {
                 if nodes[receiver_id as usize].receive(msg, sender_id) {
-                    let (sent_time, num_received_nodes) = sent_msgs.get_mut(&msg).unwrap();
+                    let (sent_time, num_received_nodes) = message_tracker.get_mut(&msg).unwrap();
                     *num_received_nodes += 1;
                     if *num_received_nodes == paramset.num_nodes {
                         let dissemination_time = vtime - *sent_time;
@@ -85,6 +87,8 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, out_csv_path: &str, topology
                             ])
                             .unwrap();
                         num_disseminated_msgs += 1;
+
+                        message_tracker.remove(&msg);
                     }
                 }
             });
