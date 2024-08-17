@@ -52,6 +52,7 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, out_csv_path: &str, topology
     writer
         .write_record(["dissemination_time", "sent_time", "all_received_time"])
         .unwrap();
+    writer.flush().unwrap();
 
     // Virtual discrete time
     let mut vtime: f32;
@@ -143,6 +144,7 @@ fn relay_messages(
                                 vtime.to_string(),
                             ])
                             .unwrap();
+                        writer.flush().unwrap();
                         *num_disseminated_msgs += 1;
 
                         message_tracker.remove(&msg);
