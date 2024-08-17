@@ -30,6 +30,8 @@ struct Args {
     outdir: String,
     #[arg(short, long)]
     num_threads: usize,
+    #[arg(short, long)]
+    from_paramset: Option<u16>,
 }
 
 fn main() {
@@ -43,6 +45,7 @@ fn main() {
         queue_type,
         outdir,
         num_threads,
+        from_paramset,
     } = args;
 
     // Create a directory and initialize a CSV file only with a header
@@ -70,6 +73,11 @@ fn main() {
 
     pool.install(|| {
         paramsets.par_iter().for_each(|paramset| {
+            if paramset.id < from_paramset.unwrap_or(0) {
+                tracing::info!("ParamSet:{} skipped", paramset.id);
+                return;
+            }
+
             let paramset_dir = format!("{outdir}/{subdir}/__WIP__paramset_{}", paramset.id);
             std::fs::create_dir_all(paramset_dir.as_str()).unwrap();
             save_paramset_info(paramset, format!("{paramset_dir}/paramset.csv").as_str()).unwrap();
