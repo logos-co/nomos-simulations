@@ -86,25 +86,31 @@ impl ParamSet {
         let mut start_id: u16 = 1;
         let mut paramsets: Vec<ParamSet> = Vec::new();
         for &num_nodes in &[20, 40, 80] {
+            let peering_degree_list = &[num_nodes / 5, num_nodes / 4, num_nodes / 2];
+            let min_queue_size_list = &[num_nodes / 2, num_nodes, num_nodes * 2];
+            let transmission_rate_list = &[num_nodes / 2, num_nodes, num_nodes * 2];
+            let num_sent_msgs_list = |_| match exp_id {
+                ExperimentId::Experiment1 | ExperimentId::Experiment3 => vec![1],
+                ExperimentId::Experiment2 | ExperimentId::Experiment4 => vec![8, 16, 32],
+            };
+            let num_senders_list = match exp_id {
+                ExperimentId::Experiment1 | ExperimentId::Experiment2 => vec![1],
+                ExperimentId::Experiment3 | ExperimentId::Experiment4 => {
+                    vec![num_nodes / 10, num_nodes / 5, num_nodes / 2]
+                }
+            };
+            let num_iterations = num_nodes / 2;
+
             let (mut new_paramsets, next_start_id) = Self::new_paramsets(
                 start_id,
                 num_nodes,
-                &[num_nodes / 5, num_nodes / 4, num_nodes / 2],
-                &[num_nodes / 2, num_nodes, num_nodes * 2],
-                &[num_nodes / 2, num_nodes, num_nodes * 2],
-                |_| match exp_id {
-                    ExperimentId::Experiment1 | ExperimentId::Experiment3 => vec![1],
-                    ExperimentId::Experiment2 | ExperimentId::Experiment4 => vec![8, 16, 32],
-                },
-                match exp_id {
-                    ExperimentId::Experiment1 | ExperimentId::Experiment2 => vec![1],
-                    ExperimentId::Experiment3 | ExperimentId::Experiment4 => {
-                        vec![num_nodes / 10, num_nodes / 5, num_nodes / 2]
-                    }
-                }
-                .as_slice(),
+                peering_degree_list,
+                min_queue_size_list,
+                transmission_rate_list,
+                num_sent_msgs_list,
+                num_senders_list.as_slice(),
                 queue_type,
-                num_nodes / 2,
+                num_iterations,
             );
             paramsets.append(&mut new_paramsets);
             start_id = next_start_id;
@@ -116,27 +122,33 @@ impl ParamSet {
         let mut start_id: u16 = 1;
         let mut paramsets: Vec<ParamSet> = Vec::new();
         for &num_nodes in &[100, 1000, 10000] {
+            let peering_degree_list = &[4, 8, 16];
+            let min_queue_size_list = &[10, 50, 100];
+            let transmission_rate_list = &[1, 10, 100];
+            let num_sent_msgs_list = |min_queue_size| match exp_id {
+                ExperimentId::Experiment1 | ExperimentId::Experiment3 => vec![1],
+                ExperimentId::Experiment2 | ExperimentId::Experiment4 => {
+                    vec![min_queue_size / 2, min_queue_size, min_queue_size * 2]
+                }
+            };
+            let num_senders_list = match exp_id {
+                ExperimentId::Experiment1 | ExperimentId::Experiment2 => vec![1],
+                ExperimentId::Experiment3 | ExperimentId::Experiment4 => {
+                    vec![num_nodes / 10, num_nodes / 5, num_nodes / 2]
+                }
+            };
+            let num_iterations = 20;
+
             let (mut new_paramsets, next_start_id) = Self::new_paramsets(
                 start_id,
                 num_nodes,
-                &[4, 8, 16],
-                &[10, 50, 100],
-                &[1, 10, 100],
-                |min_queue_size| match exp_id {
-                    ExperimentId::Experiment1 | ExperimentId::Experiment3 => vec![1],
-                    ExperimentId::Experiment2 | ExperimentId::Experiment4 => {
-                        vec![min_queue_size / 2, min_queue_size, min_queue_size * 2]
-                    }
-                },
-                match exp_id {
-                    ExperimentId::Experiment1 | ExperimentId::Experiment2 => vec![1],
-                    ExperimentId::Experiment3 | ExperimentId::Experiment4 => {
-                        vec![num_nodes / 10, num_nodes / 5, num_nodes / 2]
-                    }
-                }
-                .as_slice(),
+                peering_degree_list,
+                min_queue_size_list,
+                transmission_rate_list,
+                num_sent_msgs_list,
+                num_senders_list.as_slice(),
                 queue_type,
-                20,
+                num_iterations,
             );
             paramsets.append(&mut new_paramsets);
             start_id = next_start_id;
@@ -148,25 +160,31 @@ impl ParamSet {
         let mut start_id: u16 = 1;
         let mut paramsets: Vec<ParamSet> = Vec::new();
         for &num_nodes in &[20, 200, 2000] {
+            let peering_degree_list = &[4, 6, 8];
+            let min_queue_size_list = &[10, 50, 100];
+            let transmission_rate_list = &[1];
+            let num_sent_msgs_list = |_| match exp_id {
+                ExperimentId::Experiment1 | ExperimentId::Experiment3 => vec![1],
+                ExperimentId::Experiment2 | ExperimentId::Experiment4 => vec![1000],
+            };
+            let num_senders_list = match exp_id {
+                ExperimentId::Experiment1 | ExperimentId::Experiment2 => vec![1],
+                ExperimentId::Experiment3 | ExperimentId::Experiment4 => {
+                    vec![num_nodes / 10, num_nodes / 5, num_nodes / 2]
+                }
+            };
+            let num_iterations = 20;
+
             let (mut new_paramsets, next_start_id) = Self::new_paramsets(
                 start_id,
                 num_nodes,
-                &[4, 6, 8],
-                &[10, 50, 100],
-                &[1],
-                |_| match exp_id {
-                    ExperimentId::Experiment1 | ExperimentId::Experiment3 => vec![1],
-                    ExperimentId::Experiment2 | ExperimentId::Experiment4 => vec![1000],
-                },
-                match exp_id {
-                    ExperimentId::Experiment1 | ExperimentId::Experiment2 => vec![1],
-                    ExperimentId::Experiment3 | ExperimentId::Experiment4 => {
-                        vec![num_nodes / 10, num_nodes / 5, num_nodes / 2]
-                    }
-                }
-                .as_slice(),
+                peering_degree_list,
+                min_queue_size_list,
+                transmission_rate_list,
+                num_sent_msgs_list,
+                num_senders_list.as_slice(),
                 queue_type,
-                20,
+                num_iterations,
             );
             paramsets.append(&mut new_paramsets);
             start_id = next_start_id;
