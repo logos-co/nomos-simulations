@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use rand::{rngs::StdRng, RngCore, SeedableRng};
+use rand::{rngs::StdRng, seq::SliceRandom, RngCore, SeedableRng};
 use rustc_hash::FxHashMap;
 
 use crate::{
@@ -37,9 +37,12 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, out_csv_path: &str, topology
         });
     }
 
-    // It's okay to choose the first `num_senders` nodes as senders
-    // because the topology is randomly generated.
-    let sender_ids: Vec<NodeId> = (0..paramset.num_senders).collect();
+    let mut sender_selector = SenderSelector::new(
+        (0..paramset.num_nodes).collect(),
+        paramset.num_senders,
+        paramset.random_senders_every_time,
+        seed,
+    );
 
     // To generate unique message IDs
     let mut next_msg_id: MessageId = 0;
@@ -74,7 +77,7 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, out_csv_path: &str, topology
 
             send_messages(
                 vtime,
-                &sender_ids,
+                sender_selector.next(),
                 &mut nodes,
                 &mut next_msg_id,
                 &mut message_tracker,
@@ -169,4 +172,39 @@ fn save_topology(topology: &Topology, topology_path: &str) -> Result<(), Box<dyn
     }
     wtr.flush()?;
     Ok(())
+}
+
+struct SenderSelector {
+    candidates: Vec<NodeId>,
+    num_senders: usize,
+    random_senders_every_time: bool,
+    rng: StdRng,
+}
+
+impl SenderSelector {
+    fn new(
+        candidates: Vec<NodeId>,
+        num_senders: u16,
+        random_senders_every_time: bool,
+        seed: u64,
+    ) -> Self {
+        assert!(candidates.len() >= num_senders as usize);
+        Self {
+            candidates,
+            num_senders: num_senders as usize,
+            random_senders_every_time,
+            rng: StdRng::seed_from_u64(seed),
+        }
+    }
+
+    fn next(&mut self) -> &[NodeId] {
+        if !self.random_senders_every_time {
+            // It's okay to pick the first `num_senders` nodes
+            // because the topology is randomly generated.
+            &self.candidates[..self.num_senders]
+        } else {
+            self.candidates.shuffle(&mut self.rng);
+            &self.candidates[..self.num_senders]
+        }
+    }
 }

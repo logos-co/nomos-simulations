@@ -7,6 +7,7 @@ pub enum ExperimentId {
     Experiment2 = 2,
     Experiment3 = 3,
     Experiment4 = 4,
+    Experiment5 = 5,
 }
 
 impl std::str::FromStr for ExperimentId {
@@ -18,6 +19,7 @@ impl std::str::FromStr for ExperimentId {
             "2" | "Experiment2" => Ok(ExperimentId::Experiment2),
             "3" | "Experiment3" => Ok(ExperimentId::Experiment3),
             "4" | "Experiment4" => Ok(ExperimentId::Experiment4),
+            "5" | "Experiment5" => Ok(ExperimentId::Experiment5),
             _ => Err(format!("Invalid experiment ID: {}", s)),
         }
     }
@@ -52,6 +54,7 @@ pub const PARAMSET_CSV_COLUMNS: &[&str] = &[
     "transmission_rate",
     "num_sent_msgs",
     "num_senders",
+    "random_senders_every_time",
     "queue_type",
     "num_iterations",
 ];
@@ -65,6 +68,7 @@ pub struct ParamSet {
     pub transmission_rate: u16,
     pub num_sent_msgs: u16,
     pub num_senders: u16,
+    pub random_senders_every_time: bool,
     pub queue_type: QueueType,
     pub num_iterations: u16,
 }
@@ -91,14 +95,19 @@ impl ParamSet {
             let transmission_rate_list = &[num_nodes / 2, num_nodes, num_nodes * 2];
             let num_sent_msgs_list = |_| match exp_id {
                 ExperimentId::Experiment1 | ExperimentId::Experiment3 => vec![1],
-                ExperimentId::Experiment2 | ExperimentId::Experiment4 => vec![8, 16, 32],
+                ExperimentId::Experiment2
+                | ExperimentId::Experiment4
+                | ExperimentId::Experiment5 => vec![8, 16, 32],
             };
             let num_senders_list = match exp_id {
                 ExperimentId::Experiment1 | ExperimentId::Experiment2 => vec![1],
-                ExperimentId::Experiment3 | ExperimentId::Experiment4 => {
+                ExperimentId::Experiment3
+                | ExperimentId::Experiment4
+                | ExperimentId::Experiment5 => {
                     vec![num_nodes / 10, num_nodes / 5, num_nodes / 2]
                 }
             };
+            let random_senders_every_time = exp_id == ExperimentId::Experiment5;
             let num_iterations = num_nodes / 2;
 
             let (mut new_paramsets, next_start_id) = Self::new_paramsets(
@@ -109,6 +118,7 @@ impl ParamSet {
                 transmission_rate_list,
                 num_sent_msgs_list,
                 num_senders_list.as_slice(),
+                random_senders_every_time,
                 queue_type,
                 num_iterations,
             );
@@ -127,16 +137,21 @@ impl ParamSet {
             let transmission_rate_list = &[1, 10, 100];
             let num_sent_msgs_list = |min_queue_size| match exp_id {
                 ExperimentId::Experiment1 | ExperimentId::Experiment3 => vec![1],
-                ExperimentId::Experiment2 | ExperimentId::Experiment4 => {
+                ExperimentId::Experiment2
+                | ExperimentId::Experiment4
+                | ExperimentId::Experiment5 => {
                     vec![min_queue_size / 2, min_queue_size, min_queue_size * 2]
                 }
             };
             let num_senders_list = match exp_id {
                 ExperimentId::Experiment1 | ExperimentId::Experiment2 => vec![1],
-                ExperimentId::Experiment3 | ExperimentId::Experiment4 => {
+                ExperimentId::Experiment3
+                | ExperimentId::Experiment4
+                | ExperimentId::Experiment5 => {
                     vec![num_nodes / 10, num_nodes / 5, num_nodes / 2]
                 }
             };
+            let random_senders_every_time = exp_id == ExperimentId::Experiment5;
             let num_iterations = 20;
 
             let (mut new_paramsets, next_start_id) = Self::new_paramsets(
@@ -147,6 +162,7 @@ impl ParamSet {
                 transmission_rate_list,
                 num_sent_msgs_list,
                 num_senders_list.as_slice(),
+                random_senders_every_time,
                 queue_type,
                 num_iterations,
             );
@@ -165,14 +181,19 @@ impl ParamSet {
             let transmission_rate_list = &[1];
             let num_sent_msgs_list = |_| match exp_id {
                 ExperimentId::Experiment1 | ExperimentId::Experiment3 => vec![1],
-                ExperimentId::Experiment2 | ExperimentId::Experiment4 => vec![1000],
+                ExperimentId::Experiment2
+                | ExperimentId::Experiment4
+                | ExperimentId::Experiment5 => vec![1000],
             };
             let num_senders_list = match exp_id {
                 ExperimentId::Experiment1 | ExperimentId::Experiment2 => vec![1],
-                ExperimentId::Experiment3 | ExperimentId::Experiment4 => {
+                ExperimentId::Experiment3
+                | ExperimentId::Experiment4
+                | ExperimentId::Experiment5 => {
                     vec![num_nodes / 10, num_nodes / 5, num_nodes / 2]
                 }
             };
+            let random_senders_every_time = exp_id == ExperimentId::Experiment5;
             let num_iterations = 20;
 
             let (mut new_paramsets, next_start_id) = Self::new_paramsets(
@@ -183,6 +204,7 @@ impl ParamSet {
                 transmission_rate_list,
                 num_sent_msgs_list,
                 num_senders_list.as_slice(),
+                random_senders_every_time,
                 queue_type,
                 num_iterations,
             );
@@ -201,6 +223,7 @@ impl ParamSet {
         transmission_rate_list: &[u16],
         num_sent_msgs_list: impl Fn(u16) -> Vec<u16>,
         num_senders_list: &[u16],
+        random_senders_every_time: bool,
         queue_type: QueueType,
         num_iterations: u16,
     ) -> (Vec<ParamSet>, u16) {
@@ -225,6 +248,7 @@ impl ParamSet {
                                 transmission_rate,
                                 num_sent_msgs,
                                 num_senders,
+                                random_senders_every_time,
                                 queue_type,
                                 num_iterations,
                             });
@@ -255,6 +279,7 @@ impl ParamSet {
             self.transmission_rate.to_string(),
             self.num_sent_msgs.to_string(),
             self.num_senders.to_string(),
+            self.random_senders_every_time.to_string(),
             format!("{:?}", self.queue_type),
             self.num_iterations.to_string(),
         ]
@@ -290,6 +315,10 @@ mod tests {
                 3u32.pow(6),
             ),
             (
+                (ExperimentId::Experiment5, SessionId::Session1),
+                3u32.pow(6),
+            ),
+            (
                 (ExperimentId::Experiment1, SessionId::Session2),
                 3u32.pow(4),
             ),
@@ -298,11 +327,19 @@ mod tests {
                 3u32.pow(6),
             ),
             (
+                (ExperimentId::Experiment5, SessionId::Session2),
+                3u32.pow(6),
+            ),
+            (
                 (ExperimentId::Experiment1, SessionId::Session2_1),
                 3u32.pow(3),
             ),
             (
                 (ExperimentId::Experiment4, SessionId::Session2_1),
+                3u32.pow(4),
+            ),
+            (
+                (ExperimentId::Experiment5, SessionId::Session2_1),
                 3u32.pow(4),
             ),
         ];
@@ -338,10 +375,13 @@ mod tests {
             (ExperimentId::Experiment2, SessionId::Session1),
             (ExperimentId::Experiment3, SessionId::Session1),
             (ExperimentId::Experiment4, SessionId::Session1),
+            (ExperimentId::Experiment5, SessionId::Session1),
             (ExperimentId::Experiment1, SessionId::Session2),
             (ExperimentId::Experiment4, SessionId::Session2),
+            (ExperimentId::Experiment5, SessionId::Session2),
             (ExperimentId::Experiment1, SessionId::Session2_1),
             (ExperimentId::Experiment4, SessionId::Session2_1),
+            (ExperimentId::Experiment5, SessionId::Session2_1),
         ];
 
         for (exp_id, session_id) in cases.into_iter() {
