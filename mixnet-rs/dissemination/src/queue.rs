@@ -10,6 +10,7 @@ pub enum QueueType {
     PureRandomSampling,
     PermutedCoinFlipping,
     NoisyCoinFlipping,
+    NoisyCoinFlippingRandomRelease,
 }
 
 impl std::str::FromStr for QueueType {
@@ -22,6 +23,7 @@ impl std::str::FromStr for QueueType {
             "PureRandomSampling" => Ok(QueueType::PureRandomSampling),
             "PermutedCoinFlipping" => Ok(QueueType::PermutedCoinFlipping),
             "NoisyCoinFlipping" => Ok(QueueType::NoisyCoinFlipping),
+            "NoisyCoinFlippingRandomRelease" => Ok(QueueType::NoisyCoinFlippingRandomRelease),
             _ => Err(format!("Unknown queue type: {}", s)),
         }
     }
@@ -51,6 +53,9 @@ pub fn new_queue<T: 'static + Copy>(cfg: &QueueConfig) -> Box<dyn Queue<T>> {
             Box::new(PermutedCoinFlippingQueue::new(cfg.min_queue_size, cfg.seed))
         }
         QueueType::NoisyCoinFlipping => Box::new(NoisyCoinFlippingQueue::new(cfg.seed)),
+        QueueType::NoisyCoinFlippingRandomRelease => {
+            Box::new(NoisyCoinFlippingRandomReleaseQueue::new(cfg.seed))
+        }
     }
 }
 
@@ -288,6 +293,37 @@ impl<T: Copy> Queue<T> for NoisyCoinFlippingQueue<T> {
     }
 }
 
+struct NoisyCoinFlippingRandomReleaseQueue<T: Copy> {
+    queue: MixQueue<T>,
+}
+
+impl<T: Copy> NoisyCoinFlippingRandomReleaseQueue<T> {
+    pub fn new(seed: u64) -> Self {
+        Self {
+            queue: MixQueue::new(0, seed),
+        }
+    }
+}
+
+impl<T: Copy> Queue<T> for NoisyCoinFlippingRandomReleaseQueue<T> {
+    fn push(&mut self, msg: T) {
+        self.queue.push(msg)
+    }
+
+    fn pop(&mut self) -> Option<T> {
+        if self.queue.len() == 0 {
+            return None;
+        }
+
+        if self.queue.flip_coin() {
+            let i = self.queue.sample_index();
+            self.queue.pop(i)
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
@@ -328,6 +364,7 @@ mod tests {
             QueueType::PureRandomSampling,
             QueueType::PermutedCoinFlipping,
             QueueType::NoisyCoinFlipping,
+            QueueType::NoisyCoinFlippingRandomRelease,
         ] {
             test_mix_queue(queue_type);
         }
