@@ -30,7 +30,6 @@ impl std::str::FromStr for QueueType {
 pub trait Queue<T: Copy> {
     fn push(&mut self, msg: T);
     fn pop(&mut self) -> Option<T>;
-    fn len(&self) -> usize;
 }
 
 pub struct QueueConfig {
@@ -42,21 +41,16 @@ pub struct QueueConfig {
 pub fn new_queue<T: 'static + Copy>(cfg: &QueueConfig) -> Box<dyn Queue<T>> {
     match cfg.queue_type {
         QueueType::NonMix => Box::new(NonMixQueue::new()),
-        QueueType::PureCoinFlipping => Box::new(PureCoinFlippingQueue::new(
-            cfg.min_queue_size,
-            StdRng::seed_from_u64(cfg.seed),
-        )),
-        QueueType::PureRandomSampling => Box::new(PureRandomSamplingQueue::new(
-            cfg.min_queue_size,
-            StdRng::seed_from_u64(cfg.seed),
-        )),
-        QueueType::PermutedCoinFlipping => Box::new(PermutedCoinFlippingQueue::new(
-            cfg.min_queue_size,
-            StdRng::seed_from_u64(cfg.seed),
-        )),
-        QueueType::NoisyCoinFlipping => {
-            Box::new(NoisyCoinFlippingQueue::new(StdRng::seed_from_u64(cfg.seed)))
+        QueueType::PureCoinFlipping => {
+            Box::new(PureCoinFlippingQueue::new(cfg.min_queue_size, cfg.seed))
         }
+        QueueType::PureRandomSampling => {
+            Box::new(PureRandomSamplingQueue::new(cfg.min_queue_size, cfg.seed))
+        }
+        QueueType::PermutedCoinFlipping => {
+            Box::new(PermutedCoinFlippingQueue::new(cfg.min_queue_size, cfg.seed))
+        }
+        QueueType::NoisyCoinFlipping => Box::new(NoisyCoinFlippingQueue::new(cfg.seed)),
     }
 }
 
@@ -80,10 +74,6 @@ impl<T: Copy> Queue<T> for NonMixQueue<T> {
     fn pop(&mut self) -> Option<T> {
         self.queue.pop_front()
     }
-
-    fn len(&self) -> usize {
-        self.queue.len()
-    }
 }
 
 struct MixQueue<T: Copy> {
@@ -92,15 +82,19 @@ struct MixQueue<T: Copy> {
 }
 
 impl<T: Copy> MixQueue<T> {
-    fn new(rng: StdRng) -> Self {
+    fn new(num_initial_noises: usize, seed: u64) -> Self {
         Self {
-            queue: Vec::new(),
-            rng,
+            queue: vec![None; num_initial_noises],
+            rng: StdRng::seed_from_u64(seed),
         }
     }
 
     fn push(&mut self, data: T) {
         self.queue.push(Some(data))
+    }
+
+    fn fill_noises(&mut self, k: usize) {
+        self.queue.extend(std::iter::repeat(None).take(k))
     }
 
     fn pop(&mut self, idx: usize) -> Option<T> {
@@ -114,6 +108,18 @@ impl<T: Copy> MixQueue<T> {
     fn len(&self) -> usize {
         self.queue.len()
     }
+
+    fn flip_coin(&mut self) -> bool {
+        self.rng.gen_bool(0.5)
+    }
+
+    fn sample_index(&mut self) -> usize {
+        self.rng.gen_range(0..self.queue.len())
+    }
+
+    fn shuffle(&mut self) {
+        self.queue.as_mut_slice().shuffle(&mut self.rng);
+    }
 }
 
 struct MinSizeMixQueue<T: Copy> {
@@ -122,11 +128,9 @@ struct MinSizeMixQueue<T: Copy> {
 }
 
 impl<T: Copy> MinSizeMixQueue<T> {
-    fn new(min_pool_size: u16, rng: StdRng) -> Self {
-        let mut queue = MixQueue::new(rng);
-        queue.queue = vec![None; min_pool_size as usize];
+    fn new(min_pool_size: u16, seed: u64) -> Self {
         Self {
-            queue,
+            queue: MixQueue::new(min_pool_size as usize, seed),
             min_pool_size,
         }
     }
@@ -141,14 +145,25 @@ impl<T: Copy> MinSizeMixQueue<T> {
 
     fn ensure_min_size(&mut self) {
         if self.queue.len() < self.min_pool_size as usize {
-            self.queue.queue.extend(
-                std::iter::repeat(None).take(self.min_pool_size as usize - self.queue.queue.len()),
-            );
+            self.queue
+                .fill_noises(self.min_pool_size as usize - self.queue.len());
         }
     }
 
     fn len(&self) -> usize {
         self.queue.len()
+    }
+
+    fn flip_coin(&mut self) -> bool {
+        self.queue.flip_coin()
+    }
+
+    fn sample_index(&mut self) -> usize {
+        self.queue.sample_index()
+    }
+
+    fn shuffle(&mut self) {
+        self.queue.shuffle()
     }
 }
 
@@ -157,9 +172,9 @@ struct PureCoinFlippingQueue<T: Copy> {
 }
 
 impl<T: Copy> PureCoinFlippingQueue<T> {
-    fn new(min_pool_size: u16, rng: StdRng) -> Self {
+    fn new(min_pool_size: u16, seed: u64) -> Self {
         Self {
-            queue: MinSizeMixQueue::new(min_pool_size, rng),
+            queue: MinSizeMixQueue::new(min_pool_size, seed),
         }
     }
 }
@@ -173,16 +188,12 @@ impl<T: Copy> Queue<T> for PureCoinFlippingQueue<T> {
         self.queue.ensure_min_size();
 
         loop {
-            for i in 0..self.len() {
-                if self.queue.queue.rng.gen_bool(0.5) {
+            for i in 0..self.queue.len() {
+                if self.queue.flip_coin() {
                     return self.queue.pop(i);
                 }
             }
         }
-    }
-
-    fn len(&self) -> usize {
-        self.queue.len()
     }
 }
 
@@ -191,9 +202,9 @@ struct PureRandomSamplingQueue<T: Copy> {
 }
 
 impl<T: Copy> PureRandomSamplingQueue<T> {
-    fn new(min_pool_size: u16, rng: StdRng) -> Self {
+    fn new(min_pool_size: u16, seed: u64) -> Self {
         Self {
-            queue: MinSizeMixQueue::new(min_pool_size, rng),
+            queue: MinSizeMixQueue::new(min_pool_size, seed),
         }
     }
 }
@@ -206,12 +217,8 @@ impl<T: Copy> Queue<T> for PureRandomSamplingQueue<T> {
     fn pop(&mut self) -> Option<T> {
         self.queue.ensure_min_size();
 
-        let i = self.queue.queue.rng.gen_range(0..self.queue.len());
+        let i = self.queue.sample_index();
         self.queue.pop(i)
-    }
-
-    fn len(&self) -> usize {
-        self.queue.len()
     }
 }
 
@@ -220,9 +227,9 @@ struct PermutedCoinFlippingQueue<T: Copy> {
 }
 
 impl<T: Copy> PermutedCoinFlippingQueue<T> {
-    fn new(min_pool_size: u16, rng: StdRng) -> Self {
+    fn new(min_pool_size: u16, seed: u64) -> Self {
         Self {
-            queue: MinSizeMixQueue::new(min_pool_size, rng),
+            queue: MinSizeMixQueue::new(min_pool_size, seed),
         }
     }
 }
@@ -235,23 +242,15 @@ impl<T: Copy> Queue<T> for PermutedCoinFlippingQueue<T> {
     fn pop(&mut self) -> Option<T> {
         self.queue.ensure_min_size();
 
-        self.queue
-            .queue
-            .queue
-            .as_mut_slice()
-            .shuffle(&mut self.queue.queue.rng);
+        self.queue.shuffle();
 
         loop {
             for i in 0..self.queue.len() {
-                if self.queue.queue.rng.gen_bool(0.5) {
+                if self.queue.flip_coin() {
                     return self.queue.pop(i);
                 }
             }
         }
-    }
-
-    fn len(&self) -> usize {
-        self.queue.len()
     }
 }
 
@@ -260,9 +259,9 @@ struct NoisyCoinFlippingQueue<T: Copy> {
 }
 
 impl<T: Copy> NoisyCoinFlippingQueue<T> {
-    pub fn new(rng: StdRng) -> Self {
+    pub fn new(seed: u64) -> Self {
         Self {
-            queue: MixQueue::new(rng),
+            queue: MixQueue::new(0, seed),
         }
     }
 }
@@ -279,17 +278,13 @@ impl<T: Copy> Queue<T> for NoisyCoinFlippingQueue<T> {
 
         loop {
             for i in 0..self.queue.len() {
-                if self.queue.rng.gen_bool(0.5) {
+                if self.queue.flip_coin() {
                     return self.queue.pop(i);
                 } else if i == 0 {
                     return None;
                 }
             }
         }
-    }
-
-    fn len(&self) -> usize {
-        self.queue.len()
     }
 }
 
