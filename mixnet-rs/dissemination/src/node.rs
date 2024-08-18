@@ -2,7 +2,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::queue::{new_queue, Queue, QueueConfig};
 
-pub type NodeId = u16;
+pub type NodeId = u32;
 pub type MessageId = u32;
 
 pub struct Node {
@@ -13,12 +13,12 @@ pub struct Node {
     queues: Vec<(NodeId, Box<dyn Queue<MessageId>>)>,
     connected_peers: FxHashSet<NodeId>,
     // A cache to avoid relaying the same message multiple times.
-    received_msgs: FxHashMap<MessageId, u16>,
-    peering_degree: u16,
+    received_msgs: FxHashMap<MessageId, u32>,
+    peering_degree: u32,
 }
 
 impl Node {
-    pub fn new(queue_config: QueueConfig, peering_degree: u16) -> Self {
+    pub fn new(queue_config: QueueConfig, peering_degree: u32) -> Self {
         Node {
             queue_config,
             queues: Vec::new(),

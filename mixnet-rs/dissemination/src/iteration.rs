@@ -17,25 +17,32 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, out_csv_path: &str, topology
     // Initialize nodes (not connected with each other yet)
     let mut nodes: Vec<Node> = Vec::new();
     let mut queue_seed_rng = StdRng::seed_from_u64(seed);
-    for _ in 0..paramset.num_nodes {
+    let peering_degrees = paramset.gen_peering_degrees(seed);
+    tracing::debug!("PeeringDegrees initialized.");
+
+    for node_id in 0..paramset.num_nodes {
         nodes.push(Node::new(
             QueueConfig {
                 queue_type: paramset.queue_type,
                 seed: queue_seed_rng.next_u64(),
                 min_queue_size: paramset.min_queue_size,
             },
-            paramset.peering_degree,
+            peering_degrees[node_id as usize],
         ));
     }
+    tracing::debug!("Nodes initialized.");
 
     // Build a random topology, and connect nodes with each other
-    let topology = build_topology(paramset.num_nodes, paramset.peering_degree, seed);
+    let topology = build_topology(paramset.num_nodes, &peering_degrees, seed);
+    tracing::debug!("Topology built.");
     save_topology(&topology, topology_path).unwrap();
+    tracing::debug!("Topology saved.");
     for (node_id, peers) in topology.iter().enumerate() {
         peers.iter().for_each(|peer_id| {
             nodes[node_id].connect(*peer_id);
         });
     }
+    tracing::debug!("Nodes connected");
 
     let mut sender_selector = SenderSelector::new(
         (0..paramset.num_nodes).collect(),
@@ -46,8 +53,8 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, out_csv_path: &str, topology
 
     // To generate unique message IDs
     let mut next_msg_id: MessageId = 0;
-    let total_num_msgs: u32 = paramset.num_senders as u32 * paramset.num_sent_msgs as u32;
-    // To keep track of when each message was sent and how many nodes received it
+    let total_num_msgs = paramset.total_num_messages();
+    // msg_id -> (sent_vtime, num_received_nodes)
     let mut message_tracker: FxHashMap<MessageId, (f32, u16)> = FxHashMap::default();
     // To keep track of how many messages have been disseminated to all nodes
     let mut num_disseminated_msgs = 0;
@@ -135,8 +142,9 @@ fn relay_messages(
         .into_iter()
         .enumerate()
         .for_each(|(sender_id, msgs_to_relay)| {
+            let sender_id: NodeId = sender_id.try_into().unwrap();
             msgs_to_relay.into_iter().for_each(|(receiver_id, msg)| {
-                if nodes[receiver_id as usize].receive(msg, sender_id as NodeId) {
+                if nodes[receiver_id as usize].receive(msg, sender_id) {
                     let (sent_time, num_received_nodes) = message_tracker.get_mut(&msg).unwrap();
                     *num_received_nodes += 1;
                     if *num_received_nodes as usize == nodes.len() {
@@ -163,6 +171,7 @@ fn save_topology(topology: &Topology, topology_path: &str) -> Result<(), Box<dyn
     wtr.write_record(["node", "num_peers", "peers"])?;
 
     for (node, peers) in topology.iter().enumerate() {
+        let node: NodeId = node.try_into().unwrap();
         let peers_str: Vec<String> = peers.iter().map(|peer_id| peer_id.to_string()).collect();
         wtr.write_record(&[
             node.to_string(),
@@ -176,7 +185,7 @@ fn save_topology(topology: &Topology, topology_path: &str) -> Result<(), Box<dyn
 
 struct SenderSelector {
     candidates: Vec<NodeId>,
-    num_senders: usize,
+    num_senders: NodeId,
     random_senders_every_time: bool,
     rng: StdRng,
 }
@@ -184,14 +193,14 @@ struct SenderSelector {
 impl SenderSelector {
     fn new(
         candidates: Vec<NodeId>,
-        num_senders: u16,
+        num_senders: u32,
         random_senders_every_time: bool,
         seed: u64,
     ) -> Self {
         assert!(candidates.len() >= num_senders as usize);
         Self {
             candidates,
-            num_senders: num_senders as usize,
+            num_senders,
             random_senders_every_time,
             rng: StdRng::seed_from_u64(seed),
         }
@@ -201,10 +210,10 @@ impl SenderSelector {
         if !self.random_senders_every_time {
             // It's okay to pick the first `num_senders` nodes
             // because the topology is randomly generated.
-            &self.candidates[..self.num_senders]
+            &self.candidates[..self.num_senders as usize]
         } else {
             self.candidates.shuffle(&mut self.rng);
-            &self.candidates[..self.num_senders]
+            &self.candidates[..self.num_senders as usize]
         }
     }
 }

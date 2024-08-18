@@ -86,7 +86,7 @@ fn main() {
                 let out_csv_path = format!("{paramset_dir}/__WIP__iteration_{i}.csv");
                 let topology_path = format!("{paramset_dir}/topology_{i}.csv");
 
-                run_iteration(*paramset, i as u64, &out_csv_path, &topology_path);
+                run_iteration(paramset.clone(), i as u64, &out_csv_path, &topology_path);
 
                 let new_out_csv_path = out_csv_path.replace("__WIP__iteration_", "iteration_");
                 std::fs::rename(&out_csv_path, &new_out_csv_path)

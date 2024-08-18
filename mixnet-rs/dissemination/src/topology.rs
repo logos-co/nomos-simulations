@@ -6,7 +6,8 @@ use crate::node::NodeId;
 
 pub type Topology = Vec<Vec<NodeId>>;
 
-pub fn build_topology(num_nodes: u16, peering_degree: u16, seed: u64) -> Topology {
+pub fn build_topology(num_nodes: u32, peering_degrees: &[u32], seed: u64) -> Topology {
+    assert_eq!(num_nodes as usize, peering_degrees.len());
     let mut rng = StdRng::seed_from_u64(seed);
 
     loop {
@@ -21,14 +22,14 @@ pub fn build_topology(num_nodes: u16, peering_degree: u16, seed: u64) -> Topolog
                 // Check if the other node is not already connected to the current node
                 // and the other node has not reached the peering degree.
                 if !topology[node as usize].contains(&other)
-                    && topology[other as usize].len() < peering_degree as usize
+                    && topology[other as usize].len() < peering_degrees[other as usize] as usize
                 {
                     others.push(other);
                 }
             }
 
             // How many more connections the current node needs
-            let num_needs = peering_degree as usize - topology[node as usize].len();
+            let num_needs = peering_degrees[node as usize] as usize - topology[node as usize].len();
             // Smaple peers as many as possible and connect them to the current node
             let k = std::cmp::min(num_needs, others.len());
             others.as_mut_slice().shuffle(&mut rng);
