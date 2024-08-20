@@ -1,12 +1,12 @@
 use std::error::Error;
 
+use queue::QueueConfig;
 use rand::{rngs::StdRng, seq::SliceRandom, RngCore, SeedableRng};
 use rustc_hash::FxHashMap;
 
 use crate::{
     node::{MessageId, Node, NodeId},
     paramset::ParamSet,
-    queue::QueueConfig,
     topology::{build_topology, Topology},
 };
 

@@ -1,6 +1,5 @@
+use queue::QueueType;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
-
-use crate::queue::QueueType;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]

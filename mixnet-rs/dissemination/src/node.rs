@@ -1,6 +1,5 @@
+use queue::{new_queue, Queue, QueueConfig};
 use rustc_hash::{FxHashMap, FxHashSet};
-
-use crate::queue::{new_queue, Queue, QueueConfig};
 
 pub type NodeId = u32;
 pub type MessageId = u32;

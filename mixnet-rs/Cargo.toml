@@ -1,5 +1,3 @@
 [workspace]
-members = [
-    "dissemination"
-]
+members = ["dissemination", "queue"]
 resolver = "2"

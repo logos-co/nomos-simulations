@@ -1,5 +1,6 @@
 use chrono::Utc;
 use clap::Parser;
+use queue::QueueType;
 use rayon::prelude::*;
 use std::{
     error::Error,
@@ -9,12 +10,10 @@ use std::{
 
 use iteration::run_iteration;
 use paramset::{ExperimentId, ParamSet, SessionId, PARAMSET_CSV_COLUMNS};
-use queue::QueueType;
 
 mod iteration;
 mod node;
 mod paramset;
-mod queue;
 mod topology;
 
 #[derive(Debug, Parser)]
