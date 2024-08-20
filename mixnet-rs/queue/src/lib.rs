@@ -32,6 +32,7 @@ impl std::str::FromStr for QueueType {
 pub trait Queue<T: Copy> {
     fn push(&mut self, msg: T);
     fn pop(&mut self) -> Option<T>;
+    fn message_count(&self) -> usize;
 }
 
 pub struct QueueConfig {
@@ -79,10 +80,15 @@ impl<T: Copy> Queue<T> for NonMixQueue<T> {
     fn pop(&mut self) -> Option<T> {
         self.queue.pop_front()
     }
+
+    fn message_count(&self) -> usize {
+        self.queue.len()
+    }
 }
 
 struct MixQueue<T: Copy> {
     queue: Vec<Option<T>>, // None element means noise
+    message_count: usize,
     rng: StdRng,
 }
 
@@ -90,12 +96,14 @@ impl<T: Copy> MixQueue<T> {
     fn new(num_initial_noises: usize, seed: u64) -> Self {
         Self {
             queue: vec![None; num_initial_noises],
+            message_count: 0,
             rng: StdRng::seed_from_u64(seed),
         }
     }
 
     fn push(&mut self, data: T) {
-        self.queue.push(Some(data))
+        self.queue.push(Some(data));
+        self.message_count += 1;
     }
 
     fn fill_noises(&mut self, k: usize) {
@@ -104,10 +112,20 @@ impl<T: Copy> MixQueue<T> {
 
     fn pop(&mut self, idx: usize) -> Option<T> {
         if idx < self.queue.len() {
-            self.queue.remove(idx)
+            match self.queue.remove(idx) {
+                Some(msg) => {
+                    self.message_count -= 1;
+                    Some(msg)
+                }
+                None => None,
+            }
         } else {
             None
         }
+    }
+
+    fn message_count(&self) -> usize {
+        self.message_count
     }
 
     fn len(&self) -> usize {
@@ -146,6 +164,10 @@ impl<T: Copy> MinSizeMixQueue<T> {
 
     fn pop(&mut self, idx: usize) -> Option<T> {
         self.queue.pop(idx)
+    }
+
+    fn message_count(&self) -> usize {
+        self.queue.message_count()
     }
 
     fn ensure_min_size(&mut self) {
@@ -200,6 +222,10 @@ impl<T: Copy> Queue<T> for PureCoinFlippingQueue<T> {
             }
         }
     }
+
+    fn message_count(&self) -> usize {
+        self.queue.message_count()
+    }
 }
 
 struct PureRandomSamplingQueue<T: Copy> {
@@ -224,6 +250,10 @@ impl<T: Copy> Queue<T> for PureRandomSamplingQueue<T> {
 
         let i = self.queue.sample_index();
         self.queue.pop(i)
+    }
+
+    fn message_count(&self) -> usize {
+        self.queue.message_count()
     }
 }
 
@@ -256,6 +286,10 @@ impl<T: Copy> Queue<T> for PermutedCoinFlippingQueue<T> {
                 }
             }
         }
+    }
+
+    fn message_count(&self) -> usize {
+        self.queue.message_count()
     }
 }
 
@@ -291,6 +325,10 @@ impl<T: Copy> Queue<T> for NoisyCoinFlippingQueue<T> {
             }
         }
     }
+
+    fn message_count(&self) -> usize {
+        self.queue.message_count()
+    }
 }
 
 struct NoisyCoinFlippingRandomReleaseQueue<T: Copy> {
@@ -321,6 +359,10 @@ impl<T: Copy> Queue<T> for NoisyCoinFlippingRandomReleaseQueue<T> {
         } else {
             None
         }
+    }
+
+    fn message_count(&self) -> usize {
+        self.queue.message_count()
     }
 }
 
