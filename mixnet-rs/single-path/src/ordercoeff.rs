@@ -45,13 +45,13 @@ impl Sequence {
 }
 
 impl Sequence {
-    pub fn calculate_strong_ordering_coefficient(&self, other: &Sequence) -> u64 {
+    pub fn ordering_coefficient(&self, other: &Sequence, strong: bool) -> u64 {
         let mut coeff = 0;
         let mut i = 0;
 
         while i < self.0.len() {
             if let Entry::Message(_) = &self.0[i] {
-                let (c, next_i) = self.calculate_strong_ordering_coefficient_from(i, other);
+                let (c, next_i) = self.ordering_coefficient_from(i, other, strong);
                 coeff += c;
 
                 if next_i != i {
@@ -67,10 +67,11 @@ impl Sequence {
         coeff
     }
 
-    fn calculate_strong_ordering_coefficient_from(
+    fn ordering_coefficient_from(
         &self,
         start_idx: usize,
         other: &Sequence,
+        strong: bool,
     ) -> (u64, usize) {
         let msg1 = match self.0[start_idx] {
             Entry::Message(msg) => msg,
@@ -81,14 +82,18 @@ impl Sequence {
             if let Entry::Message(msg2) = entry {
                 if msg1 == *msg2 {
                     // Found the 1st matching msg. Start finding the next adjacent matching msg.
-                    return self.scan_adjacent_common_msgs(start_idx, other, j);
+                    if strong {
+                        return self.strong_ordering_coefficient_from(start_idx, other, j);
+                    } else {
+                        return self.weak_ordering_coefficient_from(start_idx, other, j);
+                    }
                 }
             }
         }
         (0, start_idx)
     }
 
-    fn scan_adjacent_common_msgs(
+    fn strong_ordering_coefficient_from(
         &self,
         start_idx: usize,
         other: &Sequence,
@@ -122,70 +127,56 @@ impl Sequence {
         (coeff, i)
     }
 
-    // pub fn calculate_weak_ordering_coefficient(&self, other: &Sequence) -> u64 {
-    //     let mut i = 0;
-    //     let mut j = 0;
-    //     let mut coeff = 0;
+    fn weak_ordering_coefficient_from(
+        &self,
+        start_idx: usize,
+        other: &Sequence,
+        other_start_idx: usize,
+    ) -> (u64, usize) {
+        let mut coeff = 0;
+        let mut i = start_idx + 1;
+        let mut j = other_start_idx + 1;
+        while i < self.0.len() && j < other.0.len() {
+            i = self.skip_noise(i);
+            j = other.skip_noise(j);
+            if i < self.0.len() && j < other.0.len() && self.0[i] == other.0[j] {
+                coeff += 1;
+                i += 1;
+                j += 1;
+            } else {
+                break;
+            }
+        }
+        (coeff, i)
+    }
 
-    //     while i < self.0.len() && j < other.0.len() {
-    //         // Skip noise to find the first message in both sequences
-    //         i = self.skip_noise(i);
-    //         j = other.skip_noise(j);
-
-    //         // Check if both indices point to valid messages and match
-    //         if i < self.0.len() && j < other.0.len() && self.0[i] == other.0[j] {
-    //             let next_i = self.skip_noise(i + 1);
-    //             let next_j = other.skip_noise(j + 1);
-
-    //             // Check if the next pair of messages match
-    //             if next_i < self.0.len()
-    //                 && next_j < other.0.len()
-    //                 && self.0[next_i] == other.0[next_j]
-    //             {
-    //                 coeff += 1;
-    //             }
-
-    //             // Move to the next message pair
-    //             i = next_i;
-    //             j = next_j;
-    //         } else {
-    //             // Move to the next elements in the sequences
-    //             i += 1;
-    //             // j += 1;
-    //         }
-    //     }
-
-    //     coeff
-    // }
-
-    // fn skip_noise(&self, mut index: usize) -> usize {
-    //     while index < self.0.len() {
-    //         if let Entry::Message(_) = self.0[index] {
-    //             break;
-    //         }
-    //         index += 1;
-    //     }
-    //     index
-    // }
+    fn skip_noise(&self, mut index: usize) -> usize {
+        while index < self.0.len() {
+            if let Entry::Message(_) = self.0[index] {
+                break;
+            }
+            index += 1;
+        }
+        index
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_strong_ordering_coefficient() {
+    fn test_ordering_coefficient_common(strong: bool) {
         // Case 0: Empty sequences
         let seq = Sequence(vec![]);
-        assert_eq!(seq.calculate_strong_ordering_coefficient(&seq), 0);
+        assert_eq!(seq.ordering_coefficient(&seq, strong), 0);
 
         // Case 1: Exact one matched pair with no noise
         let seq = Sequence(vec![Entry::Message(1), Entry::Message(2)]);
-        assert_eq!(seq.calculate_strong_ordering_coefficient(&seq), 1);
+        assert_eq!(seq.ordering_coefficient(&seq, strong), 1);
 
         // Case 2: Exact one matched pair with noise
         let seq = Sequence(vec![Entry::Message(1), Entry::Noise(10), Entry::Message(2)]);
-        assert_eq!(seq.calculate_strong_ordering_coefficient(&seq), 1);
+        assert_eq!(seq.ordering_coefficient(&seq, strong), 1);
 
         // Case 3: One matched pair with no noise
         let seq1 = Sequence(vec![
@@ -198,8 +189,8 @@ mod tests {
             Entry::Message(2),
             Entry::Message(4),
         ]);
-        assert_eq!(seq1.calculate_strong_ordering_coefficient(&seq2), 1);
-        assert_eq!(seq2.calculate_strong_ordering_coefficient(&seq1), 1);
+        assert_eq!(seq1.ordering_coefficient(&seq2, strong), 1);
+        assert_eq!(seq2.ordering_coefficient(&seq1, strong), 1);
 
         // Case 4: One matched pair with noise
         let seq1 = Sequence(vec![
@@ -209,8 +200,8 @@ mod tests {
             Entry::Message(3),
         ]);
         let seq2 = Sequence(vec![Entry::Message(1), Entry::Noise(10), Entry::Message(2)]);
-        assert_eq!(seq1.calculate_strong_ordering_coefficient(&seq2), 1);
-        assert_eq!(seq2.calculate_strong_ordering_coefficient(&seq1), 1);
+        assert_eq!(seq1.ordering_coefficient(&seq2, strong), 1);
+        assert_eq!(seq2.ordering_coefficient(&seq1, strong), 1);
 
         // Case 5: Two matched pairs with noise
         let seq1 = Sequence(vec![
@@ -226,32 +217,26 @@ mod tests {
             Entry::Message(3),
             Entry::Message(4),
         ]);
-        assert_eq!(seq1.calculate_strong_ordering_coefficient(&seq2), 2);
-        assert_eq!(seq2.calculate_strong_ordering_coefficient(&seq1), 2);
+        assert_eq!(seq1.ordering_coefficient(&seq2, strong), 2);
+        assert_eq!(seq2.ordering_coefficient(&seq1, strong), 2);
 
         // Case 6: Only partial match with no noise
         let seq1 = Sequence(vec![Entry::Message(1), Entry::Message(2)]);
         let seq2 = Sequence(vec![Entry::Message(2), Entry::Message(3)]);
-        assert_eq!(seq1.calculate_strong_ordering_coefficient(&seq2), 0);
-        assert_eq!(seq2.calculate_strong_ordering_coefficient(&seq1), 0);
+        assert_eq!(seq1.ordering_coefficient(&seq2, strong), 0);
+        assert_eq!(seq2.ordering_coefficient(&seq1, strong), 0);
 
         // Case 7: Only partial match with noise
         let seq1 = Sequence(vec![Entry::Message(1), Entry::Message(2), Entry::Noise(10)]);
         let seq2 = Sequence(vec![Entry::Message(2), Entry::Noise(10), Entry::Message(3)]);
-        assert_eq!(seq1.calculate_strong_ordering_coefficient(&seq2), 0);
-        assert_eq!(seq2.calculate_strong_ordering_coefficient(&seq1), 0);
+        assert_eq!(seq1.ordering_coefficient(&seq2, strong), 0);
+        assert_eq!(seq2.ordering_coefficient(&seq1, strong), 0);
 
         // Case 8: No match at all
         let seq1 = Sequence(vec![Entry::Message(1), Entry::Message(2), Entry::Noise(10)]);
         let seq2 = Sequence(vec![Entry::Message(3), Entry::Noise(10), Entry::Message(4)]);
-        assert_eq!(seq1.calculate_strong_ordering_coefficient(&seq2), 0);
-        assert_eq!(seq2.calculate_strong_ordering_coefficient(&seq1), 0);
-
-        // Case 9: No match because of different count of noises
-        let seq1 = Sequence(vec![Entry::Message(1), Entry::Noise(10), Entry::Message(2)]);
-        let seq2 = Sequence(vec![Entry::Message(1), Entry::Noise(5), Entry::Message(2)]);
-        assert_eq!(seq1.calculate_strong_ordering_coefficient(&seq2), 0);
-        assert_eq!(seq2.calculate_strong_ordering_coefficient(&seq1), 0);
+        assert_eq!(seq1.ordering_coefficient(&seq2, strong), 0);
+        assert_eq!(seq2.ordering_coefficient(&seq1, strong), 0);
 
         // Case 9: Matches with noise but mixed orders
         let seq1 = Sequence(vec![
@@ -272,7 +257,41 @@ mod tests {
             Entry::Message(3),
             Entry::Message(6),
         ]);
-        assert_eq!(seq1.calculate_strong_ordering_coefficient(&seq2), 3);
-        assert_eq!(seq2.calculate_strong_ordering_coefficient(&seq1), 3);
+        assert_eq!(seq1.ordering_coefficient(&seq2, strong), 3);
+        assert_eq!(seq2.ordering_coefficient(&seq1, strong), 3);
+    }
+
+    #[test]
+    fn test_strong_ordering_coefficient() {
+        test_ordering_coefficient_common(true);
+
+        // Case 0: No match because of noise
+        let seq1 = Sequence(vec![Entry::Message(1), Entry::Noise(10), Entry::Message(2)]);
+        let seq2 = Sequence(vec![Entry::Message(1), Entry::Message(2)]);
+        assert_eq!(seq1.ordering_coefficient(&seq2, true), 0);
+        assert_eq!(seq2.ordering_coefficient(&seq1, true), 0);
+
+        // Case 1: No match because of different count of noises
+        let seq1 = Sequence(vec![Entry::Message(1), Entry::Noise(10), Entry::Message(2)]);
+        let seq2 = Sequence(vec![Entry::Message(1), Entry::Noise(5), Entry::Message(2)]);
+        assert_eq!(seq1.ordering_coefficient(&seq2, true), 0);
+        assert_eq!(seq2.ordering_coefficient(&seq1, true), 0);
+    }
+
+    #[test]
+    fn test_weak_ordering_coefficient() {
+        test_ordering_coefficient_common(false);
+
+        // Case 0: Match ignoring noises
+        let seq1 = Sequence(vec![Entry::Message(1), Entry::Noise(10), Entry::Message(2)]);
+        let seq2 = Sequence(vec![Entry::Message(1), Entry::Message(2)]);
+        assert_eq!(seq1.ordering_coefficient(&seq2, false), 1);
+        assert_eq!(seq2.ordering_coefficient(&seq1, false), 1);
+
+        // Case 1: Match ignoring noise count
+        let seq1 = Sequence(vec![Entry::Message(1), Entry::Noise(10), Entry::Message(2)]);
+        let seq2 = Sequence(vec![Entry::Message(1), Entry::Noise(5), Entry::Message(2)]);
+        assert_eq!(seq1.ordering_coefficient(&seq2, false), 1);
+        assert_eq!(seq2.ordering_coefficient(&seq1, false), 1);
     }
 }
