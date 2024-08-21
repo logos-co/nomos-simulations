@@ -1,4 +1,4 @@
-use std::{fmt::Display, path::Path};
+use std::path::Path;
 
 use queue::QueueConfig;
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -6,6 +6,7 @@ use rustc_hash::FxHashMap;
 
 use crate::{
     node::{MessageId, Node},
+    ordercoeff::Sequence,
     paramset::ParamSet,
 };
 
@@ -43,8 +44,8 @@ pub fn run_iteration(
     // Results
     let mut sent_times: FxHashMap<MessageId, f32> = FxHashMap::default();
     let mut latencies: FxHashMap<MessageId, f32> = FxHashMap::default();
-    let mut sent_sequence = MessageSequence::new();
-    let mut received_sequence = MessageSequence::new();
+    let mut sent_sequence = Sequence::new();
+    let mut received_sequence = Sequence::new();
     let mut data_msg_counts_in_queue: Vec<u32> = Vec::new();
 
     let mut rng = StdRng::seed_from_u64(seed);
@@ -139,9 +140,9 @@ fn save_latencies(
     writer.flush().unwrap();
 }
 
-fn save_sequence(sequence: &MessageSequence, path: &str) {
+fn save_sequence(sequence: &Sequence, path: &str) {
     let mut writer = csv::Writer::from_path(path).unwrap();
-    sequence.messages.iter().for_each(|entry| {
+    sequence.iter().for_each(|entry| {
         writer.write_record([entry.to_string()]).unwrap();
     });
     writer.flush().unwrap();
@@ -165,45 +166,4 @@ fn save_data_msg_counts(
                 .unwrap();
         });
     writer.flush().unwrap();
-}
-
-struct MessageSequence {
-    messages: Vec<SequenceEntry>,
-}
-
-impl MessageSequence {
-    fn new() -> Self {
-        Self {
-            messages: Vec::new(),
-        }
-    }
-
-    fn add_message(&mut self, msg: MessageId) {
-        self.messages.push(SequenceEntry::Message(msg));
-    }
-
-    fn add_noise(&mut self) {
-        if let Some(last) = self.messages.last_mut() {
-            if let SequenceEntry::Noise(cnt) = last {
-                *cnt += 1;
-            } else {
-                self.messages.push(SequenceEntry::Noise(1))
-            }
-        }
-    }
-}
-
-enum SequenceEntry {
-    Message(MessageId),
-    Noise(u32), // the number of consecutive noises
-}
-
-impl Display for SequenceEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            SequenceEntry::Message(msg) => msg.to_string(),
-            SequenceEntry::Noise(cnt) => format!("-{cnt}"),
-        };
-        f.write_str(s.as_str())
-    }
 }
