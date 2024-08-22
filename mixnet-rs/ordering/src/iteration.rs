@@ -28,6 +28,8 @@ pub fn run_iteration(
         out_sent_sequence_path,
         out_received_sequence_path_prefix,
         out_queue_data_msg_counts_path,
+        out_ordering_coeff_path,
+        out_topology_path,
     ] {
         assert!(!Path::new(path).exists(), "File already exists: {path}");
     }
@@ -107,13 +109,14 @@ pub fn run_iteration(
                     if peer_id == RECEIVER_ID {
                         match msg {
                             Message::Data(msg) => {
-                                latencies
-                                    .entry(msg)
-                                    .or_insert(vtime - sent_times.get(&msg).unwrap());
-                                received_sequences
-                                    .entry(sender_id)
-                                    .or_insert(Sequence::new())
-                                    .add_message(msg);
+                                // If msg was sent by the sender (not by any mix)
+                                if let Some(&sent_time) = sent_times.get(&msg) {
+                                    latencies.entry(msg).or_insert(vtime - sent_time);
+                                    received_sequences
+                                        .entry(sender_id)
+                                        .or_insert(Sequence::new())
+                                        .add_message(msg);
+                                }
                             }
                             Message::Noise => {
                                 received_sequences
