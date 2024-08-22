@@ -17,6 +17,7 @@ pub fn run_iteration(
     out_sent_sequence_path: &str,
     out_received_sequence_path: &str,
     out_data_msg_counts_path: &str,
+    out_ordering_coeff_path: &str,
 ) {
     // Ensure that all output files do not exist
     for path in &[
@@ -108,6 +109,19 @@ pub fn run_iteration(
         transmission_interval,
         out_data_msg_counts_path,
     );
+    // Calculate ordering coefficients and save them to a CSV file.
+    let strong_ordering_coeff = sent_sequence.ordering_coefficient(&received_sequence, true);
+    let weak_ordering_coeff = sent_sequence.ordering_coefficient(&received_sequence, false);
+    tracing::info!(
+        "STRONG_COEFF:{}, WEAK_COEFF:{}",
+        strong_ordering_coeff,
+        weak_ordering_coeff
+    );
+    save_ordering_coefficients(
+        strong_ordering_coeff,
+        weak_ordering_coeff,
+        out_ordering_coeff_path,
+    );
 }
 
 fn try_probability(rng: &mut StdRng, prob: f32) -> bool {
@@ -165,5 +179,17 @@ fn save_data_msg_counts(
                 .write_record([(i as f64 * interval as f64).to_string(), count.to_string()])
                 .unwrap();
         });
+    writer.flush().unwrap();
+}
+
+fn save_ordering_coefficients(strong_ordering_coeff: u64, weak_ordering_coeff: u64, path: &str) {
+    let mut writer = csv::Writer::from_path(path).unwrap();
+    writer.write_record(["strong", "weak"]).unwrap();
+    writer
+        .write_record([
+            strong_ordering_coeff.to_string(),
+            weak_ordering_coeff.to_string(),
+        ])
+        .unwrap();
     writer.flush().unwrap();
 }

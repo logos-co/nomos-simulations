@@ -79,6 +79,7 @@ fn main() {
                 &format!("{paramset_dir}/iteration_{i}_sent_seq.csv"),
                 &format!("{paramset_dir}/iteration_{i}_recv_seq.csv"),
                 &format!("{paramset_dir}/iteration_{i}_data_msg_counts.csv"),
+                &format!("{paramset_dir}/iteration_{i}_ordering_coeff.csv"),
             );
             tracing::info!("ParamSet:{}, Iteration:{} completed.", paramset.id, i);
         }
