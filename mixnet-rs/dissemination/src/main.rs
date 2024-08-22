@@ -13,7 +13,6 @@ use paramset::{ExperimentId, ParamSet, SessionId, PARAMSET_CSV_COLUMNS};
 
 mod iteration;
 mod paramset;
-mod topology;
 
 #[derive(Debug, Parser)]
 #[command(name = "Message Dessemination Time Measurement")]

@@ -1,6 +1,6 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, error::Error};
 
-use protocol::node::NodeId;
+use crate::node::NodeId;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 
 pub type Topology = Vec<Vec<NodeId>>;
@@ -68,4 +68,21 @@ fn dfs(topology: &[HashSet<NodeId>], start_node: NodeId) -> HashSet<NodeId> {
         }
     }
     visited
+}
+
+pub fn save_topology(topology: &Topology, path: &str) -> Result<(), Box<dyn Error>> {
+    let mut wtr = csv::Writer::from_path(path)?;
+    wtr.write_record(["node", "num_peers", "peers"])?;
+
+    for (node, peers) in topology.iter().enumerate() {
+        let node: NodeId = node.try_into().unwrap();
+        let peers_str: Vec<String> = peers.iter().map(|peer_id| peer_id.to_string()).collect();
+        wtr.write_record(&[
+            node.to_string(),
+            peers.len().to_string(),
+            format!("[{}]", peers_str.join(",")),
+        ])?;
+    }
+    wtr.flush()?;
+    Ok(())
 }

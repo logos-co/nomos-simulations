@@ -3,8 +3,9 @@ use std::path::Path;
 use protocol::{
     node::{MessageId, Node, NodeId},
     queue::{Message, QueueConfig, QueueType},
+    topology::{build_topology, save_topology},
 };
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{rngs::StdRng, seq::SliceRandom, Rng, RngCore, SeedableRng};
 use rustc_hash::FxHashMap;
 
 use crate::{ordercoeff::Sequence, paramset::ParamSet};
@@ -16,44 +17,11 @@ pub fn run_iteration(
     seed: u64,
     out_latency_path: &str,
     out_sent_sequence_path: &str,
-    out_received_sequence_path: &str,
-    out_data_msg_counts_path: &str,
-    out_ordering_coeff_path: &str,
-) {
-    if paramset.random_topology {
-        run_iteration_with_random_topology(
-            paramset,
-            seed,
-            out_latency_path,
-            out_sent_sequence_path,
-            out_received_sequence_path,
-            out_data_msg_counts_path,
-            out_ordering_coeff_path,
-        )
-    } else {
-        run_iteration_without_random_topology(
-            paramset,
-            seed,
-            out_latency_path,
-            out_sent_sequence_path,
-            out_received_sequence_path,
-            out_data_msg_counts_path,
-            out_ordering_coeff_path,
-        )
-    }
-}
-
-fn run_iteration_without_random_topology(
-    paramset: ParamSet,
-    seed: u64,
-    out_latency_path: &str,
-    out_sent_sequence_path: &str,
     out_received_sequence_path_prefix: &str,
     out_queue_data_msg_counts_path: &str,
     out_ordering_coeff_path: &str,
+    out_topology_path: &str,
 ) {
-    assert!(!paramset.random_topology);
-
     // Ensure that all output files do not exist
     for path in &[
         out_latency_path,
@@ -64,44 +32,11 @@ fn run_iteration_without_random_topology(
         assert!(!Path::new(path).exists(), "File already exists: {path}");
     }
 
-    // Initialize mix nodes
-    let mut next_node_id: NodeId = 0;
-    let mut mixnodes: FxHashMap<NodeId, Node> = FxHashMap::default();
-    let mut paths: Vec<Vec<NodeId>> = Vec::with_capacity(paramset.num_paths as usize);
-    for _ in 0..paramset.num_paths {
-        let mut ids = Vec::with_capacity(paramset.num_mixes as usize);
-        for _ in 0..paramset.num_mixes {
-            let id = next_node_id;
-            next_node_id += 1;
-            mixnodes.insert(
-                id,
-                Node::new(
-                    QueueConfig {
-                        queue_type: paramset.queue_type,
-                        seed,
-                        min_queue_size: paramset.min_queue_size,
-                    },
-                    paramset.peering_degree,
-                    paramset.random_topology, // disable cache
-                ),
-            );
-            ids.push(id);
-        }
-        paths.push(ids);
-    }
-
-    // Connect mix nodes
-    for path in paths.iter() {
-        for (i, id) in path.iter().enumerate() {
-            if i != path.len() - 1 {
-                let peer_id = path[i + 1];
-                mixnodes.get_mut(id).unwrap().connect(peer_id);
-            } else {
-                mixnodes.get_mut(id).unwrap().connect(RECEIVER_ID);
-            }
-        }
-    }
-    let sender_peers: Vec<NodeId> = paths.iter().map(|path| path[0]).collect();
+    let (mut mixnodes, sender_peers) = if paramset.random_topology {
+        build_random_network(&paramset, seed, out_topology_path)
+    } else {
+        build_striped_network(&paramset, seed)
+    };
 
     let mut next_msg_id: MessageId = 0;
 
@@ -235,17 +170,112 @@ fn run_iteration_without_random_topology(
     }
 }
 
-fn run_iteration_with_random_topology(
-    paramset: ParamSet,
+fn build_striped_network(paramset: &ParamSet, seed: u64) -> (FxHashMap<NodeId, Node>, Vec<NodeId>) {
+    assert!(!paramset.random_topology);
+    let mut next_node_id: NodeId = 0;
+    let mut queue_seed_rng = StdRng::seed_from_u64(seed);
+    let mut mixnodes: FxHashMap<NodeId, Node> = FxHashMap::default();
+    let mut paths: Vec<Vec<NodeId>> = Vec::with_capacity(paramset.num_paths as usize);
+    for _ in 0..paramset.num_paths {
+        let mut ids = Vec::with_capacity(paramset.num_mixes as usize);
+        for _ in 0..paramset.num_mixes {
+            let id = next_node_id;
+            next_node_id += 1;
+            mixnodes.insert(
+                id,
+                Node::new(
+                    QueueConfig {
+                        queue_type: paramset.queue_type,
+                        seed: queue_seed_rng.next_u64(),
+                        min_queue_size: paramset.min_queue_size,
+                    },
+                    paramset.peering_degree,
+                    false, // disable cache
+                ),
+            );
+            ids.push(id);
+        }
+        paths.push(ids);
+    }
+
+    // Connect mix nodes
+    for path in paths.iter() {
+        for (i, id) in path.iter().enumerate() {
+            if i != path.len() - 1 {
+                let peer_id = path[i + 1];
+                mixnodes.get_mut(id).unwrap().connect(peer_id);
+            } else {
+                mixnodes.get_mut(id).unwrap().connect(RECEIVER_ID);
+            }
+        }
+    }
+    let sender_peers: Vec<NodeId> = paths.iter().map(|path| *path.first().unwrap()).collect();
+    (mixnodes, sender_peers)
+}
+
+fn build_random_network(
+    paramset: &ParamSet,
     seed: u64,
-    out_latency_path: &str,
-    out_sent_sequence_path: &str,
-    out_received_sequence_path: &str,
-    out_data_msg_counts_path: &str,
-    out_ordering_coeff_path: &str,
-) {
+    out_topology_path: &str,
+) -> (FxHashMap<NodeId, Node>, Vec<NodeId>) {
     assert!(paramset.random_topology);
-    todo!()
+    // Init mix nodes
+    let mut queue_seed_rng = StdRng::seed_from_u64(seed);
+    let mut mixnodes: FxHashMap<NodeId, Node> = FxHashMap::default();
+    for id in 0..paramset.num_mixes {
+        mixnodes.insert(
+            id,
+            Node::new(
+                QueueConfig {
+                    queue_type: paramset.queue_type,
+                    seed: queue_seed_rng.next_u64(),
+                    min_queue_size: paramset.min_queue_size,
+                },
+                paramset.peering_degree,
+                true, // enable cache
+            ),
+        );
+    }
+
+    // Choose sender's peers and receiver's peers randomly
+    let mut peers_rng = StdRng::seed_from_u64(seed);
+    let mut candidates: Vec<NodeId> = (0..paramset.num_mixes).collect();
+    assert!(candidates.len() >= paramset.peering_degree as usize);
+    candidates.as_mut_slice().shuffle(&mut peers_rng);
+    let sender_peers: Vec<NodeId> = candidates
+        .iter()
+        .cloned()
+        .take(paramset.peering_degree as usize)
+        .collect();
+    candidates.as_mut_slice().shuffle(&mut peers_rng);
+    let receiver_peers: Vec<NodeId> = candidates
+        .iter()
+        .cloned()
+        .take(paramset.peering_degree as usize)
+        .collect();
+
+    // Connect mix nodes
+    let topology = build_topology(
+        paramset.num_mixes,
+        &vec![paramset.peering_degree; paramset.num_mixes as usize],
+        seed,
+    );
+    save_topology(&topology, out_topology_path).unwrap();
+    for (node_id, peers) in topology.iter().enumerate() {
+        peers.iter().for_each(|peer_id| {
+            mixnodes
+                .get_mut(&(node_id.try_into().unwrap()))
+                .unwrap()
+                .connect(*peer_id);
+        });
+    }
+
+    // Connect the selected mix nodes with the receiver
+    for id in receiver_peers.iter() {
+        mixnodes.get_mut(id).unwrap().connect(RECEIVER_ID);
+    }
+
+    (mixnodes, sender_peers)
 }
 
 fn try_probability(rng: &mut StdRng, prob: f32) -> bool {

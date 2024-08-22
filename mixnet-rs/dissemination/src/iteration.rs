@@ -1,16 +1,12 @@
-use std::error::Error;
-
 use protocol::{
     node::{MessageId, Node, NodeId},
     queue::{Message, QueueConfig},
+    topology::{build_topology, save_topology},
 };
 use rand::{rngs::StdRng, seq::SliceRandom, RngCore, SeedableRng};
 use rustc_hash::FxHashMap;
 
-use crate::{
-    paramset::ParamSet,
-    topology::{build_topology, Topology},
-};
+use crate::paramset::ParamSet;
 
 // An interval that the sender nodes send (schedule) new messages
 const MSG_INTERVAL: f32 = 1.0;
@@ -170,23 +166,6 @@ fn relay_messages(
                 }
             })
         });
-}
-
-fn save_topology(topology: &Topology, topology_path: &str) -> Result<(), Box<dyn Error>> {
-    let mut wtr = csv::Writer::from_path(topology_path)?;
-    wtr.write_record(["node", "num_peers", "peers"])?;
-
-    for (node, peers) in topology.iter().enumerate() {
-        let node: NodeId = node.try_into().unwrap();
-        let peers_str: Vec<String> = peers.iter().map(|peer_id| peer_id.to_string()).collect();
-        wtr.write_record(&[
-            node.to_string(),
-            peers.len().to_string(),
-            format!("[{}]", peers_str.join(",")),
-        ])?;
-    }
-    wtr.flush()?;
-    Ok(())
 }
 
 struct SenderSelector {

@@ -76,9 +76,10 @@ fn main() {
                 i as u64,
                 &format!("{paramset_dir}/iteration_{i}_latency.csv"),
                 &format!("{paramset_dir}/iteration_{i}_sent_seq.csv"),
-                &format!("{paramset_dir}/iteration_{i}_recv_seq.csv"),
+                &format!("{paramset_dir}/iteration_{i}_recv_seq"),
                 &format!("{paramset_dir}/iteration_{i}_data_msg_counts.csv"),
                 &format!("{paramset_dir}/iteration_{i}_ordering_coeff.csv"),
+                &format!("{paramset_dir}/iteration_{i}_topology.csv"),
             );
             tracing::info!("ParamSet:{}, Iteration:{} completed.", paramset.id, i);
         }
