@@ -55,7 +55,11 @@ pub fn run_iteration(
     let mut latencies: FxHashMap<MessageId, f32> = FxHashMap::default();
     let mut sent_sequence = Sequence::new();
     let mut received_sequences: FxHashMap<NodeId, Sequence> = FxHashMap::default();
-    let mut unified_received_sequence = Sequence::new();
+    let mut unified_received_sequence = if paramset.random_topology {
+        Some(Sequence::new())
+    } else {
+        None
+    };
     let mut queue_data_msg_counts: Vec<FxHashMap<NodeId, Vec<usize>>> = Vec::new();
 
     let mut data_msg_rng = StdRng::seed_from_u64(seed);
@@ -120,7 +124,11 @@ pub fn run_iteration(
                                     // If this is the first time to see the msg
                                     if let Entry::Vacant(e) = latencies.entry(msg) {
                                         e.insert(vtime - sent_time);
-                                        unified_received_sequence.add_message(msg);
+                                        if let Some(unified_recv_seq) =
+                                            &mut unified_received_sequence
+                                        {
+                                            unified_recv_seq.add_message(msg);
+                                        }
                                     }
                                     received_sequences
                                         .entry(mix_id)
@@ -163,11 +171,13 @@ pub fn run_iteration(
     // Save results to CSV files
     save_latencies(&latencies, &sent_times, out_latency_path);
     save_sequence(&sent_sequence, out_sent_sequence_path);
-    save_sequence(
-        &unified_received_sequence,
-        format!("{out_received_sequence_path_prefix}_unified.csv").as_str(),
-    );
     save_sequences(&received_sequences, out_received_sequence_path_prefix);
+    if let Some(unified_recv_seq) = &unified_received_sequence {
+        save_sequence(
+            unified_recv_seq,
+            format!("{out_received_sequence_path_prefix}_unified.csv").as_str(),
+        );
+    }
     save_queue_data_msg_counts(
         &queue_data_msg_counts,
         transmission_interval,
@@ -175,7 +185,11 @@ pub fn run_iteration(
     );
     // Calculate ordering coefficients and save them to a CSV file.
     if paramset.queue_type != QueueType::NonMix {
-        if !paramset.random_topology {
+        if let Some(unified_recv_seq) = &unified_received_sequence {
+            let casual = sent_sequence.ordering_coefficient(unified_recv_seq, true);
+            let weak = sent_sequence.ordering_coefficient(unified_recv_seq, false);
+            save_ordering_coefficients(&[[casual, weak]], out_ordering_coeff_path);
+        } else {
             let mut coeffs: Vec<[u64; 2]> = Vec::new();
             for (_, recv_seq) in received_sequences.iter() {
                 let casual = sent_sequence.ordering_coefficient(recv_seq, true);
@@ -183,10 +197,6 @@ pub fn run_iteration(
                 coeffs.push([casual, weak]);
             }
             save_ordering_coefficients(&coeffs, out_ordering_coeff_path);
-        } else {
-            let casual = sent_sequence.ordering_coefficient(&unified_received_sequence, true);
-            let weak = sent_sequence.ordering_coefficient(&unified_received_sequence, false);
-            save_ordering_coefficients(&[[casual, weak]], out_ordering_coeff_path);
         }
     }
 }
