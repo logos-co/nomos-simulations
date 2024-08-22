@@ -52,6 +52,7 @@ pub const PARAMSET_CSV_COLUMNS: &[&str] = &[
     "peering_degree",
     "min_queue_size",
     "transmission_rate",
+    "num_senders",
     "num_sender_msgs",
     "sender_data_msg_prob",
     "mix_data_msg_prob",
@@ -68,6 +69,7 @@ pub struct ParamSet {
     pub peering_degree: u32,
     pub min_queue_size: u16,
     pub transmission_rate: u16,
+    pub num_senders: u32,
     pub num_sender_msgs: u32,
     pub sender_data_msg_prob: f32,
     pub mix_data_msg_prob: f32,
@@ -89,6 +91,10 @@ impl ParamSet {
     fn new_session1_paramsets(exp_id: ExperimentId, queue_type: QueueType) -> Vec<ParamSet> {
         let transmission_rate: u16 = 1;
         let min_queue_size: u16 = 10;
+        let num_senders: u32 = match exp_id {
+            ExperimentId::Experiment3 | ExperimentId::Experiment4 => 2,
+            _ => 1,
+        };
         let num_sender_msgs: u32 = 1000000;
         let sender_data_msg_probs: &[f32] = &[0.01, 0.1, 0.5, 0.9, 0.99, 1.0];
         let mix_data_msg_probs: &[f32] = match exp_id {
@@ -119,6 +125,7 @@ impl ParamSet {
                                     peering_degree: 1,
                                     min_queue_size,
                                     transmission_rate,
+                                    num_senders,
                                     num_sender_msgs,
                                     sender_data_msg_prob,
                                     mix_data_msg_prob,
@@ -145,6 +152,7 @@ impl ParamSet {
                                     peering_degree,
                                     min_queue_size,
                                     transmission_rate,
+                                    num_senders,
                                     num_sender_msgs,
                                     sender_data_msg_prob,
                                     mix_data_msg_prob,
@@ -172,6 +180,7 @@ impl ParamSet {
             self.peering_degree.to_string(),
             self.min_queue_size.to_string(),
             self.transmission_rate.to_string(),
+            self.num_senders.to_string(),
             self.num_sender_msgs.to_string(),
             self.sender_data_msg_prob.to_string(),
             self.mix_data_msg_prob.to_string(),
