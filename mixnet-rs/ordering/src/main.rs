@@ -71,18 +71,27 @@ fn main() {
         save_paramset_info(&paramset, format!("{paramset_dir}/paramset.csv").as_str()).unwrap();
 
         for i in 0..paramset.num_iterations {
+            let wip_queue_data_msgs_counts_path =
+                format!("{paramset_dir}/__WIP__iteration_{i}_data_msg_counts.csv");
+
             run_iteration(
                 paramset.clone(),
                 i as u64,
                 &format!("{paramset_dir}/iteration_{i}_latency.csv"),
                 &format!("{paramset_dir}/iteration_{i}_sent_seq.csv"),
                 &format!("{paramset_dir}/iteration_{i}_recv_seq"),
-                &format!("{paramset_dir}/iteration_{i}_data_msg_counts.csv"),
+                &wip_queue_data_msgs_counts_path,
                 &format!("{paramset_dir}/iteration_{i}_ordering_coeff.csv"),
                 &format!("{paramset_dir}/iteration_{i}_topology.csv"),
             );
+
+            let new_queue_data_msgs_counts_path =
+                wip_queue_data_msgs_counts_path.replace("__WIP__iteration_", "iteration_");
+            std::fs::rename(&wip_queue_data_msgs_counts_path, &new_queue_data_msgs_counts_path).expect("Failed to rename {wip_queue_data_msgs_counts_path} -> {new_queue_data_msgs_counts_path}: {e}");
+
             tracing::info!("ParamSet:{}, Iteration:{} completed.", paramset.id, i);
         }
+
         let new_paramset_dir = paramset_dir.replace("__WIP__paramset_", "paramset_");
         std::fs::rename(&paramset_dir, &new_paramset_dir)
             .expect("Failed to rename: {paramset_dir} -> {new_paramset_dir}: {e}");
