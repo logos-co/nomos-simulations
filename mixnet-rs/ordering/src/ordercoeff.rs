@@ -2,9 +2,10 @@ use std::fmt::Display;
 
 use protocol::node::MessageId;
 
+#[derive(Debug, Clone)]
 pub struct Sequence(Vec<Entry>);
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Entry {
     Data(MessageId),
     Noise(u32), // the number of consecutive noises
@@ -52,13 +53,13 @@ impl Sequence {
 }
 
 impl Sequence {
-    pub fn ordering_coefficient(&self, other: &Sequence, strong: bool) -> u64 {
+    pub fn ordering_coefficient(&self, other: &Sequence, casual: bool) -> u64 {
         let mut coeff = 0;
         let mut i = 0;
 
         while i < self.0.len() {
             if let Entry::Data(_) = &self.0[i] {
-                let (c, next_i) = self.ordering_coefficient_from(i, other, strong);
+                let (c, next_i) = self.ordering_coefficient_from(i, other, casual);
                 coeff += c;
 
                 if next_i != i {
@@ -78,7 +79,7 @@ impl Sequence {
         &self,
         start_idx: usize,
         other: &Sequence,
-        strong: bool,
+        casual: bool,
     ) -> (u64, usize) {
         let msg1 = match self.0[start_idx] {
             Entry::Data(msg) => msg,
@@ -89,8 +90,8 @@ impl Sequence {
             if let Entry::Data(msg2) = entry {
                 if msg1 == *msg2 {
                     // Found the 1st matching msg. Start finding the next adjacent matching msg.
-                    if strong {
-                        return self.strong_ordering_coefficient_from(start_idx, other, j);
+                    if casual {
+                        return self.casual_ordering_coefficient_from(start_idx, other, j);
                     } else {
                         return self.weak_ordering_coefficient_from(start_idx, other, j);
                     }
@@ -100,7 +101,7 @@ impl Sequence {
         (0, start_idx)
     }
 
-    fn strong_ordering_coefficient_from(
+    fn casual_ordering_coefficient_from(
         &self,
         start_idx: usize,
         other: &Sequence,
@@ -172,24 +173,24 @@ impl Sequence {
 mod tests {
     use super::*;
 
-    fn test_ordering_coefficient_common(strong: bool) {
+    fn test_ordering_coefficient_common(casual: bool) {
         // Case 0: Empty sequences
         let seq = Sequence(vec![]);
-        assert_eq!(seq.ordering_coefficient(&seq, strong), 0);
+        assert_eq!(seq.ordering_coefficient(&seq, casual), 0);
 
         // Case 1: Exact one matched pair with no noise
         let seq = Sequence(vec![Entry::Data(1), Entry::Data(2)]);
-        assert_eq!(seq.ordering_coefficient(&seq, strong), 1);
+        assert_eq!(seq.ordering_coefficient(&seq, casual), 1);
 
         // Case 2: Exact one matched pair with noise
         let seq = Sequence(vec![Entry::Data(1), Entry::Noise(10), Entry::Data(2)]);
-        assert_eq!(seq.ordering_coefficient(&seq, strong), 1);
+        assert_eq!(seq.ordering_coefficient(&seq, casual), 1);
 
         // Case 3: One matched pair with no noise
         let seq1 = Sequence(vec![Entry::Data(1), Entry::Data(2), Entry::Data(3)]);
         let seq2 = Sequence(vec![Entry::Data(1), Entry::Data(2), Entry::Data(4)]);
-        assert_eq!(seq1.ordering_coefficient(&seq2, strong), 1);
-        assert_eq!(seq2.ordering_coefficient(&seq1, strong), 1);
+        assert_eq!(seq1.ordering_coefficient(&seq2, casual), 1);
+        assert_eq!(seq2.ordering_coefficient(&seq1, casual), 1);
 
         // Case 4: One matched pair with noise
         let seq1 = Sequence(vec![
@@ -199,8 +200,8 @@ mod tests {
             Entry::Data(3),
         ]);
         let seq2 = Sequence(vec![Entry::Data(1), Entry::Noise(10), Entry::Data(2)]);
-        assert_eq!(seq1.ordering_coefficient(&seq2, strong), 1);
-        assert_eq!(seq2.ordering_coefficient(&seq1, strong), 1);
+        assert_eq!(seq1.ordering_coefficient(&seq2, casual), 1);
+        assert_eq!(seq2.ordering_coefficient(&seq1, casual), 1);
 
         // Case 5: Two matched pairs with noise
         let seq1 = Sequence(vec![
@@ -216,26 +217,26 @@ mod tests {
             Entry::Data(3),
             Entry::Data(4),
         ]);
-        assert_eq!(seq1.ordering_coefficient(&seq2, strong), 2);
-        assert_eq!(seq2.ordering_coefficient(&seq1, strong), 2);
+        assert_eq!(seq1.ordering_coefficient(&seq2, casual), 2);
+        assert_eq!(seq2.ordering_coefficient(&seq1, casual), 2);
 
         // Case 6: Only partial match with no noise
         let seq1 = Sequence(vec![Entry::Data(1), Entry::Data(2)]);
         let seq2 = Sequence(vec![Entry::Data(2), Entry::Data(3)]);
-        assert_eq!(seq1.ordering_coefficient(&seq2, strong), 0);
-        assert_eq!(seq2.ordering_coefficient(&seq1, strong), 0);
+        assert_eq!(seq1.ordering_coefficient(&seq2, casual), 0);
+        assert_eq!(seq2.ordering_coefficient(&seq1, casual), 0);
 
         // Case 7: Only partial match with noise
         let seq1 = Sequence(vec![Entry::Data(1), Entry::Data(2), Entry::Noise(10)]);
         let seq2 = Sequence(vec![Entry::Data(2), Entry::Noise(10), Entry::Data(3)]);
-        assert_eq!(seq1.ordering_coefficient(&seq2, strong), 0);
-        assert_eq!(seq2.ordering_coefficient(&seq1, strong), 0);
+        assert_eq!(seq1.ordering_coefficient(&seq2, casual), 0);
+        assert_eq!(seq2.ordering_coefficient(&seq1, casual), 0);
 
         // Case 8: No match at all
         let seq1 = Sequence(vec![Entry::Data(1), Entry::Data(2), Entry::Noise(10)]);
         let seq2 = Sequence(vec![Entry::Data(3), Entry::Noise(10), Entry::Data(4)]);
-        assert_eq!(seq1.ordering_coefficient(&seq2, strong), 0);
-        assert_eq!(seq2.ordering_coefficient(&seq1, strong), 0);
+        assert_eq!(seq1.ordering_coefficient(&seq2, casual), 0);
+        assert_eq!(seq2.ordering_coefficient(&seq1, casual), 0);
 
         // Case 9: Matches with noise but mixed orders
         let seq1 = Sequence(vec![
@@ -256,12 +257,12 @@ mod tests {
             Entry::Data(3),
             Entry::Data(6),
         ]);
-        assert_eq!(seq1.ordering_coefficient(&seq2, strong), 3);
-        assert_eq!(seq2.ordering_coefficient(&seq1, strong), 3);
+        assert_eq!(seq1.ordering_coefficient(&seq2, casual), 3);
+        assert_eq!(seq2.ordering_coefficient(&seq1, casual), 3);
     }
 
     #[test]
-    fn test_strong_ordering_coefficient() {
+    fn test_casual_ordering_coefficient() {
         test_ordering_coefficient_common(true);
 
         // Case 0: No match because of noise

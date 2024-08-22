@@ -75,7 +75,7 @@ impl Node {
         msgs_to_relay
     }
 
-    pub fn data_count_in_queue(&self) -> Vec<usize> {
+    pub fn queue_data_msg_counts(&self) -> Vec<usize> {
         self.queues
             .iter()
             .map(|(_, queue)| queue.data_count())
