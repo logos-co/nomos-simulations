@@ -336,12 +336,13 @@ fn save_latencies(
 ) {
     let mut writer = csv::Writer::from_path(path).unwrap();
     writer
-        .write_record(["latency", "sent_time", "received_time"])
+        .write_record(["msg_id", "latency", "sent_time", "received_time"])
         .unwrap();
     for (msg, latency) in latencies.iter() {
         let sent_time = sent_times.get(msg).unwrap();
         writer
             .write_record(&[
+                msg.to_string(),
                 latency.to_string(),
                 sent_time.to_string(),
                 (sent_time + latency).to_string(),
