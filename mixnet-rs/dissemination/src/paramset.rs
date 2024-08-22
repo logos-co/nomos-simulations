@@ -1,4 +1,4 @@
-use queue::QueueType;
+use protocol::queue::QueueType;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

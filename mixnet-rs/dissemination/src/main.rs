@@ -1,6 +1,6 @@
 use chrono::Utc;
 use clap::Parser;
-use queue::QueueType;
+use protocol::queue::QueueType;
 use rayon::prelude::*;
 use std::{
     error::Error,
@@ -12,7 +12,6 @@ use iteration::run_iteration;
 use paramset::{ExperimentId, ParamSet, SessionId, PARAMSET_CSV_COLUMNS};
 
 mod iteration;
-mod node;
 mod paramset;
 mod topology;
 

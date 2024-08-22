@@ -1,11 +1,13 @@
 use std::error::Error;
 
-use queue::QueueConfig;
+use protocol::{
+    node::{MessageId, Node, NodeId},
+    queue::{Message, QueueConfig},
+};
 use rand::{rngs::StdRng, seq::SliceRandom, RngCore, SeedableRng};
 use rustc_hash::FxHashMap;
 
 use crate::{
-    node::{MessageId, Node, NodeId},
     paramset::ParamSet,
     topology::{build_topology, Topology},
 };
@@ -28,6 +30,7 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, out_csv_path: &str, topology
                 min_queue_size: paramset.min_queue_size,
             },
             peering_degrees[node_id as usize],
+            true,
         ));
     }
     tracing::debug!("Nodes initialized.");
@@ -132,7 +135,7 @@ fn relay_messages(
     writer: &mut csv::Writer<std::fs::File>,
 ) {
     // Collect messages to relay
-    let mut all_msgs_to_relay: Vec<Vec<(NodeId, MessageId)>> = Vec::new();
+    let mut all_msgs_to_relay: Vec<Vec<(NodeId, Message<MessageId>)>> = Vec::new();
     for node in nodes.iter_mut() {
         all_msgs_to_relay.push(node.read_queues());
     }
@@ -144,22 +147,25 @@ fn relay_messages(
         .for_each(|(sender_id, msgs_to_relay)| {
             let sender_id: NodeId = sender_id.try_into().unwrap();
             msgs_to_relay.into_iter().for_each(|(receiver_id, msg)| {
-                if nodes[receiver_id as usize].receive(msg, sender_id) {
-                    let (sent_time, num_received_nodes) = message_tracker.get_mut(&msg).unwrap();
-                    *num_received_nodes += 1;
-                    if *num_received_nodes as usize == nodes.len() {
-                        let dissemination_time = vtime - *sent_time;
-                        writer
-                            .write_record(&[
-                                dissemination_time.to_string(),
-                                sent_time.to_string(),
-                                vtime.to_string(),
-                            ])
-                            .unwrap();
-                        writer.flush().unwrap();
-                        *num_disseminated_msgs += 1;
+                if let Message::Data(msg) = msg {
+                    if nodes[receiver_id as usize].receive(msg, Some(sender_id)) {
+                        let (sent_time, num_received_nodes) =
+                            message_tracker.get_mut(&msg).unwrap();
+                        *num_received_nodes += 1;
+                        if *num_received_nodes as usize == nodes.len() {
+                            let dissemination_time = vtime - *sent_time;
+                            writer
+                                .write_record(&[
+                                    dissemination_time.to_string(),
+                                    sent_time.to_string(),
+                                    vtime.to_string(),
+                                ])
+                                .unwrap();
+                            writer.flush().unwrap();
+                            *num_disseminated_msgs += 1;
 
-                        message_tracker.remove(&msg);
+                            message_tracker.remove(&msg);
+                        }
                     }
                 }
             })

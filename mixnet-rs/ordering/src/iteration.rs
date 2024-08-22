@@ -1,14 +1,13 @@
 use std::path::Path;
 
-use queue::QueueConfig;
+use protocol::{
+    node::{MessageId, Node},
+    queue::{Message, QueueConfig, QueueType},
+};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use rustc_hash::FxHashMap;
 
-use crate::{
-    node::{MessageId, Node},
-    ordercoeff::Sequence,
-    paramset::ParamSet,
-};
+use crate::{ordercoeff::Sequence, paramset::ParamSet};
 
 pub fn run_iteration(
     paramset: ParamSet,
@@ -30,11 +29,16 @@ pub fn run_iteration(
     }
 
     // Initialize a mix node
-    let mut mixnode = Node::new(&QueueConfig {
-        queue_type: paramset.queue_type,
-        seed,
-        min_queue_size: paramset.min_queue_size,
-    });
+    let mut mixnode = Node::new(
+        QueueConfig {
+            queue_type: paramset.queue_type,
+            seed,
+            min_queue_size: paramset.min_queue_size,
+        },
+        paramset.peering_degree,
+        false,
+    );
+    mixnode.connect(u32::MAX); // connect to the virtual receiver node
 
     let mut next_msg_id: MessageId = 0;
 
@@ -43,29 +47,39 @@ pub fn run_iteration(
     // Transmission interval that each queue must release a message
     let transmission_interval = 1.0 / paramset.transmission_rate as f32;
     // Results
+    let mut all_sent_count = 0; // all data + noise sent by the sender
     let mut sent_times: FxHashMap<MessageId, f32> = FxHashMap::default();
     let mut latencies: FxHashMap<MessageId, f32> = FxHashMap::default();
     let mut sent_sequence = Sequence::new();
     let mut received_sequence = Sequence::new();
-    let mut data_msg_counts_in_queue: Vec<u32> = Vec::new();
+    let mut data_msg_counts_in_queue: Vec<usize> = Vec::new();
 
     let mut rng = StdRng::seed_from_u64(seed);
     loop {
+        tracing::trace!(
+            "VTIME:{}, ALL_SENT:{}, DATA_SENT:{}, DATA_RECEIVED:{}",
+            vtime,
+            all_sent_count,
+            sent_times.len(),
+            latencies.len()
+        );
+
         // The sender emits a message (data or noise) to the mix node.
-        if sent_times.len() < paramset.num_sender_data_msgs as usize
-            && try_probability(&mut rng, paramset.sender_data_msg_prob)
-        {
-            let msg = next_msg_id;
-            next_msg_id += 1;
-            mixnode.receive(msg);
-            sent_times.insert(msg, vtime);
-            sent_sequence.add_message(msg);
-        } else {
-            // Generate noise and add it to the sequence to calculate ordering coefficients later,
-            // but don't need to send it to the mix node
-            // because the mix node will anyway drop the noise,
-            // and we don't need to record what the mix node receives.
-            sent_sequence.add_noise();
+        if all_sent_count < paramset.num_sender_msgs as usize {
+            if try_probability(&mut rng, paramset.sender_data_msg_prob) {
+                let msg = next_msg_id;
+                next_msg_id += 1;
+                mixnode.receive(msg, None);
+                sent_times.insert(msg, vtime);
+                sent_sequence.add_message(msg);
+            } else {
+                // Generate noise and add it to the sequence to calculate ordering coefficients later,
+                // but don't need to send it to the mix node
+                // because the mix node will anyway drop the noise,
+                // and we don't need to record what the mix node receives.
+                sent_sequence.add_noise();
+            }
+            all_sent_count += 1;
         }
 
         // The mix node add a new data message to its queue with a certain probability
@@ -78,22 +92,26 @@ pub fn run_iteration(
 
         // The mix node emits a message (data or noise) to the receiver.
         // As the receiver, record the time and order of the received messages.
-        match mixnode.read_queue() {
-            Some(msg) => {
+        // TODO: handle all queues
+        match mixnode.read_queues().first().unwrap().1 {
+            Message::Data(msg) => {
                 latencies.insert(msg, vtime - sent_times.get(&msg).unwrap());
                 received_sequence.add_message(msg);
             }
-            None => {
+            Message::Noise => {
                 received_sequence.add_noise();
             }
         }
 
         // Record the number of data messages in the mix node's queue
-        data_msg_counts_in_queue.push(mixnode.message_count_in_queue());
+        // TODO: handle all queues
+        data_msg_counts_in_queue.push(*mixnode.data_count_in_queue().first().unwrap());
 
-        // If all messages have been received by the receiver, stop the iteration.
-        assert!(latencies.len() <= paramset.num_sender_data_msgs as usize);
-        if latencies.len() == paramset.num_sender_data_msgs as usize {
+        // If all data amessages (that the sender has to send) have been received by the receiver,
+        // stop the iteration.
+        if all_sent_count == paramset.num_sender_msgs as usize
+            && sent_times.len() == latencies.len()
+        {
             break;
         }
 
@@ -110,18 +128,20 @@ pub fn run_iteration(
         out_data_msg_counts_path,
     );
     // Calculate ordering coefficients and save them to a CSV file.
-    let strong_ordering_coeff = sent_sequence.ordering_coefficient(&received_sequence, true);
-    let weak_ordering_coeff = sent_sequence.ordering_coefficient(&received_sequence, false);
-    tracing::info!(
-        "STRONG_COEFF:{}, WEAK_COEFF:{}",
-        strong_ordering_coeff,
-        weak_ordering_coeff
-    );
-    save_ordering_coefficients(
-        strong_ordering_coeff,
-        weak_ordering_coeff,
-        out_ordering_coeff_path,
-    );
+    if paramset.queue_type != QueueType::NonMix {
+        let strong_ordering_coeff = sent_sequence.ordering_coefficient(&received_sequence, true);
+        let weak_ordering_coeff = sent_sequence.ordering_coefficient(&received_sequence, false);
+        tracing::info!(
+            "STRONG_COEFF:{}, WEAK_COEFF:{}",
+            strong_ordering_coeff,
+            weak_ordering_coeff
+        );
+        save_ordering_coefficients(
+            strong_ordering_coeff,
+            weak_ordering_coeff,
+            out_ordering_coeff_path,
+        );
+    }
 }
 
 fn try_probability(rng: &mut StdRng, prob: f32) -> bool {
@@ -163,7 +183,7 @@ fn save_sequence(sequence: &Sequence, path: &str) {
 }
 
 fn save_data_msg_counts(
-    data_msg_counts_in_queue: &[u32],
+    data_msg_counts_in_queue: &[usize],
     interval: f32,
     out_data_msg_counts_path: &str,
 ) {

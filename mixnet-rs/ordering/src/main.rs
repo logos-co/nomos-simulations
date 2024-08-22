@@ -1,5 +1,4 @@
 mod iteration;
-mod node;
 mod ordercoeff;
 mod paramset;
 
@@ -13,7 +12,7 @@ use chrono::Utc;
 use clap::Parser;
 use iteration::run_iteration;
 use paramset::{ExperimentId, ParamSet, SessionId, PARAMSET_CSV_COLUMNS};
-use queue::QueueType;
+use protocol::queue::QueueType;
 
 #[derive(Debug, Parser)]
 #[command(name = "Single Sender Single Mix Measurement")]
@@ -49,7 +48,7 @@ fn main() {
         "Output directory does not exist: {outdir}"
     );
     let subdir = format!(
-        "__WIP__dissemination_e{}s{}_{:?}_{}___DUR__",
+        "__WIP__ordering_e{}s{}_{:?}_{}___DUR__",
         exp_id as u8,
         session_id as u8,
         queue_type,

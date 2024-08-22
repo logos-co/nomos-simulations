@@ -30,9 +30,15 @@ impl std::str::FromStr for QueueType {
 }
 
 pub trait Queue<T: Copy> {
-    fn push(&mut self, msg: T);
-    fn pop(&mut self) -> Option<T>;
-    fn message_count(&self) -> usize;
+    fn push(&mut self, data: T);
+    fn pop(&mut self) -> Message<T>;
+    fn data_count(&self) -> usize;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Message<T: Copy> {
+    Data(T),
+    Noise,
 }
 
 pub struct QueueConfig {
@@ -61,7 +67,7 @@ pub fn new_queue<T: 'static + Copy>(cfg: &QueueConfig) -> Box<dyn Queue<T>> {
 }
 
 struct NonMixQueue<T: Copy> {
-    queue: VecDeque<T>,
+    queue: VecDeque<T>, // don't need to contain Noise
 }
 
 impl<T: Copy> NonMixQueue<T> {
@@ -73,59 +79,60 @@ impl<T: Copy> NonMixQueue<T> {
 }
 
 impl<T: Copy> Queue<T> for NonMixQueue<T> {
-    fn push(&mut self, msg: T) {
-        self.queue.push_back(msg)
+    fn push(&mut self, data: T) {
+        self.queue.push_back(data)
     }
 
-    fn pop(&mut self) -> Option<T> {
-        self.queue.pop_front()
+    fn pop(&mut self) -> Message<T> {
+        match self.queue.pop_front() {
+            Some(data) => Message::Data(data),
+            None => Message::Noise,
+        }
     }
 
-    fn message_count(&self) -> usize {
+    fn data_count(&self) -> usize {
         self.queue.len()
     }
 }
 
 struct MixQueue<T: Copy> {
-    queue: Vec<Option<T>>, // None element means noise
-    message_count: usize,
+    queue: Vec<Message<T>>,
+    data_count: usize,
     rng: StdRng,
 }
 
 impl<T: Copy> MixQueue<T> {
     fn new(num_initial_noises: usize, seed: u64) -> Self {
         Self {
-            queue: vec![None; num_initial_noises],
-            message_count: 0,
+            queue: vec![Message::Noise; num_initial_noises],
+            data_count: 0,
             rng: StdRng::seed_from_u64(seed),
         }
     }
 
     fn push(&mut self, data: T) {
-        self.queue.push(Some(data));
-        self.message_count += 1;
+        self.queue.push(Message::Data(data));
+        self.data_count += 1;
     }
 
     fn fill_noises(&mut self, k: usize) {
-        self.queue.extend(std::iter::repeat(None).take(k))
+        self.queue.extend(std::iter::repeat(Message::Noise).take(k))
     }
 
-    fn pop(&mut self, idx: usize) -> Option<T> {
+    fn pop(&mut self, idx: usize) -> Option<Message<T>> {
         if idx < self.queue.len() {
-            match self.queue.remove(idx) {
-                Some(msg) => {
-                    self.message_count -= 1;
-                    Some(msg)
-                }
-                None => None,
+            let msg = self.queue.remove(idx);
+            if let Message::Data(_) = msg {
+                self.data_count -= 1;
             }
+            Some(msg)
         } else {
             None
         }
     }
 
-    fn message_count(&self) -> usize {
-        self.message_count
+    fn data_count(&self) -> usize {
+        self.data_count
     }
 
     fn len(&self) -> usize {
@@ -162,12 +169,12 @@ impl<T: Copy> MinSizeMixQueue<T> {
         self.queue.push(msg)
     }
 
-    fn pop(&mut self, idx: usize) -> Option<T> {
+    fn pop(&mut self, idx: usize) -> Option<Message<T>> {
         self.queue.pop(idx)
     }
 
-    fn message_count(&self) -> usize {
-        self.queue.message_count()
+    fn data_count(&self) -> usize {
+        self.queue.data_count()
     }
 
     fn ensure_min_size(&mut self) {
@@ -211,20 +218,20 @@ impl<T: Copy> Queue<T> for PureCoinFlippingQueue<T> {
         self.queue.push(msg)
     }
 
-    fn pop(&mut self) -> Option<T> {
+    fn pop(&mut self) -> Message<T> {
         self.queue.ensure_min_size();
 
         loop {
             for i in 0..self.queue.len() {
                 if self.queue.flip_coin() {
-                    return self.queue.pop(i);
+                    return self.queue.pop(i).unwrap();
                 }
             }
         }
     }
 
-    fn message_count(&self) -> usize {
-        self.queue.message_count()
+    fn data_count(&self) -> usize {
+        self.queue.data_count()
     }
 }
 
@@ -245,15 +252,15 @@ impl<T: Copy> Queue<T> for PureRandomSamplingQueue<T> {
         self.queue.push(msg)
     }
 
-    fn pop(&mut self) -> Option<T> {
+    fn pop(&mut self) -> Message<T> {
         self.queue.ensure_min_size();
 
         let i = self.queue.sample_index();
-        self.queue.pop(i)
+        self.queue.pop(i).unwrap()
     }
 
-    fn message_count(&self) -> usize {
-        self.queue.message_count()
+    fn data_count(&self) -> usize {
+        self.queue.data_count()
     }
 }
 
@@ -274,7 +281,7 @@ impl<T: Copy> Queue<T> for PermutedCoinFlippingQueue<T> {
         self.queue.push(msg)
     }
 
-    fn pop(&mut self) -> Option<T> {
+    fn pop(&mut self) -> Message<T> {
         self.queue.ensure_min_size();
 
         self.queue.shuffle();
@@ -282,14 +289,14 @@ impl<T: Copy> Queue<T> for PermutedCoinFlippingQueue<T> {
         loop {
             for i in 0..self.queue.len() {
                 if self.queue.flip_coin() {
-                    return self.queue.pop(i);
+                    return self.queue.pop(i).unwrap();
                 }
             }
         }
     }
 
-    fn message_count(&self) -> usize {
-        self.queue.message_count()
+    fn data_count(&self) -> usize {
+        self.queue.data_count()
     }
 }
 
@@ -310,24 +317,24 @@ impl<T: Copy> Queue<T> for NoisyCoinFlippingQueue<T> {
         self.queue.push(msg)
     }
 
-    fn pop(&mut self) -> Option<T> {
+    fn pop(&mut self) -> Message<T> {
         if self.queue.len() == 0 {
-            return None;
+            return Message::Noise;
         }
 
         loop {
             for i in 0..self.queue.len() {
                 if self.queue.flip_coin() {
-                    return self.queue.pop(i);
+                    return self.queue.pop(i).unwrap();
                 } else if i == 0 {
-                    return None;
+                    return Message::Noise;
                 }
             }
         }
     }
 
-    fn message_count(&self) -> usize {
-        self.queue.message_count()
+    fn data_count(&self) -> usize {
+        self.queue.data_count()
     }
 }
 
@@ -348,21 +355,21 @@ impl<T: Copy> Queue<T> for NoisyCoinFlippingRandomReleaseQueue<T> {
         self.queue.push(msg)
     }
 
-    fn pop(&mut self) -> Option<T> {
+    fn pop(&mut self) -> Message<T> {
         if self.queue.len() == 0 {
-            return None;
+            return Message::Noise;
         }
 
         if self.queue.flip_coin() {
             let i = self.queue.sample_index();
-            self.queue.pop(i)
+            self.queue.pop(i).unwrap()
         } else {
-            None
+            Message::Noise
         }
     }
 
-    fn message_count(&self) -> usize {
-        self.queue.message_count()
+    fn data_count(&self) -> usize {
+        self.queue.data_count()
     }
 }
 
@@ -380,23 +387,23 @@ mod tests {
             min_queue_size: 0,
         });
 
-        // Check if None (noise) is returned when queue is empty
-        assert_eq!(queue.pop(), None);
+        // Check if noise is returned when queue is empty
+        assert_eq!(queue.pop(), Message::Noise);
 
         // Check if queue is FIFO
         queue.push(0);
         queue.push(1);
-        assert_eq!(queue.pop(), Some(0));
-        assert_eq!(queue.pop(), Some(1));
+        assert_eq!(queue.pop(), Message::Data(0));
+        assert_eq!(queue.pop(), Message::Data(1));
 
-        // Check if None (noise) is returned when queue is empty
-        assert_eq!(queue.pop(), None);
+        // Check if noise is returned when queue is empty
+        assert_eq!(queue.pop(), Message::Noise);
 
         // Check if queue is FIFO again
         queue.push(2);
         queue.push(3);
-        assert_eq!(queue.pop(), Some(2));
-        assert_eq!(queue.pop(), Some(3));
+        assert_eq!(queue.pop(), Message::Data(2));
+        assert_eq!(queue.pop(), Message::Data(3));
     }
 
     #[test]
@@ -419,8 +426,8 @@ mod tests {
             min_queue_size: 4,
         });
 
-        // Check if None (noise) is returned when queue is empty
-        assert_eq!(queue.pop(), None);
+        // Check if noise is returned when queue is empty
+        assert_eq!(queue.pop(), Message::Noise);
 
         // Put only 2 messages even though the min queue size is 4
         queue.push(0);
@@ -429,12 +436,12 @@ mod tests {
         // Wait until 2 messages are returned from the queue
         let mut set: HashSet<_> = vec![0, 1].into_iter().collect();
         while !set.is_empty() {
-            if let Some(msg) = queue.pop() {
+            if let Message::Data(msg) = queue.pop() {
                 assert!(set.remove(&msg));
             }
         }
 
-        // Check if None (noise) is returned when there is no real message remains
-        assert_eq!(queue.pop(), None);
+        // Check if noise is returned when there is no real message remains
+        assert_eq!(queue.pop(), Message::Noise);
     }
 }

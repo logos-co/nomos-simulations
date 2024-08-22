@@ -1,8 +1,7 @@
 use std::collections::HashSet;
 
+use protocol::node::NodeId;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
-
-use crate::node::NodeId;
 
 pub type Topology = Vec<Vec<NodeId>>;
 

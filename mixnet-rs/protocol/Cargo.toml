@@ -1,9 +1,11 @@
 [package]
-name = "queue"
+name = "protocol"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 rand = "0.8.5"
+rustc-hash = "2.0.0"
 strum = "0.26.3"
 strum_macros = "0.26.4"
+tracing = "0.1.40"
