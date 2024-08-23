@@ -27,6 +27,8 @@ struct Args {
     outdir: String,
     #[arg(short, long)]
     from_paramset: Option<u16>,
+    #[arg(short, long)]
+    to_paramset: Option<u16>,
 }
 
 fn main() {
@@ -40,6 +42,7 @@ fn main() {
         queue_type,
         outdir,
         from_paramset,
+        to_paramset,
     } = args;
 
     // Create a directory and initialize a CSV file only with a header
@@ -64,6 +67,9 @@ fn main() {
         if paramset.id < from_paramset.unwrap_or(0) {
             tracing::info!("ParamSet:{} skipped", paramset.id);
             continue;
+        } else if paramset.id > to_paramset.unwrap_or(u16::MAX) {
+            tracing::info!("ParamSets:{}~ skipped", paramset.id);
+            break;
         }
 
         let paramset_dir = format!("{outdir}/{subdir}/__WIP__paramset_{}", paramset.id);
