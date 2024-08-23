@@ -22,7 +22,7 @@ pub fn run_iteration(
     out_queue_data_msg_counts_path: &str,
     out_ordering_coeff_path: &str,
     out_topology_path: &str,
-) {
+) -> f32 {
     // Ensure that all output files do not exist
     for path in &[
         out_latency_path,
@@ -204,6 +204,8 @@ pub fn run_iteration(
             save_ordering_coefficients(&coeffs, out_ordering_coeff_path);
         }
     }
+
+    vtime
 }
 
 fn build_striped_network(paramset: &ParamSet, seed: u64) -> (Vec<Node>, Vec<Vec<NodeId>>) {
@@ -376,6 +378,7 @@ fn new_queue_data_msg_counts_writer(path: &str, mixnodes: &[Node]) -> Writer<Fil
             });
         });
     writer.write_record(header).unwrap();
+    writer.flush().unwrap();
     writer
 }
 

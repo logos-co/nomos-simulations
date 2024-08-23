@@ -70,11 +70,19 @@ fn main() {
         std::fs::create_dir_all(paramset_dir.as_str()).unwrap();
         save_paramset_info(&paramset, format!("{paramset_dir}/paramset.csv").as_str()).unwrap();
 
+        let dur_path = format!("{paramset_dir}/__WIP__durations.csv");
+        let mut dur_writer = csv::Writer::from_path(&dur_path).unwrap();
+        dur_writer
+            .write_record(["iteration", "time_human", "time_sec", "vtime"])
+            .unwrap();
+        dur_writer.flush().unwrap();
+
         for i in 0..paramset.num_iterations {
             let wip_queue_data_msgs_counts_path =
                 format!("{paramset_dir}/__WIP__iteration_{i}_data_msg_counts.csv");
 
-            run_iteration(
+            let start_time = SystemTime::now();
+            let vtime = run_iteration(
                 paramset.clone(),
                 i as u64,
                 &format!("{paramset_dir}/iteration_{i}_latency.csv"),
@@ -84,6 +92,15 @@ fn main() {
                 &format!("{paramset_dir}/iteration_{i}_ordering_coeff.csv"),
                 &format!("{paramset_dir}/iteration_{i}_topology.csv"),
             );
+            let duration = SystemTime::now().duration_since(start_time).unwrap();
+            dur_writer
+                .write_record([
+                    i.to_string(),
+                    format_duration(duration),
+                    duration.as_secs().to_string(),
+                    vtime.to_string(),
+                ])
+                .unwrap();
 
             let new_queue_data_msgs_counts_path =
                 wip_queue_data_msgs_counts_path.replace("__WIP__iteration_", "iteration_");
@@ -91,6 +108,11 @@ fn main() {
 
             tracing::info!("ParamSet:{}, Iteration:{} completed.", paramset.id, i);
         }
+        dur_writer.flush().unwrap();
+
+        let new_dur_path = dur_path.replace("__WIP__durations", "durations");
+        std::fs::rename(&dur_path, &new_dur_path)
+            .expect("Failed to rename: {dur_path} -> {new_dur_dir}: {e}");
 
         let new_paramset_dir = paramset_dir.replace("__WIP__paramset_", "paramset_");
         std::fs::rename(&paramset_dir, &new_paramset_dir)
