@@ -115,6 +115,7 @@ fn main() {
                     vtime.to_string(),
                 ])
                 .unwrap();
+            dur_writer.flush().unwrap();
 
             let new_queue_data_msgs_counts_path =
                 wip_queue_data_msgs_counts_path.replace("__WIP__iteration_", "iteration_");
