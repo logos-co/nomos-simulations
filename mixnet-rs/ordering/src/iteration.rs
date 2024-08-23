@@ -20,7 +20,7 @@ pub fn run_iteration(
     out_sent_sequence_path: &str,
     out_received_sequence_path_prefix: &str,
     out_queue_data_msg_counts_path: &str,
-    out_ordering_coeff_path: &str,
+    out_ordering_coeff_path: Option<String>,
     out_topology_path: &str,
 ) -> f32 {
     // Ensure that all output files do not exist
@@ -29,9 +29,11 @@ pub fn run_iteration(
         out_sent_sequence_path,
         out_received_sequence_path_prefix,
         out_queue_data_msg_counts_path,
-        out_ordering_coeff_path,
         out_topology_path,
     ] {
+        assert!(!Path::new(path).exists(), "File already exists: {path}");
+    }
+    if let Some(path) = &out_ordering_coeff_path {
         assert!(!Path::new(path).exists(), "File already exists: {path}");
     }
 
@@ -188,20 +190,22 @@ pub fn run_iteration(
             format!("{out_received_sequence_path_prefix}_unified.csv").as_str(),
         );
     }
-    // Calculate ordering coefficients and save them to a CSV file.
-    if paramset.queue_type != QueueType::NonMix {
-        if let Some(unified_recv_seq) = &unified_received_sequence {
-            let casual = sent_sequence.ordering_coefficient(unified_recv_seq, true);
-            let weak = sent_sequence.ordering_coefficient(unified_recv_seq, false);
-            save_ordering_coefficients(&[[casual, weak]], out_ordering_coeff_path);
-        } else {
-            let mut coeffs: Vec<[u64; 2]> = Vec::new();
-            for recv_seq in received_sequences.iter() {
-                let casual = sent_sequence.ordering_coefficient(recv_seq, true);
-                let weak = sent_sequence.ordering_coefficient(recv_seq, false);
-                coeffs.push([casual, weak]);
+    // Calculate ordering coefficients and save them to a CSV file (if enabled)
+    if let Some(out_ordering_coeff_path) = &out_ordering_coeff_path {
+        if paramset.queue_type != QueueType::NonMix {
+            if let Some(unified_recv_seq) = &unified_received_sequence {
+                let casual = sent_sequence.ordering_coefficient(unified_recv_seq, true);
+                let weak = sent_sequence.ordering_coefficient(unified_recv_seq, false);
+                save_ordering_coefficients(&[[casual, weak]], out_ordering_coeff_path);
+            } else {
+                let mut coeffs: Vec<[u64; 2]> = Vec::new();
+                for recv_seq in received_sequences.iter() {
+                    let casual = sent_sequence.ordering_coefficient(recv_seq, true);
+                    let weak = sent_sequence.ordering_coefficient(recv_seq, false);
+                    coeffs.push([casual, weak]);
+                }
+                save_ordering_coefficients(&coeffs, out_ordering_coeff_path);
             }
-            save_ordering_coefficients(&coeffs, out_ordering_coeff_path);
         }
     }
 

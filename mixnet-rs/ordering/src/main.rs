@@ -25,6 +25,8 @@ struct Args {
     queue_type: QueueType,
     #[arg(short, long)]
     outdir: String,
+    #[arg(short, long, default_value_t = false)]
+    skip_coeff_calc: bool,
     #[arg(short, long)]
     from_paramset: Option<u16>,
     #[arg(short, long)]
@@ -41,6 +43,7 @@ fn main() {
         session_id,
         queue_type,
         outdir,
+        skip_coeff_calc,
         from_paramset,
         to_paramset,
     } = args;
@@ -95,14 +98,19 @@ fn main() {
                 &format!("{paramset_dir}/iteration_{i}_sent_seq.csv"),
                 &format!("{paramset_dir}/iteration_{i}_recv_seq"),
                 &wip_queue_data_msgs_counts_path,
-                &format!("{paramset_dir}/iteration_{i}_ordering_coeff.csv"),
+                if !skip_coeff_calc {
+                    Some(format!("{paramset_dir}/iteration_{i}_ordering_coeff.csv"))
+                } else {
+                    None
+                },
                 &format!("{paramset_dir}/iteration_{i}_topology.csv"),
             );
             let duration = SystemTime::now().duration_since(start_time).unwrap();
+            let duration_human = format_duration(duration);
             dur_writer
                 .write_record([
                     i.to_string(),
-                    format_duration(duration),
+                    duration_human.clone(),
                     duration.as_secs().to_string(),
                     vtime.to_string(),
                 ])
@@ -112,7 +120,13 @@ fn main() {
                 wip_queue_data_msgs_counts_path.replace("__WIP__iteration_", "iteration_");
             std::fs::rename(&wip_queue_data_msgs_counts_path, &new_queue_data_msgs_counts_path).expect("Failed to rename {wip_queue_data_msgs_counts_path} -> {new_queue_data_msgs_counts_path}: {e}");
 
-            tracing::info!("ParamSet:{}, Iteration:{} completed.", paramset.id, i);
+            tracing::info!(
+                "ParamSet:{}, Iteration:{} completed. Duration:{}, vtime:{}",
+                paramset.id,
+                i,
+                duration_human,
+                vtime
+            );
         }
         dur_writer.flush().unwrap();
 
