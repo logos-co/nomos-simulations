@@ -13,10 +13,10 @@ use std::{
 
 use chrono::Utc;
 use clap::Parser;
-use iteration::run_iteration;
-use outputs::Outputs;
+use iteration::Iteration;
 use paramset::{ExperimentId, ParamSet, SessionId, PARAMSET_CSV_COLUMNS};
 use protocol::queue::QueueType;
+use rayon::prelude::*;
 
 #[derive(Debug, Parser)]
 #[command(name = "Ordering Measurement")]
@@ -29,6 +29,8 @@ struct Args {
     queue_type: QueueType,
     #[arg(short, long)]
     outdir: String,
+    #[arg(short, long)]
+    num_threads: usize,
     #[arg(short, long)]
     from_paramset: Option<u16>,
     #[arg(short, long)]
@@ -45,6 +47,7 @@ fn main() {
         session_id,
         queue_type,
         outdir,
+        num_threads,
         from_paramset,
         to_paramset,
     } = args;
@@ -67,6 +70,7 @@ fn main() {
 
     let session_start_time = SystemTime::now();
 
+    let mut iterations: Vec<Iteration> = Vec::new();
     for paramset in paramsets {
         if paramset.id < from_paramset.unwrap_or(0) {
             tracing::info!("ParamSet:{} skipped", paramset.id);
@@ -76,72 +80,29 @@ fn main() {
             break;
         }
 
-        let paramset_dir = format!("{outdir}/{subdir}/__WIP__paramset_{}", paramset.id);
+        let paramset_dir = format!("{outdir}/{subdir}/paramset_{}", paramset.id);
         std::fs::create_dir_all(paramset_dir.as_str()).unwrap();
         save_paramset_info(&paramset, format!("{paramset_dir}/paramset.csv").as_str()).unwrap();
 
-        let dur_path = format!("{paramset_dir}/__WIP__durations.csv");
-        let mut dur_writer = csv::Writer::from_path(&dur_path).unwrap();
-        dur_writer
-            .write_record(["iteration", "time_human", "time_sec", "vtime"])
-            .unwrap();
-        dur_writer.flush().unwrap();
-
         for i in 0..paramset.num_iterations {
-            let mut outputs = Outputs::new(
-                format!("{paramset_dir}/__WIP__iteration_{i}_latency.csv"),
-                (0..paramset.num_senders)
-                    .map(|sender_idx| {
-                        format!("{paramset_dir}/__WIP__iteration_{i}_sent_seq_{sender_idx}.csv")
-                    })
-                    .collect(),
-                (0..paramset.peering_degree)
-                    .map(|conn_idx| {
-                        format!("{paramset_dir}/__WIP__iteration_{i}_recv_seq_{conn_idx}.csv")
-                    })
-                    .collect(),
-                format!("{paramset_dir}/__WIP__iteration_{i}_data_msg_counts.csv"),
-                format!("{paramset_dir}/iteration_{i}_topology.csv"),
-            );
-
-            let start_time = SystemTime::now();
-
-            let vtime = run_iteration(paramset.clone(), i as u64, &mut outputs);
-            outputs.close();
-            outputs.rename_paths("__WIP__iteration", "iteration");
-
-            let duration = SystemTime::now().duration_since(start_time).unwrap();
-            let duration_human = format_duration(duration);
-            dur_writer
-                .write_record([
-                    i.to_string(),
-                    duration_human.clone(),
-                    duration.as_secs().to_string(),
-                    vtime.to_string(),
-                ])
-                .unwrap();
-            dur_writer.flush().unwrap();
-
-            tracing::info!(
-                "ParamSet:{}, Iteration:{} completed. Duration:{}, vtime:{}",
-                paramset.id,
-                i,
-                duration_human,
-                vtime
-            );
+            iterations.push(Iteration {
+                paramset: paramset.clone(),
+                iteration_idx: i,
+                rootdir: paramset_dir.clone(),
+            });
         }
-        dur_writer.flush().unwrap();
-
-        let new_dur_path = dur_path.replace("__WIP__durations", "durations");
-        std::fs::rename(&dur_path, &new_dur_path)
-            .expect("Failed to rename: {dur_path} -> {new_dur_dir}: {e}");
-
-        let new_paramset_dir = paramset_dir.replace("__WIP__paramset_", "paramset_");
-        std::fs::rename(&paramset_dir, &new_paramset_dir)
-            .expect("Failed to rename: {paramset_dir} -> {new_paramset_dir}: {e}");
-
-        tracing::info!("ParamSet:{} completed", paramset.id);
     }
+
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(num_threads)
+        .build()
+        .unwrap();
+
+    pool.install(|| {
+        iterations.par_iter_mut().for_each(|iteration| {
+            iteration.start();
+        });
+    });
 
     let session_duration = SystemTime::now()
         .duration_since(session_start_time)
