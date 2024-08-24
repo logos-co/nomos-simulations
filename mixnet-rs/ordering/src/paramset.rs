@@ -95,14 +95,22 @@ impl ParamSet {
             ExperimentId::Experiment3 | ExperimentId::Experiment4 => 2,
             _ => 1,
         };
-        let num_sender_msgs: u32 = 1000000;
-        let sender_data_msg_probs: &[f32] = &[0.01, 0.1, 0.5, 0.9, 0.99, 1.0];
-        let mix_data_msg_probs: &[f32] = match exp_id {
+        let num_sender_msgs: u32 = match exp_id {
+            ExperimentId::Experiment6 => 500000,
+            _ => 1000000,
+        };
+        let sender_data_msg_probs: &[f32] = match exp_id {
+            ExperimentId::Experiment6 => &[0.01, 0.1, 0.5],
+            _ => &[0.01, 0.1, 0.5, 0.9, 0.99, 1.0],
+        };
+        let mix_data_msg_probs = |num_mixes: u32| match exp_id {
             ExperimentId::Experiment1 | ExperimentId::Experiment3 | ExperimentId::Experiment5 => {
-                &[0.0]
+                vec![0.0]
             }
-            ExperimentId::Experiment2 | ExperimentId::Experiment4 | ExperimentId::Experiment6 => {
-                &[0.001, 0.01, 0.1]
+            ExperimentId::Experiment2 | ExperimentId::Experiment4 => vec![0.001, 0.01, 0.1],
+            ExperimentId::Experiment6 => {
+                let g: f32 = num_mixes as f32;
+                vec![2.0 / g, 1.0 / g, 1.0 / (2.0 * g)]
             }
         };
 
@@ -116,7 +124,7 @@ impl ParamSet {
                 for &num_paths in &[1, 2, 3, 4] {
                     for &num_mixes in &[1, 2, 3, 4] {
                         for &sender_data_msg_prob in sender_data_msg_probs {
-                            for &mix_data_msg_prob in mix_data_msg_probs {
+                            for &mix_data_msg_prob in &mix_data_msg_probs(num_mixes) {
                                 let paramset = ParamSet {
                                     id,
                                     num_mixes,
@@ -143,7 +151,7 @@ impl ParamSet {
                 for &num_mixes in &[8, 16, 32] {
                     for &peering_degree in &[2, 3, 4] {
                         for &sender_data_msg_prob in sender_data_msg_probs {
-                            for &mix_data_msg_prob in mix_data_msg_probs {
+                            for &mix_data_msg_prob in &mix_data_msg_probs(num_mixes) {
                                 let paramset = ParamSet {
                                     id,
                                     num_mixes,
@@ -215,7 +223,7 @@ mod tests {
             ((ExperimentId::Experiment5, SessionId::Session1), 3 * 3 * 6),
             (
                 (ExperimentId::Experiment6, SessionId::Session1),
-                3 * 3 * 6 * 3,
+                3 * 3 * 3 * 3,
             ),
         ];
 
@@ -242,6 +250,7 @@ mod tests {
                 // Check if paramset IDs are correct.
                 for (i, paramset) in paramsets.iter().enumerate() {
                     assert_eq!(paramset.id as usize, i + 1);
+                    println!("{:?}", paramset);
                 }
             }
         }
