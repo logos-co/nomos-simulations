@@ -112,13 +112,13 @@ impl Outputs {
         writer.add_noise();
     }
 
-    pub fn add_recv_msg(&mut self, msg: &DataMessage, conn_idx: u16) {
-        let writer = &mut self.recv_sequence_writers[conn_idx as usize];
+    pub fn add_recv_msg(&mut self, msg: &DataMessage, conn_idx: usize) {
+        let writer = &mut self.recv_sequence_writers[conn_idx];
         writer.add_message(msg);
     }
 
-    pub fn add_recv_noise(&mut self, conn_idx: u16) {
-        let writer = &mut self.recv_sequence_writers[conn_idx as usize];
+    pub fn add_recv_noise(&mut self, conn_idx: usize) {
+        let writer = &mut self.recv_sequence_writers[conn_idx];
         writer.add_noise();
     }
 

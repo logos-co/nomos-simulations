@@ -56,7 +56,7 @@ pub fn build_striped_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq 
                 assert_eq!(mixnode.id, *id);
                 mixnode.connect(RECEIVER_NODE_ID);
 
-                receiver_peers.add(*id, receiver_peers.len().try_into().unwrap());
+                receiver_peers.add(*id, receiver_peers.len());
             }
         }
     }
@@ -139,7 +139,7 @@ pub fn build_random_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq +
         assert_eq!(mixnode.id, *mixnode_id);
         mixnode.connect(RECEIVER_NODE_ID);
 
-        receiver_peers.add(*mixnode_id, conn_idx.try_into().unwrap());
+        receiver_peers.add(*mixnode_id, conn_idx);
     }
 
     outputs.write_topology(&topology, &all_sender_peers, &receiver_peer_ids);
@@ -166,18 +166,18 @@ impl AllSenderPeers {
     }
 }
 
-pub struct ReceiverPeers(FxHashMap<NodeId, u16>);
+pub struct ReceiverPeers(FxHashMap<NodeId, usize>);
 
 impl ReceiverPeers {
     fn new() -> Self {
         ReceiverPeers(FxHashMap::default())
     }
 
-    fn add(&mut self, peer_id: NodeId, conn_idx: u16) {
+    fn add(&mut self, peer_id: NodeId, conn_idx: usize) {
         self.0.insert(peer_id, conn_idx);
     }
 
-    pub fn conn_idx(&self, node_id: &NodeId) -> Option<u16> {
+    pub fn conn_idx(&self, node_id: &NodeId) -> Option<usize> {
         self.0.get(node_id).cloned()
     }
 

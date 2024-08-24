@@ -179,6 +179,14 @@ impl ParamSet {
         paramsets
     }
 
+    pub fn num_receiver_connections(&self) -> usize {
+        if self.random_topology {
+            self.peering_degree as usize
+        } else {
+            self.num_paths as usize
+        }
+    }
+
     pub fn as_csv_record(&self) -> Vec<String> {
         vec![
             self.id.to_string(),
