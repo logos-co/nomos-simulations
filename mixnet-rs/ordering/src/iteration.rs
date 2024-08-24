@@ -18,14 +18,14 @@ use crate::{
 pub struct Iteration {
     pub paramset: ParamSet,
     pub iteration_idx: usize,
-    pub rootdir: String,
+    pub paramset_dir: String,
 }
 
 impl Iteration {
     pub fn start(&mut self) {
         let dir = format!(
             "{}/iteration_{}__WIP_DUR__",
-            self.rootdir, self.iteration_idx
+            self.paramset_dir, self.iteration_idx
         );
         std::fs::create_dir_all(dir.as_str()).unwrap();
 
