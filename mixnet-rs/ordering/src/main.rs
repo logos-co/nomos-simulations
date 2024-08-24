@@ -1,6 +1,9 @@
 mod iteration;
+mod message;
 mod ordercoeff;
+mod outputs;
 mod paramset;
+mod topology;
 
 use std::{
     error::Error,
@@ -11,11 +14,12 @@ use std::{
 use chrono::Utc;
 use clap::Parser;
 use iteration::run_iteration;
+use outputs::Outputs;
 use paramset::{ExperimentId, ParamSet, SessionId, PARAMSET_CSV_COLUMNS};
 use protocol::queue::QueueType;
 
 #[derive(Debug, Parser)]
-#[command(name = "Single Sender Single Mix Measurement")]
+#[command(name = "Ordering Measurement")]
 struct Args {
     #[arg(short, long)]
     exp_id: ExperimentId,
@@ -25,8 +29,6 @@ struct Args {
     queue_type: QueueType,
     #[arg(short, long)]
     outdir: String,
-    #[arg(short, long, default_value_t = false)]
-    skip_coeff_calc: bool,
     #[arg(short, long)]
     from_paramset: Option<u16>,
     #[arg(short, long)]
@@ -43,7 +45,6 @@ fn main() {
         session_id,
         queue_type,
         outdir,
-        skip_coeff_calc,
         from_paramset,
         to_paramset,
     } = args;
@@ -87,24 +88,28 @@ fn main() {
         dur_writer.flush().unwrap();
 
         for i in 0..paramset.num_iterations {
-            let wip_queue_data_msgs_counts_path =
-                format!("{paramset_dir}/__WIP__iteration_{i}_data_msg_counts.csv");
+            let mut outputs = Outputs::new(
+                format!("{paramset_dir}/__WIP__iteration_{i}_latency.csv"),
+                (0..paramset.num_senders)
+                    .map(|sender_idx| {
+                        format!("{paramset_dir}/__WIP__iteration_{i}_sent_seq_{sender_idx}.csv")
+                    })
+                    .collect(),
+                (0..paramset.peering_degree)
+                    .map(|conn_idx| {
+                        format!("{paramset_dir}/__WIP__iteration_{i}_recv_seq_{conn_idx}.csv")
+                    })
+                    .collect(),
+                format!("{paramset_dir}/__WIP__iteration_{i}_data_msg_counts.csv"),
+                format!("{paramset_dir}/iteration_{i}_topology.csv"),
+            );
 
             let start_time = SystemTime::now();
-            let vtime = run_iteration(
-                paramset.clone(),
-                i as u64,
-                &format!("{paramset_dir}/iteration_{i}_latency.csv"),
-                &format!("{paramset_dir}/iteration_{i}_sent_seq.csv"),
-                &format!("{paramset_dir}/iteration_{i}_recv_seq"),
-                &wip_queue_data_msgs_counts_path,
-                if !skip_coeff_calc {
-                    Some(format!("{paramset_dir}/iteration_{i}_ordering_coeff.csv"))
-                } else {
-                    None
-                },
-                &format!("{paramset_dir}/iteration_{i}_topology.csv"),
-            );
+
+            let vtime = run_iteration(paramset.clone(), i as u64, &mut outputs);
+            outputs.close();
+            outputs.rename_paths("__WIP__iteration", "iteration");
+
             let duration = SystemTime::now().duration_since(start_time).unwrap();
             let duration_human = format_duration(duration);
             dur_writer
@@ -116,10 +121,6 @@ fn main() {
                 ])
                 .unwrap();
             dur_writer.flush().unwrap();
-
-            let new_queue_data_msgs_counts_path =
-                wip_queue_data_msgs_counts_path.replace("__WIP__iteration_", "iteration_");
-            std::fs::rename(&wip_queue_data_msgs_counts_path, &new_queue_data_msgs_counts_path).expect("Failed to rename {wip_queue_data_msgs_counts_path} -> {new_queue_data_msgs_counts_path}: {e}");
 
             tracing::info!(
                 "ParamSet:{}, Iteration:{} completed. Duration:{}, vtime:{}",

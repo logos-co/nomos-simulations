@@ -69,7 +69,7 @@ pub struct ParamSet {
     pub peering_degree: u32,
     pub min_queue_size: u16,
     pub transmission_rate: u16,
-    pub num_senders: u32,
+    pub num_senders: u8,
     pub num_sender_msgs: u32,
     pub sender_data_msg_prob: f32,
     pub mix_data_msg_prob: f32,
@@ -91,7 +91,7 @@ impl ParamSet {
     fn new_session1_paramsets(exp_id: ExperimentId, queue_type: QueueType) -> Vec<ParamSet> {
         let transmission_rate: u16 = 1;
         let min_queue_size: u16 = 10;
-        let num_senders: u32 = match exp_id {
+        let num_senders: u8 = match exp_id {
             ExperimentId::Experiment3 | ExperimentId::Experiment4 => 2,
             _ => 1,
         };

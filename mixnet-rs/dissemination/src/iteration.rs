@@ -1,5 +1,5 @@
 use protocol::{
-    node::{MessageId, Node, NodeId},
+    node::{Node, NodeId},
     queue::{Message, QueueConfig},
     topology::{build_topology, save_topology},
 };
@@ -8,18 +8,21 @@ use rustc_hash::FxHashMap;
 
 use crate::paramset::ParamSet;
 
+type MessageId = u32;
+
 // An interval that the sender nodes send (schedule) new messages
 const MSG_INTERVAL: f32 = 1.0;
 
 pub fn run_iteration(paramset: ParamSet, seed: u64, out_csv_path: &str, topology_path: &str) {
     // Initialize nodes (not connected with each other yet)
-    let mut nodes: Vec<Node> = Vec::new();
+    let mut nodes: Vec<Node<MessageId>> = Vec::new();
     let mut queue_seed_rng = StdRng::seed_from_u64(seed);
     let peering_degrees = paramset.gen_peering_degrees(seed);
     tracing::debug!("PeeringDegrees initialized.");
 
     for node_id in 0..paramset.num_nodes {
         nodes.push(Node::new(
+            node_id,
             QueueConfig {
                 queue_type: paramset.queue_type,
                 seed: queue_seed_rng.next_u64(),
@@ -112,7 +115,7 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, out_csv_path: &str, topology
 fn send_messages(
     vtime: f32,
     sender_ids: &[NodeId],
-    nodes: &mut [Node],
+    nodes: &mut [Node<MessageId>],
     next_msg_id: &mut MessageId,
     message_tracker: &mut FxHashMap<MessageId, (f32, u16)>,
 ) {
@@ -125,7 +128,7 @@ fn send_messages(
 
 fn relay_messages(
     vtime: f32,
-    nodes: &mut [Node],
+    nodes: &mut [Node<MessageId>],
     message_tracker: &mut FxHashMap<MessageId, (f32, u16)>,
     num_disseminated_msgs: &mut usize,
     writer: &mut csv::Writer<std::fs::File>,

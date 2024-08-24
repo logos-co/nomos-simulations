@@ -1,25 +1,39 @@
+use std::{fmt::Debug, hash::Hash};
+
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::queue::{new_queue, Message, Queue, QueueConfig};
 
 pub type NodeId = u32;
-pub type MessageId = u32;
 
-pub struct Node {
+pub struct Node<M>
+where
+    M: Debug + Copy + Clone + PartialEq + Eq + Hash,
+{
+    pub id: NodeId,
     queue_config: QueueConfig,
     // To have the deterministic result, we use Vec instead of FxHashMap.
     // Building `queues` is inefficient, but it's not a problem because it's done only once at the beginning.
     // Instead, use `connected_peers` to build `queues` efficiently.
-    queues: Vec<(NodeId, Box<dyn Queue<MessageId>>)>,
+    queues: Vec<(NodeId, Box<dyn Queue<M>>)>,
     connected_peers: FxHashSet<NodeId>,
     // A cache to avoid relaying the same message multiple times.
-    received_msgs: Option<FxHashMap<MessageId, u32>>,
+    received_msgs: Option<FxHashMap<M, u32>>,
     peering_degree: u32,
 }
 
-impl Node {
-    pub fn new(queue_config: QueueConfig, peering_degree: u32, enable_cache: bool) -> Self {
-        Node {
+impl<M> Node<M>
+where
+    M: 'static + Debug + Copy + Clone + PartialEq + Eq + Hash,
+{
+    pub fn new(
+        id: NodeId,
+        queue_config: QueueConfig,
+        peering_degree: u32,
+        enable_cache: bool,
+    ) -> Self {
+        Node::<M> {
+            id,
             queue_config,
             queues: Vec::new(),
             connected_peers: FxHashSet::default(),
@@ -39,18 +53,18 @@ impl Node {
                 .binary_search_by(|probe| probe.0.cmp(&peer_id))
                 .unwrap_or_else(|pos| pos);
             self.queues
-                .insert(pos, (peer_id, new_queue(&self.queue_config)));
+                .insert(pos, (peer_id, new_queue::<M>(&self.queue_config)));
         }
     }
 
-    pub fn send(&mut self, msg: MessageId) {
+    pub fn send(&mut self, msg: M) {
         assert!(self.check_and_update_cache(msg, true));
         for (_, queue) in self.queues.iter_mut() {
             queue.push(msg);
         }
     }
 
-    pub fn receive(&mut self, msg: MessageId, from: Option<NodeId>) -> bool {
+    pub fn receive(&mut self, msg: M, from: Option<NodeId>) -> bool {
         let first_received = self.check_and_update_cache(msg, false);
         if first_received {
             for (node_id, queue) in self.queues.iter_mut() {
@@ -67,8 +81,8 @@ impl Node {
         first_received
     }
 
-    pub fn read_queues(&mut self) -> Vec<(NodeId, Message<MessageId>)> {
-        let mut msgs_to_relay: Vec<(NodeId, Message<MessageId>)> = Vec::new();
+    pub fn read_queues(&mut self) -> Vec<(NodeId, Message<M>)> {
+        let mut msgs_to_relay: Vec<(NodeId, Message<M>)> = Vec::new();
         self.queues.iter_mut().for_each(|(node_id, queue)| {
             msgs_to_relay.push((*node_id, queue.pop()));
         });
@@ -82,7 +96,7 @@ impl Node {
             .collect()
     }
 
-    fn check_and_update_cache(&mut self, msg: MessageId, sending: bool) -> bool {
+    fn check_and_update_cache(&mut self, msg: M, sending: bool) -> bool {
         if let Some(received_msgs) = &mut self.received_msgs {
             let first_received = if let Some(count) = received_msgs.get_mut(&msg) {
                 *count += 1;
@@ -95,7 +109,7 @@ impl Node {
             // If the message have been received from all connected peers, remove it from the cache
             // because there is no possibility that the message will be received again.
             if received_msgs.get(&msg).unwrap() == &self.peering_degree {
-                tracing::debug!("Remove message from cache: {}", msg);
+                tracing::debug!("Remove message from cache: {:?}", msg);
                 received_msgs.remove(&msg);
             }
 
