@@ -22,6 +22,8 @@ where
     peering_degree: u32,
 }
 
+pub type MessagesToRelay<M> = Vec<(NodeId, Message<M>)>;
+
 impl<M> Node<M>
 where
     M: 'static + Debug + Copy + Clone + PartialEq + Eq + Hash,
@@ -81,8 +83,8 @@ where
         first_received
     }
 
-    pub fn read_queues(&mut self) -> Vec<(NodeId, Message<M>)> {
-        let mut msgs_to_relay: Vec<(NodeId, Message<M>)> = Vec::new();
+    pub fn read_queues(&mut self) -> MessagesToRelay<M> {
+        let mut msgs_to_relay: MessagesToRelay<M> = Vec::with_capacity(self.queues.len());
         self.queues.iter_mut().for_each(|(node_id, queue)| {
             msgs_to_relay.push((*node_id, queue.pop()));
         });

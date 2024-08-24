@@ -1,6 +1,9 @@
 use std::collections::hash_map::Entry;
 
-use protocol::{node::NodeId, queue::Message};
+use protocol::{
+    node::{MessagesToRelay, Node, NodeId},
+    queue::Message,
+};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use rustc_hash::FxHashMap;
 
@@ -88,15 +91,8 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, outputs: &mut Outputs) -> f3
 
         // Each mix node relays a message (data or noise) to the next mix node or the receiver.
         // As the receiver, record the time and order of the received messages.
-        //
-        // relayer_id -> (peer_id, msg)
-        let mut all_msgs_to_relay: Vec<(NodeId, Vec<(NodeId, Message<DataMessage>)>)> = Vec::new();
-        for node in mixnodes.iter_mut() {
-            all_msgs_to_relay.push((node.id, node.read_queues()));
-        }
-        all_msgs_to_relay
-            .into_iter()
-            .for_each(|(relayer_id, msgs_to_relay)| {
+        AllMessagesToRelay::new(&mut mixnodes).into_iter().for_each(
+            |(relayer_id, msgs_to_relay)| {
                 msgs_to_relay.into_iter().for_each(|(peer_id, msg)| {
                     if peer_id == RECEIVER_NODE_ID {
                         match msg {
@@ -126,7 +122,8 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, outputs: &mut Outputs) -> f3
                         peer.receive(msg, Some(relayer_id));
                     }
                 });
-            });
+            },
+        );
 
         // Record the number of data messages in each mix node's queues
         outputs.add_queue_data_msg_counts(vtime, &mixnodes);
@@ -150,4 +147,20 @@ fn try_probability(rng: &mut StdRng, prob: f32) -> bool {
         "Probability must be in [0, 1]."
     );
     rng.gen::<f32>() < prob
+}
+
+struct AllMessagesToRelay(Vec<(NodeId, MessagesToRelay<DataMessage>)>);
+
+impl AllMessagesToRelay {
+    fn new(mixnodes: &mut [Node<DataMessage>]) -> Self {
+        let mut all_msgs_to_relay = Vec::with_capacity(mixnodes.len());
+        for node in mixnodes.iter_mut() {
+            all_msgs_to_relay.push((node.id, node.read_queues()));
+        }
+        Self(all_msgs_to_relay)
+    }
+
+    fn into_iter(self) -> impl Iterator<Item = (NodeId, Vec<(NodeId, Message<DataMessage>)>)> {
+        self.0.into_iter()
+    }
 }
