@@ -1,8 +1,10 @@
 use std::fmt::Display;
 
+pub type SenderIdx = u8;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DataMessage {
-    pub sender: u8,
+    pub sender: SenderIdx,
     pub msg_id: u32,
 }
 
@@ -23,7 +25,7 @@ impl DataMessageGenerator {
         }
     }
 
-    pub fn next(&mut self, sender: u8) -> DataMessage {
+    pub fn next(&mut self, sender: SenderIdx) -> DataMessage {
         let msg_id = self.next_msg_ids[sender as usize];
         self.next_msg_ids[sender as usize] += 1;
         DataMessage { sender, msg_id }

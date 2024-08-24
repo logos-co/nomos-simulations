@@ -8,14 +8,14 @@ use protocol::{
 use rand::{rngs::StdRng, seq::SliceRandom, RngCore, SeedableRng};
 use rustc_hash::FxHashMap;
 
-use crate::{outputs::Outputs, paramset::ParamSet};
+use crate::{message::SenderIdx, outputs::Outputs, paramset::ParamSet};
 
 pub const RECEIVER_NODE_ID: NodeId = NodeId::MAX;
 
 pub fn build_striped_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq + Hash>(
     paramset: &ParamSet,
     seed: u64,
-) -> (Vec<Node<M>>, Vec<Vec<NodeId>>, FxHashMap<NodeId, u16>) {
+) -> (Vec<Node<M>>, AllSenderPeers, ReceiverPeers) {
     assert!(!paramset.random_topology);
     let mut next_node_id: NodeId = 0;
     let mut queue_seed_rng = StdRng::seed_from_u64(seed);
@@ -43,7 +43,7 @@ pub fn build_striped_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq 
     }
 
     // Connect mix nodes
-    let mut receiver_peer_conn_idx: FxHashMap<NodeId, u16> = FxHashMap::default();
+    let mut receiver_peers = ReceiverPeers::new();
     for path in paths.iter() {
         for (i, id) in path.iter().enumerate() {
             if i != path.len() - 1 {
@@ -56,24 +56,28 @@ pub fn build_striped_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq 
                 assert_eq!(mixnode.id, *id);
                 mixnode.connect(RECEIVER_NODE_ID);
 
-                receiver_peer_conn_idx
-                    .insert(*id, receiver_peer_conn_idx.len().try_into().unwrap());
+                receiver_peers.add(*id, receiver_peers.len().try_into().unwrap());
             }
         }
     }
-    let sender_peers_list: Vec<Vec<NodeId>> =
-        vec![
-            paths.iter().map(|path| *path.first().unwrap()).collect();
-            paramset.num_senders as usize
-        ];
-    (mixnodes, sender_peers_list, receiver_peer_conn_idx)
+
+    let mut all_sender_peers = AllSenderPeers::new(paramset.num_senders);
+    let sender_peers = paths
+        .iter()
+        .map(|path| *path.first().unwrap())
+        .collect::<Vec<_>>();
+    (0..paramset.num_senders).for_each(|_| {
+        all_sender_peers.add(sender_peers.clone());
+    });
+
+    (mixnodes, all_sender_peers, receiver_peers)
 }
 
 pub fn build_random_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq + Hash>(
     paramset: &ParamSet,
     seed: u64,
     outputs: &mut Outputs,
-) -> (Vec<Node<M>>, Vec<Vec<NodeId>>, FxHashMap<NodeId, u16>) {
+) -> (Vec<Node<M>>, AllSenderPeers, ReceiverPeers) {
     assert!(paramset.random_topology);
     // Init mix nodes
     let mut queue_seed_rng = StdRng::seed_from_u64(seed);
@@ -95,7 +99,7 @@ pub fn build_random_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq +
     let mut peers_rng = StdRng::seed_from_u64(seed);
     let mut candidates: Vec<NodeId> = mixnodes.iter().map(|mixnode| mixnode.id).collect();
     assert!(candidates.len() >= paramset.peering_degree as usize);
-    let mut sender_peers_list: Vec<Vec<NodeId>> = Vec::with_capacity(paramset.num_senders as usize);
+    let mut all_sender_peers = AllSenderPeers::new(paramset.num_senders);
     for _ in 0..paramset.num_senders {
         candidates.as_mut_slice().shuffle(&mut peers_rng);
         let mut peers: Vec<NodeId> = candidates
@@ -104,15 +108,15 @@ pub fn build_random_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq +
             .take(paramset.peering_degree as usize)
             .collect();
         peers.sort();
-        sender_peers_list.push(peers);
+        all_sender_peers.add(peers);
     }
     candidates.as_mut_slice().shuffle(&mut peers_rng);
-    let mut receiver_peers: Vec<NodeId> = candidates
+    let mut receiver_peer_ids: Vec<NodeId> = candidates
         .iter()
         .cloned()
         .take(paramset.peering_degree as usize)
         .collect();
-    receiver_peers.sort();
+    receiver_peer_ids.sort();
 
     // Connect mix nodes
     let topology = build_topology(
@@ -129,18 +133,55 @@ pub fn build_random_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq +
     }
 
     // Connect the selected mix nodes with the receiver
-    //
-    // peer_id -> conn_idx
-    let mut receiver_peer_conn_idx: FxHashMap<NodeId, u16> = FxHashMap::default();
-    for (conn_idx, mixnode_id) in receiver_peers.iter().enumerate() {
+    let mut receiver_peers = ReceiverPeers::new();
+    for (conn_idx, mixnode_id) in receiver_peer_ids.iter().enumerate() {
         let mixnode = mixnodes.get_mut(*mixnode_id as usize).unwrap();
         assert_eq!(mixnode.id, *mixnode_id);
         mixnode.connect(RECEIVER_NODE_ID);
 
-        receiver_peer_conn_idx.insert(*mixnode_id, conn_idx.try_into().unwrap());
+        receiver_peers.add(*mixnode_id, conn_idx.try_into().unwrap());
     }
 
-    outputs.write_topology(&topology, &sender_peers_list, &receiver_peers);
+    outputs.write_topology(&topology, &all_sender_peers, &receiver_peer_ids);
 
-    (mixnodes, sender_peers_list, receiver_peer_conn_idx)
+    (mixnodes, all_sender_peers, receiver_peers)
+}
+
+pub struct AllSenderPeers(Vec<Vec<NodeId>>);
+
+impl AllSenderPeers {
+    fn new(num_senders: u8) -> Self {
+        Self(Vec::with_capacity(num_senders as usize))
+    }
+
+    fn add(&mut self, peers: Vec<NodeId>) {
+        self.0.push(peers)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (SenderIdx, &Vec<NodeId>)> {
+        self.0
+            .iter()
+            .enumerate()
+            .map(|(idx, v)| (idx.try_into().unwrap(), v))
+    }
+}
+
+pub struct ReceiverPeers(FxHashMap<NodeId, u16>);
+
+impl ReceiverPeers {
+    fn new() -> Self {
+        ReceiverPeers(FxHashMap::default())
+    }
+
+    fn add(&mut self, peer_id: NodeId, conn_idx: u16) {
+        self.0.insert(peer_id, conn_idx);
+    }
+
+    pub fn conn_idx(&self, node_id: &NodeId) -> Option<u16> {
+        self.0.get(node_id).cloned()
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
 }

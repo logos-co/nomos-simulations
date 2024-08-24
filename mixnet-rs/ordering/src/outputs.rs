@@ -5,7 +5,11 @@ use protocol::{
     topology::Topology,
 };
 
-use crate::{message::DataMessage, ordercoeff::SequenceWriter};
+use crate::{
+    message::{DataMessage, SenderIdx},
+    ordercoeff::SequenceWriter,
+    topology::AllSenderPeers,
+};
 
 pub struct Outputs {
     closed: bool,
@@ -103,18 +107,18 @@ impl Outputs {
         writer.add_message(msg);
     }
 
-    pub fn add_sent_noise(&mut self, sender_idx: usize) {
-        let writer = &mut self.sent_sequence_writers[sender_idx];
+    pub fn add_sent_noise(&mut self, sender_idx: SenderIdx) {
+        let writer = &mut self.sent_sequence_writers[sender_idx as usize];
         writer.add_noise();
     }
 
-    pub fn add_recv_msg(&mut self, msg: &DataMessage, conn_idx: usize) {
-        let writer = &mut self.recv_sequence_writers[conn_idx];
+    pub fn add_recv_msg(&mut self, msg: &DataMessage, conn_idx: u16) {
+        let writer = &mut self.recv_sequence_writers[conn_idx as usize];
         writer.add_message(msg);
     }
 
-    pub fn add_recv_noise(&mut self, conn_idx: usize) {
-        let writer = &mut self.recv_sequence_writers[conn_idx];
+    pub fn add_recv_noise(&mut self, conn_idx: u16) {
+        let writer = &mut self.recv_sequence_writers[conn_idx as usize];
         writer.add_noise();
     }
 
@@ -151,7 +155,7 @@ impl Outputs {
     pub fn write_topology(
         &self,
         topology: &Topology,
-        sender_peers_list: &[Vec<NodeId>],
+        all_sender_peers: &AllSenderPeers,
         receiver_peers: &[NodeId],
     ) {
         let mut writer = csv::Writer::from_path(&self.topology_path).unwrap();
@@ -176,7 +180,7 @@ impl Outputs {
         }
 
         // Write peers of senders
-        for (sender_idx, peers) in sender_peers_list.iter().enumerate() {
+        for (sender_idx, peers) in all_sender_peers.iter() {
             writer
                 .write_record(&[
                     format!("sender-{}", sender_idx),

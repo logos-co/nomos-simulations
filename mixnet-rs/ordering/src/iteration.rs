@@ -15,7 +15,7 @@ use crate::{
 };
 
 pub fn run_iteration(paramset: ParamSet, seed: u64, outputs: &mut Outputs) -> f32 {
-    let (mut mixnodes, sender_peers_list, receiver_peer_conn_idx) = if paramset.random_topology {
+    let (mut mixnodes, all_sender_peers, receiver_peers) = if paramset.random_topology {
         build_random_network(&paramset, seed, outputs)
     } else {
         build_striped_network(&paramset, seed)
@@ -56,9 +56,9 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, outputs: &mut Outputs) -> f3
         // All senders emit a message (data or noise) to all of their own adjacent peers.
         if all_sent_count < all_sent_count_target {
             // For each sender
-            for (sender_idx, sender_peers) in sender_peers_list.iter().enumerate() {
+            for (sender_idx, sender_peers) in all_sender_peers.iter() {
                 if try_probability(&mut data_msg_rng, paramset.sender_data_msg_prob) {
-                    let msg = data_msg_gen.next(sender_idx.try_into().unwrap());
+                    let msg = data_msg_gen.next(sender_idx);
                     sender_peers.iter().for_each(|peer_id| {
                         mixnodes
                             .get_mut(*peer_id as usize)
@@ -107,13 +107,13 @@ pub fn run_iteration(paramset: ParamSet, seed: u64, outputs: &mut Outputs) -> f3
                                     }
                                 }
                                 // Record msg to the sequence
-                                let conn_idx = receiver_peer_conn_idx.get(&relayer_id).unwrap();
-                                outputs.add_recv_msg(&msg, *conn_idx as usize);
+                                let conn_idx = receiver_peers.conn_idx(&relayer_id).unwrap();
+                                outputs.add_recv_msg(&msg, conn_idx);
                             }
                             Message::Noise => {
                                 // Record noise to the sequence
-                                let conn_idx = receiver_peer_conn_idx.get(&relayer_id).unwrap();
-                                outputs.add_recv_noise(*conn_idx as usize);
+                                let conn_idx = receiver_peers.conn_idx(&relayer_id).unwrap();
+                                outputs.add_recv_noise(conn_idx);
                             }
                         }
                     } else if let Message::Data(msg) = msg {
