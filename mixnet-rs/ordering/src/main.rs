@@ -31,6 +31,8 @@ struct Args {
     outdir: String,
     #[arg(short, long)]
     num_threads: usize,
+    #[arg(short, long, default_value_t = false)]
+    reverse_order: bool,
     #[arg(short, long)]
     from_paramset: Option<u16>,
     #[arg(short, long)]
@@ -48,6 +50,7 @@ fn main() {
         queue_type,
         outdir,
         num_threads,
+        reverse_order,
         from_paramset,
         to_paramset,
     } = args;
@@ -91,6 +94,10 @@ fn main() {
                 rootdir: paramset_dir.clone(),
             });
         }
+    }
+
+    if reverse_order {
+        iterations.reverse();
     }
 
     let pool = rayon::ThreadPoolBuilder::new()

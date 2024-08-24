@@ -110,7 +110,7 @@ impl ParamSet {
             ExperimentId::Experiment2 | ExperimentId::Experiment4 => vec![0.001, 0.01, 0.1],
             ExperimentId::Experiment6 => {
                 let g: f32 = num_mixes as f32;
-                vec![2.0 / g, 1.0 / g, 1.0 / (2.0 * g)]
+                vec![1.0 / (2.0 * g), 1.0 / g, 2.0 / g]
             }
         };
 
