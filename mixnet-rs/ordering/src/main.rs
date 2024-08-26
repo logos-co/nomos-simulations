@@ -81,7 +81,7 @@ fn main() {
         reverse_order,
         &rootdir,
     );
-    run_all_iterations(iterations, num_threads);
+    run_all_iterations(iterations, num_threads, paramsets.len());
 
     let session_duration = SystemTime::now()
         .duration_since(session_start_time)
@@ -139,7 +139,7 @@ fn prepare_all_iterations(
     iterations
 }
 
-fn run_all_iterations(iterations: Vec<Iteration>, num_threads: usize) {
+fn run_all_iterations(iterations: Vec<Iteration>, num_threads: usize, num_paramsets: usize) {
     let (task_tx, task_rx) = crossbeam::channel::unbounded::<Iteration>();
     let (noti_tx, noti_rx) = crossbeam::channel::unbounded::<Iteration>();
 
@@ -165,6 +165,7 @@ fn run_all_iterations(iterations: Vec<Iteration>, num_threads: usize) {
     drop(task_tx);
 
     let mut paramset_progresses: HashMap<u16, usize> = HashMap::new();
+    let mut num_done_paramsets = 0;
     for _ in 0..num_all_iterations {
         let iteration = noti_rx.recv().unwrap();
 
@@ -180,14 +181,17 @@ fn run_all_iterations(iterations: Vec<Iteration>, num_threads: usize) {
         if *paramset_progresses.get(&iteration.paramset.id).unwrap()
             == iteration.paramset.num_iterations
         {
+            num_done_paramsets += 1;
             let new_paramset_dir = iteration
                 .paramset_dir
                 .replace("__WIP__paramset", "paramset");
             std::fs::rename(iteration.paramset_dir, new_paramset_dir).unwrap();
             tracing::info!(
-                "ParamSet:{} is done ({} iterations)",
+                "ParamSet:{} is done ({} iterations). {}/{} ParamSets done.",
                 iteration.paramset.id,
-                iteration.paramset.num_iterations
+                iteration.paramset.num_iterations,
+                num_done_paramsets,
+                num_paramsets,
             );
         }
     }
