@@ -67,7 +67,11 @@ where
     }
 
     pub fn receive(&mut self, msg: M, from: Option<NodeId>) -> bool {
-        let first_received = self.check_and_update_cache(msg, false);
+        // If `from` is None, it means that the message is being sent from the node outside of the gossip network.
+        // In this case, the received count in the cache must start from 0, so it can be removed from the cache only when it is received from C gossip peers (not C-1).
+        // For that, we set `sending` to true, as if this node is sending the message.
+        let sending = from.is_none();
+        let first_received = self.check_and_update_cache(msg, sending);
         if first_received {
             for (node_id, queue) in self.queues.iter_mut() {
                 match from {
@@ -111,7 +115,11 @@ where
             // If the message have been received from all connected peers, remove it from the cache
             // because there is no possibility that the message will be received again.
             if received_msgs.get(&msg).unwrap() == &self.peering_degree {
-                tracing::debug!("Remove message from cache: {:?}", msg);
+                tracing::debug!(
+                    "Remove message from cache: {:?} because it has been received {} times, assuming that each inbound peer sent the message once.",
+                    msg,
+                    self.peering_degree
+                );
                 received_msgs.remove(&msg);
             }
 
