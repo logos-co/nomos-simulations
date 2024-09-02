@@ -96,7 +96,7 @@ impl ParamSet {
             _ => 1,
         };
         let num_sender_msgs: u32 = match exp_id {
-            ExperimentId::Experiment6 => 500000,
+            ExperimentId::Experiment6 => 100000,
             _ => 1000000,
         };
         let sender_data_msg_probs: &[f32] = match exp_id {
