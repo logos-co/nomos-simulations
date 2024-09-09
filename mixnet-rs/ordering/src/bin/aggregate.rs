@@ -71,11 +71,11 @@ fn aggregate(path: &str) {
 
 fn add_stats_columns(df: &mut DataFrame, path: PathBuf, col_prefix: &str) {
     let mut schema = Schema::new();
-    schema.with_column("min".into(), DataType::Float64);
+    schema.with_column("min".into(), DataType::UInt64);
     schema.with_column("median".into(), DataType::Float64);
     schema.with_column("mean".into(), DataType::Float64);
     schema.with_column("std".into(), DataType::Float64);
-    schema.with_column("max".into(), DataType::Float64);
+    schema.with_column("max".into(), DataType::UInt64);
 
     let stats_df = CsvReadOptions::default()
         .with_has_header(true)
