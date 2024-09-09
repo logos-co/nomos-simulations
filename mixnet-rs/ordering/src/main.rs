@@ -1,8 +1,7 @@
 mod iteration;
-mod message;
-mod ordercoeff;
 mod outputs;
 mod paramset;
+mod sequence;
 mod topology;
 
 use std::{

@@ -9,11 +9,11 @@ use rustc_hash::FxHashMap;
 
 use crate::{
     format_duration,
-    message::{DataMessage, DataMessageGenerator},
     outputs::Outputs,
     paramset::ParamSet,
     topology::{build_random_network, build_striped_network, RECEIVER_NODE_ID},
 };
+use ordering::message::{DataMessage, DataMessageGenerator};
 
 pub struct Iteration {
     pub paramset: ParamSet,

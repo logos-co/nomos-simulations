@@ -8,7 +8,8 @@ use protocol::{
 use rand::{rngs::StdRng, seq::SliceRandom, RngCore, SeedableRng};
 use rustc_hash::FxHashMap;
 
-use crate::{message::SenderIdx, outputs::Outputs, paramset::ParamSet};
+use crate::{outputs::Outputs, paramset::ParamSet};
+use ordering::message::SenderIdx;
 
 pub const RECEIVER_NODE_ID: NodeId = NodeId::MAX;
 

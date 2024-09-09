@@ -5,11 +5,8 @@ use protocol::{
     topology::Topology,
 };
 
-use crate::{
-    message::{DataMessage, SenderIdx},
-    ordercoeff::SequenceWriter,
-    topology::AllSenderPeers,
-};
+use crate::{sequence::SequenceWriter, topology::AllSenderPeers};
+use ordering::message::{DataMessage, SenderIdx};
 
 pub struct Outputs {
     closed: bool,
