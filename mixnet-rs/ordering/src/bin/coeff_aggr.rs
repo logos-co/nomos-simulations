@@ -16,7 +16,7 @@ fn aggregate(path: &str) {
             let mut casuals = Series::new_empty("", &DataType::Int64);
             let mut weaks = Series::new_empty("", &DataType::Int64);
 
-            let pattern = format!("{}/**/coeffs.csv", entry.path().display());
+            let pattern = format!("{}/**/coeffs_*.csv", entry.path().display());
             for file in glob(&pattern).unwrap().filter_map(Result::ok) {
                 let df = CsvReadOptions::default()
                     .with_has_header(true)
