@@ -46,9 +46,11 @@ fn aggregate(path: &str) {
             );
             add_stats_columns(&mut df, entry.path().join("latency_stats.csv"), "latency_");
 
-            let coeff_stats_path = entry.path().join("coeff_stats.csv");
-            if coeff_stats_path.exists() {
-                add_stats_columns(&mut df, coeff_stats_path, "");
+            for prefix in ["strong", "casual", "weak"] {
+                let coeff_stats_path = entry.path().join(format!("{}_coeff_stats.csv", prefix));
+                if coeff_stats_path.exists() {
+                    add_stats_columns(&mut df, coeff_stats_path, &format!("{}_coeff_", prefix));
+                }
             }
 
             dataframes.push(df);
