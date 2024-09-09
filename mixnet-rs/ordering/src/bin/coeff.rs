@@ -235,12 +235,6 @@ fn main() {
 }
 
 fn calculate_coeffs(path: &str) {
-    let mut senders: Vec<u64> = Vec::new();
-    let mut receivers: Vec<u64> = Vec::new();
-    let mut strongs: Vec<u64> = Vec::new();
-    let mut casuals: Vec<u64> = Vec::new();
-    let mut weaks: Vec<u64> = Vec::new();
-
     for entry in WalkDir::new(path)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -248,6 +242,12 @@ fn calculate_coeffs(path: &str) {
     {
         let dir_name = entry.path().file_name().unwrap().to_string_lossy();
         if dir_name.starts_with("iteration_") {
+            let mut senders: Vec<u64> = Vec::new();
+            let mut receivers: Vec<u64> = Vec::new();
+            let mut strongs: Vec<u64> = Vec::new();
+            let mut casuals: Vec<u64> = Vec::new();
+            let mut weaks: Vec<u64> = Vec::new();
+
             for sent_seq_file in glob(&format!("{}/sent_seq_*.csv", entry.path().display()))
                 .unwrap()
                 .filter_map(Result::ok)
@@ -287,25 +287,25 @@ fn calculate_coeffs(path: &str) {
                     );
                 }
             }
+
+            // Create a Polars DataFrame
+            let mut df = DataFrame::new(vec![
+                Series::new("sender", &senders),
+                Series::new("receiver", &receivers),
+                Series::new("strong", &strongs),
+                Series::new("casual", &casuals),
+                Series::new("weak", &weaks),
+            ])
+            .unwrap()
+            .sort(["sender", "receiver"], SortMultipleOptions::default())
+            .unwrap();
+            // Write the sorted DataFrame to a CSV file
+            let outpath = Path::new(entry.path()).join("coeffs.csv");
+            let mut file = File::create(&outpath).unwrap();
+            CsvWriter::new(&mut file).finish(&mut df).unwrap();
+            tracing::info!("Saved {}", outpath.display());
         }
     }
-
-    // Create a Polars DataFrame
-    let mut df = DataFrame::new(vec![
-        Series::new("sender", &senders),
-        Series::new("receiver", &receivers),
-        Series::new("strong", &strongs),
-        Series::new("casual", &casuals),
-        Series::new("weak", &weaks),
-    ])
-    .unwrap()
-    .sort(["sender", "receiver"], SortMultipleOptions::default())
-    .unwrap();
-    // Write the sorted DataFrame to a CSV file
-    let outpath = Path::new(path).join("coeffs.csv");
-    let mut file = File::create(&outpath).unwrap();
-    CsvWriter::new(&mut file).finish(&mut df).unwrap();
-    tracing::info!("Saved {}", outpath.display());
 }
 
 fn extract_id(filename: &str) -> Option<u8> {
