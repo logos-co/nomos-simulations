@@ -45,46 +45,21 @@ fn parse_data_msg(value: &str) -> DataMessage {
     }
 }
 
-pub fn strong_and_casual_coeff(seq1: &[Entry], seq2: &[Entry]) -> (u64, u64) {
-    let coeffs = coeff(seq1, seq2, CoefficientType::StrongAndCasual);
-    assert_eq!(coeffs.len(), 2);
-    (coeffs[0], coeffs[1])
-}
-
-pub fn weak_coeff(seq1: &[Entry], seq2: &[Entry]) -> u64 {
-    let coeffs = coeff(seq1, seq2, CoefficientType::Weak);
-    assert_eq!(coeffs.len(), 1);
-    coeffs[0]
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CoefficientType {
-    StrongAndCasual,
+enum OrderingType {
+    Strong,
+    Casual,
     Weak,
 }
 
-impl CoefficientType {
-    fn zero(&self) -> Vec<u64> {
-        match self {
-            CoefficientType::StrongAndCasual => vec![0, 0],
-            CoefficientType::Weak => vec![0],
-        }
-    }
-}
-
-fn coeff(seq1: &[Entry], seq2: &[Entry], coeff_type: CoefficientType) -> Vec<u64> {
-    let mut coeffs = coeff_type.zero();
+fn coeff(seq1: &[Entry], seq2: &[Entry], ordering_type: OrderingType) -> u64 {
+    let mut coeff = 0;
     let mut i = 0;
 
     while i < seq1.len() {
         if let Entry::Data(_) = &seq1[i] {
-            let (c, next_i) = coeff_from(seq1, i, seq2, coeff_type);
-            assert_eq!(coeffs.len(), c.len());
-            coeffs = coeffs
-                .iter()
-                .zip(c.iter())
-                .map(|(a, b)| a.checked_add(*b).unwrap())
-                .collect();
+            let (c, next_i) = coeff_from(seq1, i, seq2, ordering_type);
+            coeff += c;
 
             if next_i != i {
                 i = next_i;
@@ -96,15 +71,15 @@ fn coeff(seq1: &[Entry], seq2: &[Entry], coeff_type: CoefficientType) -> Vec<u64
         }
     }
 
-    coeffs
+    coeff
 }
 
 fn coeff_from(
     seq1: &[Entry],
     start_idx: usize,
     seq2: &[Entry],
-    coeff_type: CoefficientType,
-) -> (Vec<u64>, usize) {
+    ordering_type: OrderingType,
+) -> (u64, usize) {
     let msg1 = match seq1[start_idx] {
         Entry::Data(msg) => msg,
         _ => panic!("Entry at index {start_idx} must be Message"),
@@ -114,13 +89,15 @@ fn coeff_from(
         if let Entry::Data(msg2) = entry {
             if msg1 == *msg2 {
                 // Found the 1st matching msg. Start finding the next adjacent matching msg.
-                match coeff_type {
-                    CoefficientType::StrongAndCasual => {
-                        return strong_and_casual_coeff_from(seq1, start_idx, seq2, j);
+                match ordering_type {
+                    OrderingType::Strong => {
+                        return strong_coeff_from(seq1, start_idx, seq2, j);
                     }
-                    CoefficientType::Weak => {
-                        let (coeff, next_start_idx) = weak_coeff_from(seq1, start_idx, seq2, j);
-                        return (vec![coeff], next_start_idx);
+                    OrderingType::Casual => {
+                        return casual_coeff_from(seq1, start_idx, seq2, j);
+                    }
+                    OrderingType::Weak => {
+                        return weak_coeff_from(seq1, start_idx, seq2, j);
                     }
                 }
             }
@@ -128,29 +105,42 @@ fn coeff_from(
     }
 
     // Couldn't find any matching msg in seq2. Returning the zero coefficients and the same start index.
-    (coeff_type.zero(), start_idx)
+    (0, start_idx)
 }
 
-fn strong_and_casual_coeff_from(
+fn strong_coeff_from(
     seq1: &[Entry],
     start_idx: usize,
     seq2: &[Entry],
     seq2_start_idx: usize,
-) -> (Vec<u64>, usize) {
-    let (casual_coeff, next_start_idx) = casual_coeff_from(seq1, start_idx, seq2, seq2_start_idx);
+) -> (u64, usize) {
+    // Find the number of consecutive matching exactly pairs that don't contain noises.
+    let mut num_consecutive_pairs: u64 = 0;
+    let mut i = start_idx + 1;
+    let mut j = seq2_start_idx + 1;
+    while i < seq1.len() && j < seq2.len() {
+        match (&seq1[i], &seq2[j]) {
+            (Entry::Data(msg1), Entry::Data(msg2)) => {
+                if msg1 == msg2 {
+                    num_consecutive_pairs += 1;
+                    i += 1;
+                    j += 1;
+                } else {
+                    break;
+                }
+            }
+            _ => break,
+        }
+    }
 
-    // The partially calcuated casual coefficient means the number of consecutive matching pairs,
-    // which is also what should be calculated for the strong coefficient.
-    // So, we reuse it.
-    let num_consecutive_pairs = casual_coeff;
-    let strong_coeff = if num_consecutive_pairs == 0 {
+    let coeff = if num_consecutive_pairs == 0 {
         0
     } else {
-        (num_consecutive_pairs)
+        num_consecutive_pairs
             .checked_pow(num_consecutive_pairs.try_into().unwrap())
             .unwrap()
     };
-    (vec![strong_coeff, casual_coeff], next_start_idx)
+    (coeff, i)
 }
 
 fn casual_coeff_from(
@@ -329,8 +319,9 @@ impl Task {
 
         let sent_seq = load_sequence(self.sent_seq_file.to_str().unwrap());
         let recv_seq = load_sequence(self.recv_seq_file.to_str().unwrap());
-        let (strong, casual) = strong_and_casual_coeff(&sent_seq, &recv_seq);
-        let weak = weak_coeff(&sent_seq, &recv_seq);
+        let strong = coeff(&sent_seq, &recv_seq, OrderingType::Strong);
+        let casual = coeff(&sent_seq, &recv_seq, OrderingType::Casual);
+        let weak = coeff(&sent_seq, &recv_seq, OrderingType::Weak);
 
         let mut df = DataFrame::new(vec![
             Series::new("sender", &[self.sender as u64]),
@@ -355,173 +346,157 @@ mod tests {
     #[test]
     fn test_strong_coeff() {
         // Empty sequences
-        assert_eq!(strong_coeff(&[], &[]), 0);
+        assert_eq!(coeff(&[], &[], OrderingType::Strong), 0);
 
         // One matching pair without noise
         let seq = vec![data(1), data(2)];
-        assert_eq!(strong_coeff(&seq, &seq), 1);
+        assert_eq!(coeff(&seq, &seq, OrderingType::Strong), 1);
 
-        // One matching pair with noise
+        // No matching pair due to noise
         let seq = vec![data(1), noise(10), data(2)];
-        assert_eq!(strong_coeff(&seq, &seq), 1);
+        assert_eq!(coeff(&seq, &seq, OrderingType::Strong), 0);
 
         // One matching pair without noise from different sequences
         let seq1 = vec![data(1), data(2), data(3)];
         let seq2 = vec![data(1), data(2), data(4)];
-        assert_eq!(strong_coeff(&seq1, &seq2), 1);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Strong), 1);
         let seq1 = vec![data(4), data(2), data(3)];
         let seq2 = vec![data(1), data(2), data(3)];
-        assert_eq!(strong_coeff(&seq1, &seq2), 1);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Strong), 1);
 
-        // One matching pair with noise from different sequences
-        let seq1 = vec![data(1), noise(10), data(2), data(3)];
-        let seq2 = vec![data(1), noise(10), data(2), data(4)];
-        assert_eq!(strong_coeff(&seq1, &seq2), 1);
-        let seq1 = vec![data(4), data(2), noise(10), data(3)];
-        let seq2 = vec![data(1), data(2), noise(10), data(3)];
-        assert_eq!(strong_coeff(&seq1, &seq2), 1);
-
-        // Two pairs with noise
+        // One pair, not two because of noise
         let seq1 = vec![data(1), noise(10), data(2), data(3)];
         let seq2 = vec![data(1), noise(10), data(2), data(3), data(4)];
-        assert_eq!(strong_coeff(&seq1, &seq2), 4);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Strong), 1);
 
         // No match
         let seq1 = vec![data(1), data(2)];
         let seq2 = vec![data(2), data(3)];
-        assert_eq!(strong_coeff(&seq1, &seq2), 0);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Strong), 0);
         let seq1 = vec![data(1), data(2)];
         let seq2 = vec![data(3), data(4)];
-        assert_eq!(strong_coeff(&seq1, &seq2), 0);
-
-        // No match because of noise
-        let seq1 = vec![data(1), noise(10), data(2)];
-        let seq2 = vec![data(1), data(2)];
-        assert_eq!(strong_coeff(&seq1, &seq2), 0);
-        let seq1 = vec![data(1), noise(10), data(2)];
-        let seq2 = vec![data(1), noise(5), data(2)];
-        assert_eq!(strong_coeff(&seq1, &seq2), 0);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Strong), 0);
 
         // Matching pairs in different indexes
         let seq1 = vec![data(1), data(2), data(3), data(4)];
         let seq2 = vec![data(2), data(3), data(4), data(1)];
-        assert_eq!(strong_coeff(&seq1, &seq2), 4);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Strong), 4);
         let seq1 = vec![data(1), data(2), data(3), data(4)];
         let seq2 = vec![data(1), data(2), data(5), data(3), data(4)];
-        assert_eq!(strong_coeff(&seq1, &seq2), 2);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Strong), 2);
     }
 
     #[test]
     fn test_casual_coeff() {
         // Empty sequences
-        assert_eq!(casual_coeff(&[], &[]), 0);
+        assert_eq!(coeff(&[], &[], OrderingType::Casual), 0);
 
         // One matching pair without noise
         let seq = vec![data(1), data(2)];
-        assert_eq!(casual_coeff(&seq, &seq), 1);
+        assert_eq!(coeff(&seq, &seq, OrderingType::Casual), 1);
 
         // One matching pair with noise
         let seq = vec![data(1), noise(10), data(2)];
-        assert_eq!(casual_coeff(&seq, &seq), 1);
+        assert_eq!(coeff(&seq, &seq, OrderingType::Casual), 1);
 
         // One matching pair without noise from different sequences
         let seq1 = vec![data(1), data(2), data(3)];
         let seq2 = vec![data(1), data(2), data(4)];
-        assert_eq!(casual_coeff(&seq1, &seq2), 1);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Casual), 1);
         let seq1 = vec![data(4), data(2), data(3)];
         let seq2 = vec![data(1), data(2), data(3)];
-        assert_eq!(casual_coeff(&seq1, &seq2), 1);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Casual), 1);
 
         // One matching pair with noise from different sequences
         let seq1 = vec![data(1), noise(10), data(2), data(3)];
         let seq2 = vec![data(1), noise(10), data(2), data(4)];
-        assert_eq!(casual_coeff(&seq1, &seq2), 1);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Casual), 1);
         let seq1 = vec![data(4), data(2), noise(10), data(3)];
         let seq2 = vec![data(1), data(2), noise(10), data(3)];
-        assert_eq!(casual_coeff(&seq1, &seq2), 1);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Casual), 1);
 
         // Two pairs with noise
         let seq1 = vec![data(1), noise(10), data(2), data(3)];
         let seq2 = vec![data(1), noise(10), data(2), data(3), data(4)];
-        assert_eq!(casual_coeff(&seq1, &seq2), 2);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Casual), 2);
 
         // No match
         let seq1 = vec![data(1), data(2)];
         let seq2 = vec![data(2), data(3)];
-        assert_eq!(casual_coeff(&seq1, &seq2), 0);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Casual), 0);
         let seq1 = vec![data(1), data(2)];
         let seq2 = vec![data(3), data(4)];
-        assert_eq!(casual_coeff(&seq1, &seq2), 0);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Casual), 0);
 
         // No match because of noise
         let seq1 = vec![data(1), noise(10), data(2)];
         let seq2 = vec![data(1), data(2)];
-        assert_eq!(casual_coeff(&seq1, &seq2), 0);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Casual), 0);
         let seq1 = vec![data(1), noise(10), data(2)];
         let seq2 = vec![data(1), noise(5), data(2)];
-        assert_eq!(casual_coeff(&seq1, &seq2), 0);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Casual), 0);
 
         // Matching pairs in different indexes
         let seq1 = vec![data(1), data(2), data(3), data(4)];
         let seq2 = vec![data(2), data(3), data(4), data(1)];
-        assert_eq!(casual_coeff(&seq1, &seq2), 2);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Casual), 2);
         let seq1 = vec![data(1), data(2), data(3), data(4)];
         let seq2 = vec![data(1), data(2), data(5), data(3), data(4)];
-        assert_eq!(casual_coeff(&seq1, &seq2), 2);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Casual), 2);
     }
 
     #[test]
     fn test_weak_coeff() {
         // Empty sequences
-        assert_eq!(weak_coeff(&[], &[]), 0);
+        assert_eq!(coeff(&[], &[], OrderingType::Weak), 0);
 
         // One matching pair without noise
         let seq = vec![data(1), data(2)];
-        assert_eq!(weak_coeff(&seq, &seq), 1);
+        assert_eq!(coeff(&seq, &seq, OrderingType::Weak), 1);
 
         // One matching pair with noise
         let seq = vec![data(1), noise(10), data(2)];
-        assert_eq!(weak_coeff(&seq, &seq), 1);
+        assert_eq!(coeff(&seq, &seq, OrderingType::Weak), 1);
 
         // One matching pair without noise from different sequences
         let seq1 = vec![data(1), data(2), data(3)];
         let seq2 = vec![data(1), data(2), data(4)];
-        assert_eq!(weak_coeff(&seq1, &seq2), 1);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Weak), 1);
         let seq1 = vec![data(4), data(2), data(3)];
         let seq2 = vec![data(1), data(2), data(3)];
-        assert_eq!(weak_coeff(&seq1, &seq2), 1);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Weak), 1);
 
         // One matching pair with noise from different sequences
         let seq1 = vec![data(1), noise(10), data(2), data(3)];
         let seq2 = vec![data(1), noise(5), data(2), data(4)];
-        assert_eq!(weak_coeff(&seq1, &seq2), 1);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Weak), 1);
         let seq1 = vec![data(4), data(2), noise(10), data(3)];
         let seq2 = vec![data(1), data(2), noise(5), data(3)];
-        assert_eq!(weak_coeff(&seq1, &seq2), 1);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Weak), 1);
         let seq1 = vec![data(4), data(2), noise(10), data(3)];
         let seq2 = vec![data(1), data(2), data(3)];
-        assert_eq!(weak_coeff(&seq1, &seq2), 1);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Weak), 1);
 
         // Two pairs with noise
         let seq1 = vec![data(1), noise(10), data(2), data(3)];
         let seq2 = vec![data(1), noise(5), data(2), data(3), data(4)];
-        assert_eq!(weak_coeff(&seq1, &seq2), 2);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Weak), 2);
 
         // No match
         let seq1 = vec![data(1), data(2)];
         let seq2 = vec![data(2), data(3)];
-        assert_eq!(weak_coeff(&seq1, &seq2), 0);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Weak), 0);
         let seq1 = vec![data(1), data(2)];
         let seq2 = vec![data(3), data(4)];
-        assert_eq!(weak_coeff(&seq1, &seq2), 0);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Weak), 0);
 
         // Matching pairs in different indexes
         let seq1 = vec![data(1), data(2), data(3), data(4)];
         let seq2 = vec![data(2), data(3), data(4), data(1)];
-        assert_eq!(weak_coeff(&seq1, &seq2), 2);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Weak), 2);
         let seq1 = vec![data(1), data(2), data(3), data(4)];
         let seq2 = vec![data(1), data(2), data(5), data(3), data(4)];
-        assert_eq!(weak_coeff(&seq1, &seq2), 2);
+        assert_eq!(coeff(&seq1, &seq2, OrderingType::Weak), 2);
     }
 
     fn data(msg_id: u32) -> Entry {
@@ -530,15 +505,5 @@ mod tests {
 
     fn noise(count: u32) -> Entry {
         Entry::Noise(count)
-    }
-
-    fn strong_coeff(seq1: &[Entry], seq2: &[Entry]) -> u64 {
-        let (strong, _) = strong_and_casual_coeff(seq1, seq2);
-        strong
-    }
-
-    fn casual_coeff(seq1: &[Entry], seq2: &[Entry]) -> u64 {
-        let (_, casual) = strong_and_casual_coeff(seq1, seq2);
-        casual
     }
 }
