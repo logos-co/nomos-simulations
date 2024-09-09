@@ -1,3 +1,9 @@
+use std::{env, fs::File, path::Path};
+
+use glob::glob;
+use polars::prelude::*;
+use walkdir::WalkDir;
+
 use ordering::message::{DataMessage, SenderIdx};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -216,12 +222,101 @@ fn skip_noise(seq: &[Entry], mut index: usize) -> usize {
 }
 
 fn main() {
-    let seq1 = load_sequence("/Users/yjlee/repos/nomos-simulations/mixnet-rs/results/ordering_e5s1_PureCoinFlipping_2024-09-01T19:30:03.957310+00:00_0d0h12m25s/paramset_1/iteration_0_0d0h0m2s/sent_seq_0.csv");
-    let seq2 = load_sequence("/Users/yjlee/repos/nomos-simulations/mixnet-rs/results/ordering_e5s1_PureCoinFlipping_2024-09-01T19:30:03.957310+00:00_0d0h12m25s/paramset_1/iteration_0_0d0h0m2s/recv_seq_0.csv");
-    let (strong, casual) = strong_and_casual_coeff(&seq1, &seq2);
-    println!("strong:{:?}", strong);
-    println!("casual:{:?}", casual);
-    println!("weak:{:?}", weak_coeff(&seq1, &seq2));
+    tracing_subscriber::fmt::init();
+
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        eprintln!("Usage: {} <path>", args[0]);
+        std::process::exit(1);
+    }
+    let path = &args[1];
+
+    calculate_coeffs(path);
+}
+
+fn calculate_coeffs(path: &str) {
+    let mut senders: Vec<u64> = Vec::new();
+    let mut receivers: Vec<u64> = Vec::new();
+    let mut strongs: Vec<u64> = Vec::new();
+    let mut casuals: Vec<u64> = Vec::new();
+    let mut weaks: Vec<u64> = Vec::new();
+
+    for entry in WalkDir::new(path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_dir())
+    {
+        let dir_name = entry.path().file_name().unwrap().to_string_lossy();
+        if dir_name.starts_with("iteration_") {
+            for sent_seq_file in glob(&format!("{}/sent_seq_*.csv", entry.path().display()))
+                .unwrap()
+                .filter_map(Result::ok)
+            {
+                let sender =
+                    extract_id(&sent_seq_file.file_name().unwrap().to_string_lossy()).unwrap();
+
+                for recv_seq_file in glob(&format!("{}/recv_seq_*.csv", entry.path().display()))
+                    .unwrap()
+                    .filter_map(Result::ok)
+                {
+                    let receiver =
+                        extract_id(&recv_seq_file.file_name().unwrap().to_string_lossy()).unwrap();
+
+                    tracing::info!("Processing:");
+                    tracing::info!("  {}", sent_seq_file.display());
+                    tracing::info!("  {}", recv_seq_file.display());
+
+                    let sent_seq = load_sequence(sent_seq_file.to_str().unwrap());
+                    let recv_seq = load_sequence(recv_seq_file.to_str().unwrap());
+                    let (strong, casual) = strong_and_casual_coeff(&sent_seq, &recv_seq);
+                    let weak = weak_coeff(&sent_seq, &recv_seq);
+
+                    senders.push(sender as u64);
+                    receivers.push(receiver as u64);
+                    strongs.push(strong);
+                    casuals.push(casual);
+                    weaks.push(weak);
+
+                    tracing::info!(
+                        "Processed: sender:{}, receiver:{}, strong:{}, casual:{}, weak:{}",
+                        sender,
+                        receiver,
+                        strong,
+                        casual,
+                        weak
+                    );
+                }
+            }
+        }
+    }
+
+    // Create a Polars DataFrame
+    let mut df = DataFrame::new(vec![
+        Series::new("sender", &senders),
+        Series::new("receiver", &receivers),
+        Series::new("strong", &strongs),
+        Series::new("casual", &casuals),
+        Series::new("weak", &weaks),
+    ])
+    .unwrap()
+    .sort(["sender", "receiver"], SortMultipleOptions::default())
+    .unwrap();
+    // Write the sorted DataFrame to a CSV file
+    let outpath = Path::new(path).join("coeffs.csv");
+    let mut file = File::create(&outpath).unwrap();
+    CsvWriter::new(&mut file).finish(&mut df).unwrap();
+    tracing::info!("Saved {}", outpath.display());
+}
+
+fn extract_id(filename: &str) -> Option<u8> {
+    if let Some(stripped) = filename.strip_suffix(".csv") {
+        if let Some(stripped) = stripped.strip_prefix("sent_seq_") {
+            return stripped.parse::<u8>().ok();
+        } else if let Some(stripped) = stripped.strip_prefix("recv_seq_") {
+            return stripped.parse::<u8>().ok();
+        }
+    }
+    None
 }
 
 #[cfg(test)]
