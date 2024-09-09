@@ -53,13 +53,17 @@ enum OrderingType {
 }
 
 fn coeff(seq1: &[Entry], seq2: &[Entry], ordering_type: OrderingType) -> u64 {
-    let mut coeff = 0;
+    let mut coeff: u64 = 0;
     let mut i = 0;
 
     while i < seq1.len() {
         if let Entry::Data(_) = &seq1[i] {
             let (c, next_i) = coeff_from(seq1, i, seq2, ordering_type);
-            coeff += c;
+            coeff = coeff.saturating_add(c);
+            if coeff == u64::MAX {
+                // no need to continue
+                break;
+            }
 
             if next_i != i {
                 i = next_i;
@@ -136,9 +140,7 @@ fn strong_coeff_from(
     let coeff = if num_consecutive_pairs == 0 {
         0
     } else {
-        num_consecutive_pairs
-            .checked_pow(num_consecutive_pairs.try_into().unwrap())
-            .unwrap()
+        num_consecutive_pairs.saturating_pow(num_consecutive_pairs.try_into().unwrap())
     };
     (coeff, i)
 }
@@ -219,6 +221,8 @@ struct Args {
     path: String,
     #[arg(short, long)]
     num_threads: usize,
+    #[arg(short, long)]
+    sent_seq_limit: Option<usize>,
 }
 
 fn main() {
@@ -259,6 +263,7 @@ fn calculate_coeffs(args: &Args) {
                         outpath: entry
                             .path()
                             .join(format!("coeffs_{}_{}.csv", sender, receiver)),
+                        sent_seq_limit: args.sent_seq_limit,
                     };
                     tasks.push(task);
                 }
@@ -307,6 +312,7 @@ struct Task {
     sender: u8,
     receiver: u8,
     outpath: PathBuf,
+    sent_seq_limit: Option<usize>,
 }
 
 impl Task {
@@ -317,8 +323,15 @@ impl Task {
             self.recv_seq_file.display()
         );
 
-        let sent_seq = load_sequence(self.sent_seq_file.to_str().unwrap());
+        let mut sent_seq = load_sequence(self.sent_seq_file.to_str().unwrap());
         let recv_seq = load_sequence(self.recv_seq_file.to_str().unwrap());
+
+        if let Some(limit) = self.sent_seq_limit {
+            if sent_seq.len() > limit {
+                sent_seq.truncate(limit);
+            }
+        }
+
         let strong = coeff(&sent_seq, &recv_seq, OrderingType::Strong);
         let casual = coeff(&sent_seq, &recv_seq, OrderingType::Casual);
         let weak = coeff(&sent_seq, &recv_seq, OrderingType::Weak);
