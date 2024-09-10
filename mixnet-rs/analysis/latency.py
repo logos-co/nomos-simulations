@@ -6,13 +6,13 @@ import pandas as pd
 from common import MARKERS, X_FIELDS
 
 
-def analyze(path: str):
+def analyze(path: str, outdir: str):
     data = pd.read_csv(path)
     for x_field in X_FIELDS:
-        analyze_versus(data, x_field)
+        analyze_versus(data, x_field, outdir)
 
 
-def analyze_versus(data: pd.DataFrame, x_field: str):
+def analyze_versus(data: pd.DataFrame, x_field: str, outdir: str):
     # Group by both x_field and queue_type, then select the row with the largest paramset for each group
     max_paramset_data = data.loc[
         data.groupby([x_field, "queue_type"])["paramset"].idxmax()
@@ -45,6 +45,7 @@ def analyze_versus(data: pd.DataFrame, x_field: str):
         ax[ax_col].set_ylim(bottom=0)
 
     plt.tight_layout()
+    fig.savefig(f"{outdir}/latency_vs_{x_field}.png")
 
     # Display the table of values
     # Create a table with x_field, queue_type, and coefficients
@@ -69,7 +70,9 @@ def analyze_versus(data: pd.DataFrame, x_field: str):
     for i in range(len(table_data.columns)):
         table.auto_set_column_width(i)
 
-    plt.show()
+    fig_table.savefig(f"{outdir}/latency_vs_{x_field}_table.png")
+
+    plt.draw()
 
 
 if __name__ == "__main__":
@@ -77,5 +80,6 @@ if __name__ == "__main__":
         description="Aggregate the results of all paramsets of an experiment"
     )
     parser.add_argument("path", type=str, help="dir path")
+    parser.add_argument("outdir", type=str, help="output dir path")
     args = parser.parse_args()
-    analyze(args.path)
+    analyze(args.path, args.outdir)
