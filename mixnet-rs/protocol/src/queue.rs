@@ -302,12 +302,14 @@ impl<T: Copy> Queue<T> for PermutedCoinFlippingQueue<T> {
 
 struct NoisyCoinFlippingQueue<T: Copy> {
     queue: MixQueue<T>,
+    idx: usize,
 }
 
 impl<T: Copy> NoisyCoinFlippingQueue<T> {
     pub fn new(seed: u64) -> Self {
         Self {
             queue: MixQueue::new(0, seed),
+            idx: 0,
         }
     }
 }
@@ -323,12 +325,16 @@ impl<T: Copy> Queue<T> for NoisyCoinFlippingQueue<T> {
         }
 
         loop {
-            for i in 0..self.queue.len() {
-                if self.queue.flip_coin() {
-                    return self.queue.pop(i).unwrap();
-                } else if i == 0 {
-                    return Message::Noise;
-                }
+            if self.idx >= self.queue.len() {
+                self.idx = 0;
+            }
+
+            if self.queue.flip_coin() {
+                return self.queue.pop(self.idx).unwrap();
+            } else if self.idx == 0 {
+                return Message::Noise;
+            } else {
+                self.idx += 1;
             }
         }
     }
