@@ -65,8 +65,8 @@ def analyze_versus(data: pd.DataFrame, x_field: str, outdir: str):
     columns = [x_field, "queue_type"] + flatten_fields
     table_data = max_paramset_data[columns].sort_values(by=[x_field, "queue_type"])
     # Prepare to display values with only 2 decimal places
-    table_data[flatten_fields] = table_data[flatten_fields].applymap(
-        lambda x: f"{x:.2f}"
+    table_data[fields] = table_data[fields].map(
+        lambda x: f"{x:.2e}" if abs(x) >= 1e6 else f"{x:.2f}"
     )
     # Display the table as a separate subplot
     fig_table, ax_table = plt.subplots(
