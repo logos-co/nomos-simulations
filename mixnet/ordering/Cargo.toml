@@ -1,0 +1,29 @@
+[package]
+name = "ordering"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = "0.4.38"
+clap = { version = "4.5.16", features = ["derive"] }
+crossbeam = "0.8.4"
+csv = "1.3.0"
+protocol = { version = "0.1.0", path = "../protocol" }
+rand = "0.8.5"
+rustc-hash = "2.0.0"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+walkdir = "2.3"
+glob = "0.3"
+polars = { version = "0.42.0", features = [
+    "csv",
+    "diagonal_concat",
+    "polars-io",
+    "zip_with",
+] }
+
+[profile.release]
+opt-level = 3 # max optimization
+
+[dev-dependencies]
+strum = "0.26.3"
