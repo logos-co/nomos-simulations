@@ -15,6 +15,8 @@ use crate::{
 };
 use ordering::message::{DataMessage, DataMessageGenerator};
 
+const QUEUE_DATA_MSG_COUNT_MEASUREMENT_INTERVAL: f32 = 100.0;
+
 pub struct Iteration {
     pub paramset: ParamSet,
     pub iteration_idx: usize,
@@ -79,6 +81,7 @@ impl Iteration {
 
         // Virtual discrete time
         let mut vtime: f32 = 0.0;
+        let mut recent_vtime_queue_data_msg_count_measured: f32 = 0.0;
         // Transmission interval that each queue must release a message
         let transmission_interval = 1.0 / paramset.transmission_rate as f32;
         // Results
@@ -174,7 +177,13 @@ impl Iteration {
             );
 
             // Record the number of data messages in each mix node's queues
-            outputs.add_queue_data_msg_counts(vtime, &mixnodes);
+            if vtime == 0.0
+                || vtime - recent_vtime_queue_data_msg_count_measured
+                    >= QUEUE_DATA_MSG_COUNT_MEASUREMENT_INTERVAL
+            {
+                outputs.add_queue_data_msg_counts(vtime, &mixnodes);
+                recent_vtime_queue_data_msg_count_measured = vtime;
+            }
 
             // If all senders finally emitted all data+noise messages,
             // and If all data messages have been received by the receiver,
