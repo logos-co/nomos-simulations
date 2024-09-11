@@ -30,7 +30,6 @@ def analyze_versus(data: pd.DataFrame, x_field: str, outdir: str):
         max_y = 0
         for field in fields:
             max_y = max(max_y, max_paramset_data[field].max())
-        max_y = min(max_y, 5000)  # hard limit
 
         for ax_row, field in enumerate(fields):
             for queue_type in max_paramset_data["queue_type"].unique():
@@ -52,7 +51,10 @@ def analyze_versus(data: pd.DataFrame, x_field: str, outdir: str):
             if ax_row == 0 and ax_col == len(all_fields) - 1:
                 ax[ax_row][ax_col].legend(bbox_to_anchor=(1, 1), loc="upper left")
             ax[ax_row][ax_col].grid(True)
-            ax[ax_row][ax_col].set_ylim(-10, max_y * 1.05)
+            if max_y < 1e6:
+                ax[ax_row][ax_col].set_ylim(-10, max_y * 1.05)
+            else:
+                ax[ax_row][ax_col].set_ylim(bottom=-10)
 
     plt.tight_layout()
     fig.savefig(f"{outdir}/coeff_vs_{x_field}.png")
