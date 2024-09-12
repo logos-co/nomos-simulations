@@ -19,7 +19,7 @@ where
     connected_peers: FxHashSet<NodeId>,
     // A cache to avoid relaying the same message multiple times.
     received_msgs: Option<FxHashMap<M, u32>>,
-    peering_degree: u32,
+    pub peering_degree: u32,
 }
 
 pub type MessagesToRelay<M> = Vec<(NodeId, Message<M>)>;

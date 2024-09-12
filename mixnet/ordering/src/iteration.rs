@@ -36,7 +36,7 @@ impl Iteration {
             (0..self.paramset.num_senders)
                 .map(|sender_idx| format!("{dir}/sent_seq_{sender_idx}__WIP__.csv"))
                 .collect(),
-            (0..self.paramset.num_receiver_connections())
+            (0..self.paramset.num_sender_or_receiver_conns())
                 .map(|conn_idx| format!("{dir}/recv_seq_{conn_idx}__WIP__.csv"))
                 .collect(),
             format!("{dir}/data_msg_counts__WIP__.csv"),

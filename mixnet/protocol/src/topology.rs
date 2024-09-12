@@ -7,6 +7,9 @@ pub type Topology = Vec<Vec<NodeId>>;
 
 pub fn build_topology(num_nodes: u32, peering_degrees: &[u32], seed: u64) -> Topology {
     assert_eq!(num_nodes as usize, peering_degrees.len());
+    // Assert that peering degrees are sorted in descending order
+    assert!(peering_degrees.windows(2).all(|w| w[0] >= w[1]));
+
     let mut rng = StdRng::seed_from_u64(seed);
 
     loop {

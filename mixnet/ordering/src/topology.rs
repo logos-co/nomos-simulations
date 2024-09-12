@@ -8,7 +8,10 @@ use protocol::{
 use rand::{rngs::StdRng, seq::SliceRandom, RngCore, SeedableRng};
 use rustc_hash::FxHashMap;
 
-use crate::{outputs::Outputs, paramset::ParamSet};
+use crate::{
+    outputs::Outputs,
+    paramset::{ParamSet, PeeringDegree},
+};
 use ordering::message::SenderIdx;
 
 pub const RECEIVER_NODE_ID: NodeId = NodeId::MAX;
@@ -18,6 +21,13 @@ pub fn build_striped_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq 
     seed: u64,
 ) -> (Vec<Node<M>>, AllSenderPeers, ReceiverPeers) {
     assert!(!paramset.random_topology);
+    let peering_degree = match paramset.peering_degree {
+        PeeringDegree::Fixed(c) => c,
+        PeeringDegree::Random(_) => {
+            panic!("PeeringDegree::Random not supported for striped network");
+        }
+    };
+
     let mut next_node_id: NodeId = 0;
     let mut queue_seed_rng = StdRng::seed_from_u64(seed);
     let mut mixnodes: Vec<Node<M>> =
@@ -35,7 +45,7 @@ pub fn build_striped_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq 
                     seed: queue_seed_rng.next_u64(),
                     min_queue_size: paramset.min_queue_size,
                 },
-                paramset.peering_degree,
+                peering_degree,
                 false, // disable cache
             ));
             ids.push(id);
@@ -80,6 +90,28 @@ pub fn build_random_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq +
     outputs: &mut Outputs,
 ) -> (Vec<Node<M>>, AllSenderPeers, ReceiverPeers) {
     assert!(paramset.random_topology);
+
+    let peering_degrees = match &paramset.peering_degree {
+        PeeringDegree::Fixed(c) => vec![*c; paramset.num_mixes as usize],
+        PeeringDegree::Random(c_probs) => {
+            // Sort c_probs by the probability in ascending order
+            let mut c_probs = c_probs.clone();
+            c_probs.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+
+            let mut degrees = Vec::with_capacity(paramset.num_mixes as usize);
+            for (i, (c, prob)) in c_probs.iter().enumerate() {
+                let count = if i < c_probs.len() - 1 {
+                    (prob * paramset.num_mixes as f32).ceil() as u32
+                } else {
+                    let num_determined: u32 = degrees.len().try_into().unwrap();
+                    paramset.num_mixes - num_determined
+                };
+                degrees.extend(std::iter::repeat(*c).take(count as usize));
+            }
+            degrees
+        }
+    };
+
     // Init mix nodes
     let mut queue_seed_rng = StdRng::seed_from_u64(seed);
     let mut mixnodes: Vec<Node<M>> = Vec::with_capacity(paramset.num_mixes as usize);
@@ -91,7 +123,7 @@ pub fn build_random_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq +
                 seed: queue_seed_rng.next_u64(),
                 min_queue_size: paramset.min_queue_size,
             },
-            paramset.peering_degree,
+            peering_degrees[id as usize],
             true, // enable cache
         ));
     }
@@ -99,14 +131,15 @@ pub fn build_random_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq +
     // Choose sender's peers and receiver's peers randomly
     let mut peers_rng = StdRng::seed_from_u64(seed);
     let mut candidates: Vec<NodeId> = mixnodes.iter().map(|mixnode| mixnode.id).collect();
-    assert!(candidates.len() >= paramset.peering_degree as usize);
+    let num_sender_or_receiver_conns = paramset.num_sender_or_receiver_conns();
+    assert!(candidates.len() >= num_sender_or_receiver_conns);
     let mut all_sender_peers = AllSenderPeers::new(paramset.num_senders);
     for _ in 0..paramset.num_senders {
         candidates.as_mut_slice().shuffle(&mut peers_rng);
         let mut peers: Vec<NodeId> = candidates
             .iter()
             .cloned()
-            .take(paramset.peering_degree as usize)
+            .take(num_sender_or_receiver_conns)
             .collect();
         peers.sort();
         all_sender_peers.add(peers);
@@ -115,14 +148,17 @@ pub fn build_random_network<M: 'static + Debug + Copy + Clone + PartialEq + Eq +
     let mut receiver_peer_ids: Vec<NodeId> = candidates
         .iter()
         .cloned()
-        .take(paramset.peering_degree as usize)
+        .take(num_sender_or_receiver_conns)
         .collect();
     receiver_peer_ids.sort();
 
     // Connect mix nodes
     let topology = build_topology(
-        paramset.num_mixes,
-        &vec![paramset.peering_degree; paramset.num_mixes as usize],
+        mixnodes.len().try_into().unwrap(),
+        &mixnodes
+            .iter()
+            .map(|mixnode| mixnode.peering_degree)
+            .collect::<Vec<u32>>(),
         seed,
     );
     for (node_id, peers) in topology.iter().enumerate() {
