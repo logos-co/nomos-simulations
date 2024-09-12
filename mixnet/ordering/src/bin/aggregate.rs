@@ -13,7 +13,7 @@ fn aggregate(path: &str) {
     schema.with_column("num_mixes".into(), DataType::Int64);
     schema.with_column("num_paths".into(), DataType::Int64);
     schema.with_column("random_topology".into(), DataType::Boolean);
-    schema.with_column("peering_degree".into(), DataType::Int64);
+    schema.with_column("peering_degree".into(), DataType::String);
     schema.with_column("min_queue_size".into(), DataType::Int64);
     schema.with_column("transmission_rate".into(), DataType::Int64);
     schema.with_column("num_senders".into(), DataType::Int64);
