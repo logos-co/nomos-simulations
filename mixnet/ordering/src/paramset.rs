@@ -233,7 +233,7 @@ impl ParamSet {
                             num_paths: 0, // since we're gonna build random topology
                             random_topology: true,
                             peering_degree: PeeringDegree::Random(vec![
-                                (4, 0.87),
+                                (2, 0.87),
                                 (12, 0.123),
                                 (24, 0.007),
                             ]),
