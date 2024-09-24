@@ -4,7 +4,7 @@ use protocol::{
     node::{MessagesToRelay, Node, NodeId},
     queue::Message,
 };
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{rngs::StdRng, seq::index::sample, Rng, SeedableRng};
 use rustc_hash::FxHashMap;
 
 use crate::{
@@ -131,11 +131,31 @@ impl Iteration {
 
             // Each mix node add a new data message to its queue with a certain probability
             if paramset.mix_data_msg_prob > 0.0 {
-                for node in mixnodes.iter_mut() {
-                    if Self::try_probability(&mut data_msg_rng, paramset.mix_data_msg_prob) {
-                        node.send(data_msg_gen.next(mix_msg_sender_id));
-                        // We don't put the msg into the sent_sequence
-                        // because sent_sequence is only for recording messages sent by the senders, not the mixnode.
+                if (paramset.num_mixes_sending_data as usize) == mixnodes.len() {
+                    for node in mixnodes.iter_mut() {
+                        Self::try_mixnode_send_data(
+                            node,
+                            paramset.mix_data_msg_prob,
+                            &mut data_msg_rng,
+                            &mut data_msg_gen,
+                            mix_msg_sender_id,
+                        );
+                    }
+                } else {
+                    assert!((paramset.num_mixes_sending_data as usize) < mixnodes.len());
+                    let indices = sample(
+                        &mut data_msg_rng,
+                        mixnodes.len(),
+                        paramset.num_mixes_sending_data as usize,
+                    );
+                    for idx in indices {
+                        Self::try_mixnode_send_data(
+                            &mut mixnodes[idx],
+                            paramset.mix_data_msg_prob,
+                            &mut data_msg_rng,
+                            &mut data_msg_gen,
+                            mix_msg_sender_id,
+                        );
                     }
                 }
             }
@@ -198,6 +218,20 @@ impl Iteration {
         }
 
         vtime
+    }
+
+    fn try_mixnode_send_data(
+        node: &mut Node<DataMessage>,
+        prob: f32,
+        rng: &mut StdRng,
+        msg_gen: &mut DataMessageGenerator,
+        sender_id: u8,
+    ) {
+        if Self::try_probability(rng, prob) {
+            node.send(msg_gen.next(sender_id));
+            // We don't put the msg into the sent_sequence
+            // because sent_sequence is only for recording messages sent by the senders, not the mixnode.
+        }
     }
 
     fn try_probability(rng: &mut StdRng, prob: f32) -> bool {
