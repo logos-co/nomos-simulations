@@ -37,6 +37,7 @@ pub enum SessionId {
     Session1 = 1,
     Session2 = 2,
     Session3 = 3,
+    Session100 = 100,
 }
 
 impl std::str::FromStr for SessionId {
@@ -47,6 +48,7 @@ impl std::str::FromStr for SessionId {
             "1" => Ok(SessionId::Session1),
             "2" => Ok(SessionId::Session2),
             "3" => Ok(SessionId::Session3),
+            "100" => Ok(SessionId::Session100),
             _ => Err(format!("Invalid session ID: {}", s)),
         }
     }
@@ -112,6 +114,7 @@ impl ParamSet {
             SessionId::Session1 => Self::new_session1_paramsets(exp_id, queue_type),
             SessionId::Session2 => Self::new_session2_paramsets(exp_id, queue_type),
             SessionId::Session3 => Self::new_session3_paramsets(exp_id, queue_type),
+            SessionId::Session100 => Self::new_session100_paramsets(exp_id, queue_type),
         }
     }
 
@@ -323,6 +326,46 @@ impl ParamSet {
         paramsets
     }
 
+    fn new_session100_paramsets(exp_id: ExperimentId, queue_type: QueueType) -> Vec<ParamSet> {
+        let mut id: u16 = 1;
+        let mut paramsets: Vec<ParamSet> = Vec::new();
+        match exp_id {
+            ExperimentId::Experiment6 => {
+                for num_mixes in [100, 1000, 10000, 100000] {
+                    for peering_degree in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] {
+                        for transmission_rate in [1, 10, 50, 100, 500, 1000] {
+                            for mix_data_msg_prob in [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06] {
+                                let paramset = ParamSet {
+                                    id,
+                                    num_mixes,
+                                    num_paths: 0, // since we're gonna build random topology
+                                    random_topology: true,
+                                    peering_degree: PeeringDegree::Fixed(peering_degree),
+                                    min_queue_size: 10,
+                                    transmission_rate,
+                                    num_senders: 1,
+                                    num_sender_msgs: 1000,
+                                    sender_data_msg_prob: 0.5,
+                                    mix_data_msg_prob,
+                                    num_mixes_sending_data: num_mixes, // All mixes try to send data msg following mix_data_msg_prob
+                                    queue_type,
+                                    num_iterations: 3,
+                                };
+                                id += 1;
+                                paramsets.push(paramset);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {
+                panic!("{exp_id:?} not supported for Session100");
+            }
+        }
+
+        paramsets
+    }
+
     pub fn num_sender_or_receiver_conns(&self) -> usize {
         if self.random_topology {
             match &self.peering_degree {
@@ -389,6 +432,10 @@ mod tests {
             ),
             ((ExperimentId::Experiment5, SessionId::Session3), 6),
             ((ExperimentId::Experiment6, SessionId::Session3), 3 * 3),
+            (
+                (ExperimentId::Experiment6, SessionId::Session100),
+                4 * 10 * 6 * 7,
+            ),
         ];
 
         for queue_type in QueueType::iter() {
@@ -428,6 +475,9 @@ mod tests {
                         }
                         SessionId::Session3 => {
                             assert!(matches!(paramset.peering_degree, PeeringDegree::Random(_)))
+                        }
+                        SessionId::Session100 => {
+                            assert!(matches!(paramset.peering_degree, PeeringDegree::Fixed(_)))
                         }
                     }
                 }
