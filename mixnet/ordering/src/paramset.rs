@@ -11,6 +11,7 @@ pub enum ExperimentId {
     Experiment4 = 4,
     Experiment5 = 5,
     Experiment6 = 6,
+    Experiment7 = 7,
 }
 
 impl std::str::FromStr for ExperimentId {
@@ -24,6 +25,7 @@ impl std::str::FromStr for ExperimentId {
             "4" => Ok(ExperimentId::Experiment4),
             "5" => Ok(ExperimentId::Experiment5),
             "6" => Ok(ExperimentId::Experiment6),
+            "7" => Ok(ExperimentId::Experiment7),
             _ => Err(format!("Invalid experiment ID: {}", s)),
         }
     }
@@ -33,6 +35,7 @@ impl std::str::FromStr for ExperimentId {
 #[repr(u8)]
 pub enum SessionId {
     Session1 = 1,
+    Session2 = 2,
     Session3 = 3,
 }
 
@@ -42,6 +45,7 @@ impl std::str::FromStr for SessionId {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "1" => Ok(SessionId::Session1),
+            "2" => Ok(SessionId::Session2),
             "3" => Ok(SessionId::Session3),
             _ => Err(format!("Invalid session ID: {}", s)),
         }
@@ -60,6 +64,7 @@ pub const PARAMSET_CSV_COLUMNS: &[&str] = &[
     "num_sender_msgs",
     "sender_data_msg_prob",
     "mix_data_msg_prob",
+    "num_mixes_sending_data",
     "queue_type",
     "num_iterations",
 ];
@@ -77,6 +82,7 @@ pub struct ParamSet {
     pub num_sender_msgs: u32,
     pub sender_data_msg_prob: f32,
     pub mix_data_msg_prob: f32,
+    pub num_mixes_sending_data: u32,
     pub queue_type: QueueType,
     pub num_iterations: usize,
 }
@@ -104,6 +110,7 @@ impl ParamSet {
     ) -> Vec<Self> {
         match session_id {
             SessionId::Session1 => Self::new_session1_paramsets(exp_id, queue_type),
+            SessionId::Session2 => Self::new_session2_paramsets(exp_id, queue_type),
             SessionId::Session3 => Self::new_session3_paramsets(exp_id, queue_type),
         }
     }
@@ -132,6 +139,9 @@ impl ParamSet {
                 let g: f32 = num_mixes as f32;
                 vec![1.0 / (2.0 * g), 1.0 / g, 2.0 / g]
             }
+            exp => {
+                panic!("{exp:?} is not supported for Session1");
+            }
         };
 
         let mut id: u16 = 1;
@@ -157,6 +167,7 @@ impl ParamSet {
                                     num_sender_msgs,
                                     sender_data_msg_prob,
                                     mix_data_msg_prob,
+                                    num_mixes_sending_data: num_mixes,
                                     queue_type,
                                     num_iterations: 1,
                                 };
@@ -184,6 +195,7 @@ impl ParamSet {
                                     num_sender_msgs,
                                     sender_data_msg_prob,
                                     mix_data_msg_prob,
+                                    num_mixes_sending_data: num_mixes,
                                     queue_type,
                                     num_iterations: 10,
                                 };
@@ -193,6 +205,54 @@ impl ParamSet {
                         }
                     }
                 }
+            }
+            exp => {
+                panic!("{exp:?} is not supported for Session1");
+            }
+        }
+
+        paramsets
+    }
+
+    fn new_session2_paramsets(exp_id: ExperimentId, queue_type: QueueType) -> Vec<ParamSet> {
+        let transmission_rate: u16 = 1;
+        let min_queue_size: u16 = 10;
+        let num_senders: u8 = 1;
+        let num_sender_msgs: u32 = 10000;
+
+        let mut id: u16 = 1;
+        let mut paramsets: Vec<ParamSet> = Vec::new();
+        match exp_id {
+            ExperimentId::Experiment7 => {
+                for &num_mixes in &[20, 40, 80] {
+                    for &peering_degree in &[4, 6, 8] {
+                        for &sender_data_msg_prob in &[0.01, 0.1, 0.5] {
+                            for &num_mixes_sending_data in &[0, 1, 2, 3, 4] {
+                                let paramset = ParamSet {
+                                    id,
+                                    num_mixes,
+                                    num_paths: 0, // since we're gonna build random topology
+                                    random_topology: true,
+                                    peering_degree: PeeringDegree::Fixed(peering_degree),
+                                    min_queue_size,
+                                    transmission_rate,
+                                    num_senders,
+                                    num_sender_msgs,
+                                    sender_data_msg_prob,
+                                    mix_data_msg_prob: 1.0,
+                                    num_mixes_sending_data,
+                                    queue_type,
+                                    num_iterations: 10,
+                                };
+                                id += 1;
+                                paramsets.push(paramset);
+                            }
+                        }
+                    }
+                }
+            }
+            exp => {
+                panic!("{exp:?} is not supported for Session2");
             }
         }
 
@@ -246,6 +306,7 @@ impl ParamSet {
                             },
                             sender_data_msg_prob,
                             mix_data_msg_prob,
+                            num_mixes_sending_data: num_mixes,
                             queue_type,
                             num_iterations: 10,
                         };
@@ -288,6 +349,7 @@ impl ParamSet {
             self.num_sender_msgs.to_string(),
             self.sender_data_msg_prob.to_string(),
             self.mix_data_msg_prob.to_string(),
+            self.num_mixes_sending_data.to_string(),
             format!("{:?}", self.queue_type),
             self.num_iterations.to_string(),
         ]
@@ -320,6 +382,10 @@ mod tests {
             (
                 (ExperimentId::Experiment6, SessionId::Session1),
                 3 * 3 * 3 * 3,
+            ),
+            (
+                (ExperimentId::Experiment7, SessionId::Session2),
+                3 * 3 * 3 * 5,
             ),
             ((ExperimentId::Experiment5, SessionId::Session3), 6),
             ((ExperimentId::Experiment6, SessionId::Session3), 3 * 3),
@@ -355,6 +421,9 @@ mod tests {
                 for paramset in paramsets.iter() {
                     match session_id {
                         SessionId::Session1 => {
+                            assert!(matches!(paramset.peering_degree, PeeringDegree::Fixed(_)))
+                        }
+                        SessionId::Session2 => {
                             assert!(matches!(paramset.peering_degree, PeeringDegree::Fixed(_)))
                         }
                         SessionId::Session3 => {
