@@ -12,7 +12,7 @@ fn aggregate(path: &str) {
     {
         let dir_name = entry.path().file_name().unwrap().to_string_lossy();
         if dir_name.starts_with("paramset_") {
-            let mut aggregated_series = Series::new_empty("", &DataType::Int64);
+            let mut aggregated_series = Series::new_empty("", &DataType::Float64);
             let pattern = format!("{}/**/latency.csv", entry.path().display());
 
             for file in glob(&pattern).unwrap().filter_map(Result::ok) {
