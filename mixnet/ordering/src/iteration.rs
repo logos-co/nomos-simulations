@@ -85,7 +85,7 @@ impl Iteration {
         let mut recent_vtime_sent_data_msg_by_sender: f32 = 0.0;
         let mut recent_vtime_queue_data_msg_count_measured: f32 = 0.0;
         // Transmission interval that each queue must release a message
-        let transmission_interval = 1.0 / paramset.transmission_rate as f32;
+        let transmission_interval = 1.0 / paramset.transmission_rate;
         // Results
         let mut all_sent_count = 0; // all data + noise sent by all senders
         let all_sent_count_target = (paramset.num_sender_msgs as usize)
