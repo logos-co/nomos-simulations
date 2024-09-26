@@ -280,7 +280,7 @@ impl AllMessagesToRelay {
     fn new(mixnodes: &mut [Node<DataMessage>]) -> Self {
         let mut all_msgs_to_relay = Vec::with_capacity(mixnodes.len());
         for node in mixnodes.iter_mut() {
-            all_msgs_to_relay.push((node.id, node.read_queues()));
+            all_msgs_to_relay.push((node.id, node.read_queues(Some(RECEIVER_NODE_ID))));
         }
         Self(all_msgs_to_relay)
     }

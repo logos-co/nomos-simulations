@@ -87,10 +87,25 @@ where
         first_received
     }
 
-    pub fn read_queues(&mut self) -> MessagesToRelay<M> {
+    pub fn read_queues(&mut self, noise_receiver: Option<NodeId>) -> MessagesToRelay<M> {
         let mut msgs_to_relay: MessagesToRelay<M> = Vec::with_capacity(self.queues.len());
         self.queues.iter_mut().for_each(|(node_id, queue)| {
-            msgs_to_relay.push((*node_id, queue.pop()));
+            let msg = queue.pop();
+            match msg {
+                Message::Data(_) => {
+                    msgs_to_relay.push((*node_id, msg));
+                }
+                Message::Noise => match noise_receiver {
+                    Some(noise_receiver) => {
+                        if *node_id == noise_receiver {
+                            msgs_to_relay.push((*node_id, msg));
+                        }
+                    }
+                    None => {
+                        msgs_to_relay.push((*node_id, msg));
+                    }
+                },
+            }
         });
         msgs_to_relay
     }

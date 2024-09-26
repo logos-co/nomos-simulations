@@ -136,7 +136,7 @@ fn relay_messages(
     // Collect messages to relay
     let mut all_msgs_to_relay: Vec<Vec<(NodeId, Message<MessageId>)>> = Vec::new();
     for node in nodes.iter_mut() {
-        all_msgs_to_relay.push(node.read_queues());
+        all_msgs_to_relay.push(node.read_queues(None));
     }
 
     // Relay the messages
