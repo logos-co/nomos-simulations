@@ -23,16 +23,22 @@ fn aggregate(path: &str) {
                     .finish()
                     .unwrap();
 
-                aggregated_series
-                    .extend(
-                        &df.column("latency")
-                            .unwrap()
-                            .f64()
-                            .unwrap()
-                            .clone()
-                            .into_series(),
-                    )
-                    .unwrap();
+                match &df.column("latency").unwrap().f64() {
+                    Ok(col) => {
+                        aggregated_series
+                            .extend(&(*col).clone().into_series())
+                            .unwrap();
+                    }
+                    Err(PolarsError::SchemaMismatch(_)) => {
+                        let col = &df.column("latency").unwrap().i64().unwrap();
+                        aggregated_series
+                            .extend(&col.cast(&DataType::Float64).unwrap())
+                            .unwrap();
+                    }
+                    Err(e) => {
+                        panic!("Error: {}", e);
+                    }
+                };
 
                 println!("Processed {}", file.display());
             }
