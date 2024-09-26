@@ -263,10 +263,7 @@ impl Iteration {
         rng: &mut StdRng,
     ) -> bool {
         match paramset.sender_data_msg_interval {
-            Some(interval) => {
-                vtime - recent_vtime_sent_data_msg_by_sender >= interval
-                    && Self::try_probability(rng, paramset.sender_data_msg_prob)
-            }
+            Some(interval) => vtime - recent_vtime_sent_data_msg_by_sender >= interval,
             None => Self::try_probability(rng, paramset.sender_data_msg_prob),
         }
     }
