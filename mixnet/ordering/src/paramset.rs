@@ -356,13 +356,13 @@ impl ParamSet {
                                 transmission_rate,
                                 num_senders: 1,
                                 num_sender_msgs: 0,
-                                num_sender_data_msgs: Some(100),
+                                num_sender_data_msgs: Some(50),
                                 sender_data_msg_prob: 1.0,
                                 sender_data_msg_interval: Some(20.0),
                                 mix_data_msg_prob: 1.0 / transmission_rate as f32, // to let mix send data_msg every 1s approx.
                                 num_mixes_sending_data: num_mixes, // All mixes try to send data msg following mix_data_msg_prob
                                 queue_type,
-                                num_iterations: 10,
+                                num_iterations: 3,
                             };
                             id += 1;
                             paramsets.push(paramset);
