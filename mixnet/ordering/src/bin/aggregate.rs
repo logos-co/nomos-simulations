@@ -15,10 +15,12 @@ fn aggregate(path: &str) {
     schema.with_column("random_topology".into(), DataType::Boolean);
     schema.with_column("peering_degree".into(), DataType::String);
     schema.with_column("min_queue_size".into(), DataType::Int64);
-    schema.with_column("transmission_rate".into(), DataType::Int64);
+    schema.with_column("transmission_rate".into(), DataType::Float32);
     schema.with_column("num_senders".into(), DataType::Int64);
     schema.with_column("num_sender_msgs".into(), DataType::Int64);
+    schema.with_column("num_sender_data_msgs".into(), DataType::Int64);
     schema.with_column("sender_data_msg_prob".into(), DataType::Float32);
+    schema.with_column("sender_data_msg_interval".into(), DataType::Float32);
     schema.with_column("mix_data_msg_prob".into(), DataType::Float32);
     schema.with_column("num_mixes_sending_data".into(), DataType::Int64);
     schema.with_column("queue_type".into(), DataType::String);

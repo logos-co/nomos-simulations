@@ -81,7 +81,7 @@ pub struct ParamSet {
     pub random_topology: bool,
     pub peering_degree: PeeringDegree,
     pub min_queue_size: u16,
-    pub transmission_rate: u16,
+    pub transmission_rate: f32,
     pub num_senders: u8,
     pub num_sender_msgs: u32,
     pub num_sender_data_msgs: Option<u32>,
@@ -123,7 +123,7 @@ impl ParamSet {
     }
 
     fn new_session1_paramsets(exp_id: ExperimentId, queue_type: QueueType) -> Vec<ParamSet> {
-        let transmission_rate: u16 = 1;
+        let transmission_rate: f32 = 1.0;
         let min_queue_size: u16 = 10;
         let num_senders: u8 = match exp_id {
             ExperimentId::Experiment3 | ExperimentId::Experiment4 => 2,
@@ -226,7 +226,7 @@ impl ParamSet {
     }
 
     fn new_session2_paramsets(exp_id: ExperimentId, queue_type: QueueType) -> Vec<ParamSet> {
-        let transmission_rate: u16 = 1;
+        let transmission_rate: f32 = 1.0;
         let min_queue_size: u16 = 10;
         let num_senders: u8 = 1;
         let num_sender_msgs: u32 = 10000;
@@ -311,7 +311,7 @@ impl ParamSet {
                                 (24, 0.007),
                             ]),
                             min_queue_size: 10,
-                            transmission_rate: 1,
+                            transmission_rate: 1.0,
                             num_senders: 1,
                             num_sender_msgs: match exp_id {
                                 ExperimentId::Experiment6 => 10000,
@@ -342,30 +342,32 @@ impl ParamSet {
         let mut id: u16 = 1;
         let mut paramsets: Vec<ParamSet> = Vec::new();
         match exp_id {
-            ExperimentId::Experiment6 => {
+            ExperimentId::Experiment7 => {
                 for num_mixes in [100, 1000, 10000, 100000] {
-                    for peering_degree in [10, 9, 8, 7, 6, 5, 4, 3] {
-                        for transmission_rate in [100, 70, 40, 10] {
-                            let paramset = ParamSet {
-                                id,
-                                num_mixes,
-                                num_paths: 0, // since we're gonna build random topology
-                                random_topology: true,
-                                peering_degree: PeeringDegree::Fixed(peering_degree),
-                                min_queue_size: 10,
-                                transmission_rate,
-                                num_senders: 1,
-                                num_sender_msgs: 0,
-                                num_sender_data_msgs: Some(50),
-                                sender_data_msg_prob: 1.0,
-                                sender_data_msg_interval: Some(20.0),
-                                mix_data_msg_prob: 1.0 / transmission_rate as f32, // to let mix send data_msg every 1s approx.
-                                num_mixes_sending_data: num_mixes, // All mixes try to send data msg following mix_data_msg_prob
-                                queue_type,
-                                num_iterations: 3,
-                            };
-                            id += 1;
-                            paramsets.push(paramset);
+                    for peering_degree in [8, 6, 4] {
+                        for transmission_rate in [1.0, 0.5, 0.2, 0.1, 0.05] {
+                            for num_mixes_sending_data in [0, 1, 2, 3, 4] {
+                                let paramset = ParamSet {
+                                    id,
+                                    num_mixes,
+                                    num_paths: 0, // since we're gonna build random topology
+                                    random_topology: true,
+                                    peering_degree: PeeringDegree::Fixed(peering_degree),
+                                    min_queue_size: 10,
+                                    transmission_rate,
+                                    num_senders: 1,
+                                    num_sender_msgs: 0,
+                                    num_sender_data_msgs: Some(50),
+                                    sender_data_msg_prob: 1.0,
+                                    sender_data_msg_interval: Some(20.0),
+                                    mix_data_msg_prob: 1.0,
+                                    num_mixes_sending_data,
+                                    queue_type,
+                                    num_iterations: 10,
+                                };
+                                id += 1;
+                                paramsets.push(paramset);
+                            }
                         }
                     }
                 }
@@ -453,8 +455,8 @@ mod tests {
             ((ExperimentId::Experiment5, SessionId::Session3), 6),
             ((ExperimentId::Experiment6, SessionId::Session3), 3 * 3),
             (
-                (ExperimentId::Experiment6, SessionId::Session100),
-                4 * 8 * 4,
+                (ExperimentId::Experiment7, SessionId::Session100),
+                4 * 3 * 5 * 5,
             ),
         ];
 

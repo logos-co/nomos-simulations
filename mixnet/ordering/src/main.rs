@@ -32,6 +32,8 @@ struct Args {
     num_threads: usize,
     #[arg(short, long, default_value_t = false)]
     reverse_order: bool,
+    #[arg(short, long, default_value_t = false)]
+    disable_measure_queue_data_msg: bool,
     #[arg(short, long)]
     from_paramset: Option<u16>,
     #[arg(short, long)]
@@ -50,6 +52,7 @@ fn main() {
         outdir,
         num_threads,
         reverse_order,
+        disable_measure_queue_data_msg,
         from_paramset,
         to_paramset,
     } = args;
@@ -78,6 +81,7 @@ fn main() {
         from_paramset,
         to_paramset,
         reverse_order,
+        disable_measure_queue_data_msg,
         &rootdir,
     );
     run_all_iterations(iterations, num_threads, paramsets.len());
@@ -107,6 +111,7 @@ fn prepare_all_iterations(
     from_paramset: Option<u16>,
     to_paramset: Option<u16>,
     reverse_order: bool,
+    disable_measure_queue_data_msg: bool,
     rootdir: &str,
 ) -> Vec<Iteration> {
     let mut iterations: Vec<Iteration> = Vec::new();
@@ -128,6 +133,7 @@ fn prepare_all_iterations(
                 paramset: paramset.clone(),
                 iteration_idx: i,
                 paramset_dir: paramset_dir.clone(),
+                disable_measure_queue_data_msg,
             });
         }
     }

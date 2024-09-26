@@ -21,6 +21,7 @@ pub struct Iteration {
     pub paramset: ParamSet,
     pub iteration_idx: usize,
     pub paramset_dir: String,
+    pub disable_measure_queue_data_msg: bool,
 }
 
 impl Iteration {
@@ -211,9 +212,10 @@ impl Iteration {
             );
 
             // Record the number of data messages in each mix node's queues
-            if vtime == 0.0
-                || vtime - recent_vtime_queue_data_msg_count_measured
-                    >= QUEUE_DATA_MSG_COUNT_MEASUREMENT_INTERVAL
+            if !self.disable_measure_queue_data_msg
+                && (vtime == 0.0
+                    || vtime - recent_vtime_queue_data_msg_count_measured
+                        >= QUEUE_DATA_MSG_COUNT_MEASUREMENT_INTERVAL)
             {
                 outputs.add_queue_data_msg_counts(vtime, &mixnodes);
                 recent_vtime_queue_data_msg_count_measured = vtime;
