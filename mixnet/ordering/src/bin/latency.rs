@@ -27,7 +27,7 @@ fn aggregate(path: &str) {
                     .extend(
                         &df.column("latency")
                             .unwrap()
-                            .i64()
+                            .f64()
                             .unwrap()
                             .clone()
                             .into_series(),
@@ -44,8 +44,8 @@ fn aggregate(path: &str) {
 }
 
 fn save_stats(aggregated: &Series, outpath: &str) {
-    let min = aggregated.min::<i64>().unwrap();
-    let max = aggregated.max::<i64>().unwrap();
+    let min = aggregated.min::<f64>().unwrap();
+    let max = aggregated.max::<f64>().unwrap();
     let mean = aggregated.mean().unwrap();
     let median = aggregated.median().unwrap();
     let std = aggregated.std(1).unwrap();
