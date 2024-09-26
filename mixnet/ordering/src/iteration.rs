@@ -81,6 +81,7 @@ impl Iteration {
 
         // Virtual discrete time
         let mut vtime: f32 = 0.0;
+        let mut recent_vtime_sent_data_msg_by_sender: f32 = 0.0;
         let mut recent_vtime_queue_data_msg_count_measured: f32 = 0.0;
         // Transmission interval that each queue must release a message
         let transmission_interval = 1.0 / paramset.transmission_rate as f32;
@@ -89,6 +90,9 @@ impl Iteration {
         let all_sent_count_target = (paramset.num_sender_msgs as usize)
             .checked_mul(paramset.num_senders as usize)
             .unwrap();
+        let data_sent_count_target = paramset
+            .num_sender_data_msgs
+            .map(|target| target.checked_mul(paramset.num_senders as u32).unwrap());
         let mut sent_data_msgs: FxHashMap<DataMessage, f32> = FxHashMap::default();
         let mut recv_data_msgs: FxHashMap<DataMessage, f32> = FxHashMap::default();
 
@@ -105,10 +109,19 @@ impl Iteration {
             );
 
             // All senders emit a message (data or noise) to all of their own adjacent peers.
-            if all_sent_count < all_sent_count_target {
+            let need_to_send_more_by_sender = match data_sent_count_target {
+                Some(target) => sent_data_msgs.len() < target as usize,
+                None => all_sent_count < all_sent_count_target,
+            };
+            if need_to_send_more_by_sender {
                 // For each sender
                 for (sender_idx, sender_peers) in all_sender_peers.iter() {
-                    if Self::try_probability(&mut data_msg_rng, paramset.sender_data_msg_prob) {
+                    if Self::decide_to_send_data_msg_by_sender(
+                        vtime,
+                        recent_vtime_sent_data_msg_by_sender,
+                        paramset,
+                        &mut data_msg_rng,
+                    ) {
                         let msg = data_msg_gen.next(sender_idx);
                         sender_peers.iter().for_each(|peer_id| {
                             mixnodes
@@ -117,7 +130,8 @@ impl Iteration {
                                 .receive(msg, None);
                         });
                         sent_data_msgs.insert(msg, vtime);
-                        outputs.add_sent_msg(&msg)
+                        outputs.add_sent_msg(&msg);
+                        recent_vtime_sent_data_msg_by_sender = vtime;
                     } else {
                         // Generate noise and add it to the sequence to calculate ordering coefficients later,
                         // but don't need to send it to the mix nodes
@@ -240,6 +254,21 @@ impl Iteration {
             "Probability must be in [0, 1]."
         );
         rng.gen::<f32>() < prob
+    }
+
+    fn decide_to_send_data_msg_by_sender(
+        vtime: f32,
+        recent_vtime_sent_data_msg_by_sender: f32,
+        paramset: &ParamSet,
+        rng: &mut StdRng,
+    ) -> bool {
+        match paramset.sender_data_msg_interval {
+            Some(interval) => {
+                vtime - recent_vtime_sent_data_msg_by_sender >= interval
+                    && Self::try_probability(rng, paramset.sender_data_msg_prob)
+            }
+            None => Self::try_probability(rng, paramset.sender_data_msg_prob),
+        }
     }
 }
 
