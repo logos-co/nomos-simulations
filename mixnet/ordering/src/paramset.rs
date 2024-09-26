@@ -334,7 +334,7 @@ impl ParamSet {
                 for num_mixes in [32] {
                     for peering_degree in [10, 9, 8, 7, 6, 5, 4, 3, 2, 1] {
                         for transmission_rate in [1000, 500, 100, 50, 10, 1] {
-                            for mix_data_msg_prob in [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06] {
+                            for mix_data_msg_prob in [0.03] {
                                 let paramset = ParamSet {
                                     id,
                                     num_mixes,
@@ -344,8 +344,8 @@ impl ParamSet {
                                     min_queue_size: 10,
                                     transmission_rate,
                                     num_senders: 1,
-                                    num_sender_msgs: 1000,
-                                    sender_data_msg_prob: 0.5,
+                                    num_sender_msgs: 10000,
+                                    sender_data_msg_prob: 0.01,
                                     mix_data_msg_prob,
                                     num_mixes_sending_data: num_mixes, // All mixes try to send data msg following mix_data_msg_prob
                                     queue_type,
