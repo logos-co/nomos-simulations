@@ -20,6 +20,7 @@ fn aggregate(path: &str) {
     schema.with_column("num_sender_msgs".into(), DataType::Int64);
     schema.with_column("sender_data_msg_prob".into(), DataType::Float32);
     schema.with_column("mix_data_msg_prob".into(), DataType::Float32);
+    schema.with_column("num_mixes_sending_data".into(), DataType::Int64);
     schema.with_column("queue_type".into(), DataType::String);
     schema.with_column("num_iterations".into(), DataType::Int64);
 
