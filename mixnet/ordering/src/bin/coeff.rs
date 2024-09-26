@@ -240,32 +240,45 @@ fn calculate_coeffs(args: &Args) {
         .filter(|e| e.file_type().is_dir())
     {
         let dir_name = entry.path().file_name().unwrap().to_string_lossy();
-        if dir_name.starts_with("iteration_") {
-            for sent_seq_file in glob(&format!("{}/sent_seq_*.csv", entry.path().display()))
-                .unwrap()
-                .filter_map(Result::ok)
+        if dir_name.starts_with("paramset_") {
+            for inner_entry in WalkDir::new(entry.path())
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .filter(|e| e.file_type().is_dir())
             {
-                let sender =
-                    extract_id(&sent_seq_file.file_name().unwrap().to_string_lossy()).unwrap();
+                let dir_name = inner_entry.path().file_name().unwrap().to_string_lossy();
+                if dir_name.starts_with("iteration_") {
+                    for sent_seq_file in
+                        glob(&format!("{}/sent_seq_*.csv", inner_entry.path().display()))
+                            .unwrap()
+                            .filter_map(Result::ok)
+                    {
+                        let sender =
+                            extract_id(&sent_seq_file.file_name().unwrap().to_string_lossy())
+                                .unwrap();
 
-                for recv_seq_file in glob(&format!("{}/recv_seq_*.csv", entry.path().display()))
-                    .unwrap()
-                    .filter_map(Result::ok)
-                {
-                    let receiver =
-                        extract_id(&recv_seq_file.file_name().unwrap().to_string_lossy()).unwrap();
+                        for recv_seq_file in
+                            glob(&format!("{}/recv_seq_*.csv", inner_entry.path().display()))
+                                .unwrap()
+                                .filter_map(Result::ok)
+                        {
+                            let receiver =
+                                extract_id(&recv_seq_file.file_name().unwrap().to_string_lossy())
+                                    .unwrap();
 
-                    let task = Task {
-                        sent_seq_file: sent_seq_file.clone(),
-                        recv_seq_file: recv_seq_file.clone(),
-                        sender,
-                        receiver,
-                        outpath: entry
-                            .path()
-                            .join(format!("coeffs_{}_{}.csv", sender, receiver)),
-                        sent_seq_limit: args.sent_seq_limit,
-                    };
-                    tasks.push(task);
+                            let task = Task {
+                                sent_seq_file: sent_seq_file.clone(),
+                                recv_seq_file: recv_seq_file.clone(),
+                                sender,
+                                receiver,
+                                outpath: inner_entry
+                                    .path()
+                                    .join(format!("coeffs_{}_{}.csv", sender, receiver)),
+                                sent_seq_limit: args.sent_seq_limit,
+                            };
+                            tasks.push(task);
+                        }
+                    }
                 }
             }
         }
