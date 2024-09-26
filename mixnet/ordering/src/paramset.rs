@@ -349,7 +349,7 @@ impl ParamSet {
                                     mix_data_msg_prob,
                                     num_mixes_sending_data: num_mixes, // All mixes try to send data msg following mix_data_msg_prob
                                     queue_type,
-                                    num_iterations: 3,
+                                    num_iterations: 10,
                                 };
                                 id += 1;
                                 paramsets.push(paramset);
