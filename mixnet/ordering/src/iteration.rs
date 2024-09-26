@@ -220,11 +220,14 @@ impl Iteration {
             }
 
             // If all senders finally emitted all data+noise messages,
+            // (or if all senders finally emitted all data messages)
             // and If all data messages have been received by the receiver,
             // stop the iteration.
-            if all_sent_count == all_sent_count_target
-                && sent_data_msgs.len() == recv_data_msgs.len()
-            {
+            let sent_count_target_reached = match data_sent_count_target {
+                Some(target) => sent_data_msgs.len() == target as usize,
+                None => all_sent_count == all_sent_count_target,
+            };
+            if sent_count_target_reached && sent_data_msgs.len() == recv_data_msgs.len() {
                 break;
             }
 
