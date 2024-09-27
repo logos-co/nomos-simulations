@@ -49,6 +49,7 @@ fn aggregate(path: &str) {
             //     "data_msg_count_",
             // );
             add_stats_columns(&mut df, entry.path().join("latency_stats.csv"), "latency_");
+            add_stats_columns(&mut df, entry.path().join("hops_stats.csv"), "hops_");
 
             for prefix in ["strong", "casual", "weak"] {
                 let coeff_stats_path = entry.path().join(format!("{}_coeff_stats.csv", prefix));
