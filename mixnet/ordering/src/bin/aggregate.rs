@@ -42,11 +42,11 @@ fn aggregate(path: &str) {
                 .finish()
                 .unwrap();
 
-            add_stats_columns(
-                &mut df,
-                entry.path().join("data_msg_counts_stats.csv"),
-                "data_msg_count_",
-            );
+            // add_stats_columns(
+            //     &mut df,
+            //     entry.path().join("data_msg_counts_stats.csv"),
+            //     "data_msg_count_",
+            // );
             add_stats_columns(&mut df, entry.path().join("latency_stats.csv"), "latency_");
 
             for prefix in ["strong", "casual", "weak"] {
