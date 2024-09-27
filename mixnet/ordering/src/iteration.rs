@@ -34,6 +34,7 @@ impl Iteration {
 
         let mut outputs = Outputs::new(
             format!("{dir}/latency__WIP__.csv"),
+            format!("{dir}/hops__WIP__.csv"),
             (0..self.paramset.num_senders)
                 .map(|sender_idx| format!("{dir}/sent_seq_{sender_idx}__WIP__.csv"))
                 .collect(),
@@ -187,7 +188,8 @@ impl Iteration {
                     msgs_to_relay.into_iter().for_each(|(peer_id, msg)| {
                         if peer_id == RECEIVER_NODE_ID {
                             match msg {
-                                Message::Data(msg) => {
+                                Message::Data(mut msg) => {
+                                    msg.increment_hops();
                                     // If msg was sent by the sender (not by any mix)
                                     if let Some(&sent_time) = sent_data_msgs.get(&msg) {
                                         // If this is the first time to see the msg,
@@ -195,6 +197,7 @@ impl Iteration {
                                         if let Entry::Vacant(e) = recv_data_msgs.entry(msg) {
                                             e.insert(vtime);
                                             outputs.add_latency(&msg, sent_time, vtime);
+                                            outputs.add_hops(&msg);
                                         }
                                     }
                                     // Record msg to the sequence
@@ -207,7 +210,8 @@ impl Iteration {
                                     outputs.add_recv_noise(conn_idx);
                                 }
                             }
-                        } else if let Message::Data(msg) = msg {
+                        } else if let Message::Data(mut msg) = msg {
+                            msg.increment_hops();
                             let peer = mixnodes.get_mut(peer_id as usize).unwrap();
                             assert_eq!(peer.id, peer_id);
                             peer.receive(msg, Some(relayer_id));

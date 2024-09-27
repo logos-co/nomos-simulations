@@ -13,6 +13,8 @@ pub struct Outputs {
     // gradual writing
     latency_path: String,
     latency_writer: csv::Writer<File>,
+    hops_path: String,
+    hops_writer: csv::Writer<File>,
     sent_sequence_paths: Vec<String>,
     sent_sequence_writers: Vec<SequenceWriter>,
     recv_sequence_paths: Vec<String>,
@@ -26,6 +28,7 @@ pub struct Outputs {
 impl Outputs {
     pub fn new(
         latency_path: String,
+        hops_path: String,
         sent_sequence_paths: Vec<String>,
         recv_sequence_paths: Vec<String>,
         queue_data_msg_counts_path: String,
@@ -34,6 +37,7 @@ impl Outputs {
         // Ensure that all output files do not exist
         for path in [
             latency_path.clone(),
+            hops_path.clone(),
             queue_data_msg_counts_path.clone(),
             topology_path.clone(),
         ]
@@ -50,6 +54,9 @@ impl Outputs {
             .write_record(["msg", "latency", "sent_time", "recv_time"])
             .unwrap();
         latency_writer.flush().unwrap();
+        let mut hops_writer = csv::Writer::from_path(&hops_path).unwrap();
+        hops_writer.write_record(["msg", "hops"]).unwrap();
+        hops_writer.flush().unwrap();
         let sent_sequence_writers = sent_sequence_paths
             .iter()
             .map(|path| SequenceWriter::new(path))
@@ -65,6 +72,8 @@ impl Outputs {
             closed: false,
             latency_path,
             latency_writer,
+            hops_path,
+            hops_writer,
             sent_sequence_paths,
             sent_sequence_writers,
             recv_sequence_paths,
@@ -77,6 +86,7 @@ impl Outputs {
 
     pub fn close(&mut self) {
         self.latency_writer.flush().unwrap();
+        self.hops_writer.flush().unwrap();
         for seq in &mut self.sent_sequence_writers {
             seq.flush();
         }
@@ -96,6 +106,12 @@ impl Outputs {
                 sent_time.to_string(),
                 recv_time.to_string(),
             ])
+            .unwrap();
+    }
+
+    pub fn add_hops(&mut self, msg: &DataMessage) {
+        self.hops_writer
+            .write_record(&[msg.to_string(), msg.num_hops_passed.to_string()])
             .unwrap();
     }
 
@@ -218,6 +234,7 @@ impl Outputs {
 
         for path in [
             &self.latency_path.clone(),
+            &self.hops_path.clone(),
             &self.queue_data_msg_counts_path.clone(),
         ]
         .into_iter()

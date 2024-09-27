@@ -42,6 +42,7 @@ fn parse_data_msg(value: &str) -> DataMessage {
     DataMessage {
         sender: parts[0].parse::<SenderIdx>().unwrap(),
         msg_id: parts[1].parse::<u32>().unwrap(),
+        num_hops_passed: 0,
     }
 }
 
@@ -526,7 +527,11 @@ mod tests {
     }
 
     fn data(msg_id: u32) -> Entry {
-        Entry::Data(DataMessage { sender: 0, msg_id })
+        Entry::Data(DataMessage {
+            sender: 0,
+            msg_id,
+            num_hops_passed: 0,
+        })
     }
 
     fn noise(count: u32) -> Entry {

@@ -1,11 +1,36 @@
-use std::fmt::Display;
+use std::{
+    fmt::Display,
+    hash::{Hash, Hasher},
+};
 
 pub type SenderIdx = u8;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy)]
 pub struct DataMessage {
     pub sender: SenderIdx,
     pub msg_id: u32,
+    pub num_hops_passed: u32,
+}
+
+impl DataMessage {
+    pub fn increment_hops(&mut self) {
+        self.num_hops_passed += 1;
+    }
+}
+
+impl PartialEq for DataMessage {
+    fn eq(&self, other: &Self) -> bool {
+        self.sender == other.sender && self.msg_id == other.msg_id
+    }
+}
+
+impl Eq for DataMessage {}
+
+impl Hash for DataMessage {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.sender.hash(state);
+        self.msg_id.hash(state);
+    }
 }
 
 impl Display for DataMessage {
@@ -28,6 +53,10 @@ impl DataMessageGenerator {
     pub fn next(&mut self, sender: SenderIdx) -> DataMessage {
         let msg_id = self.next_msg_ids[sender as usize];
         self.next_msg_ids[sender as usize] += 1;
-        DataMessage { sender, msg_id }
+        DataMessage {
+            sender,
+            msg_id,
+            num_hops_passed: 0,
+        }
     }
 }
