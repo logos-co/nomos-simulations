@@ -344,8 +344,8 @@ impl ParamSet {
         match exp_id {
             ExperimentId::Experiment6 => {
                 for num_mixes in [1000, 10000, 100000] {
-                    for peering_degree in [14, 12, 10, 8, 6, 4] {
-                        for transmission_rate in [2.0, 1.5, 1.0, 0.5, 0.2, 0.1, 0.05] {
+                    for peering_degree in [8, 6, 4] {
+                        for transmission_rate in [1.0] {
                             for mix_data_msg_prob in [0.001, 0.005, 0.01] {
                                 let paramset = ParamSet {
                                     id,
