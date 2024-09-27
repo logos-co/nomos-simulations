@@ -350,10 +350,11 @@ impl ParamSet {
         let mut paramsets: Vec<ParamSet> = Vec::new();
         match exp_id {
             ExperimentId::Experiment7 => {
-                for num_mixes in [100000] {
-                    for peering_degree in [10, 8, 6, 4] {
+                for num_mixes in [100, 1000, 10000] {
+                    for peering_degree in [12, 10, 8, 6, 4] {
                         for transmission_rate in [1.0, 1.5, 2.0] {
-                            for mix_data_msg_interval in [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] {
+                            for mix_data_msg_interval in [1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0]
+                            {
                                 for num_mixes_sending_data in [1] {
                                     let paramset = ParamSet {
                                         id,
