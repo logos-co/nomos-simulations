@@ -342,11 +342,11 @@ impl ParamSet {
         let mut id: u16 = 1;
         let mut paramsets: Vec<ParamSet> = Vec::new();
         match exp_id {
-            ExperimentId::Experiment7 => {
-                for num_mixes in [100000] {
-                    for peering_degree in [8, 6, 4] {
-                        for transmission_rate in [1.0, 0.5, 0.2, 0.1, 0.05] {
-                            for num_mixes_sending_data in [1] {
+            ExperimentId::Experiment6 => {
+                for num_mixes in [1000, 10000, 100000] {
+                    for peering_degree in [14, 12, 10, 8, 6, 4] {
+                        for transmission_rate in [2.0, 1.5, 1.0, 0.5, 0.2, 0.1, 0.05] {
+                            for mix_data_msg_prob in [0.001, 0.005, 0.01] {
                                 let paramset = ParamSet {
                                     id,
                                     num_mixes,
@@ -360,8 +360,8 @@ impl ParamSet {
                                     num_sender_data_msgs: Some(50),
                                     sender_data_msg_prob: 1.0,
                                     sender_data_msg_interval: Some(20.0),
-                                    mix_data_msg_prob: 1.0,
-                                    num_mixes_sending_data,
+                                    mix_data_msg_prob,
+                                    num_mixes_sending_data: num_mixes,
                                     queue_type,
                                     num_iterations: 10,
                                 };
@@ -455,8 +455,8 @@ mod tests {
             ((ExperimentId::Experiment5, SessionId::Session3), 6),
             ((ExperimentId::Experiment6, SessionId::Session3), 3 * 3),
             (
-                (ExperimentId::Experiment7, SessionId::Session100),
-                4 * 3 * 5 * 5,
+                (ExperimentId::Experiment6, SessionId::Session100),
+                3 * 6 * 7 * 3,
             ),
         ];
 
