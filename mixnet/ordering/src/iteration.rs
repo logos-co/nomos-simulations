@@ -83,6 +83,7 @@ impl Iteration {
         // Virtual discrete time
         let mut vtime: f32 = 0.0;
         let mut recent_vtime_sent_data_msg_by_sender: f32 = 0.0;
+        let mut recent_vtime_sent_data_msg_by_mix: f32 = 0.0;
         let mut recent_vtime_queue_data_msg_count_measured: f32 = 0.0;
         // Transmission interval that each queue must release a message
         let transmission_interval = 1.0 / paramset.transmission_rate;
@@ -145,7 +146,11 @@ impl Iteration {
             }
 
             // Each mix node add a new data message to its queue with a certain probability
-            if paramset.mix_data_msg_prob > 0.0 {
+            if paramset.mix_data_msg_prob > 0.0
+                && vtime - recent_vtime_sent_data_msg_by_mix >= paramset.mix_data_msg_interval
+            {
+                recent_vtime_sent_data_msg_by_mix = vtime;
+
                 if (paramset.num_mixes_sending_data as usize) == mixnodes.len() {
                     for node in mixnodes.iter_mut() {
                         Self::try_mixnode_send_data(
