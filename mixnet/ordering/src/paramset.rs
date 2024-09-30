@@ -352,7 +352,7 @@ impl ParamSet {
             ExperimentId::Experiment7 => {
                 for num_mixes in [20, 40, 60, 80] {
                     for peering_degree in [12, 10, 8, 6, 4] {
-                        for transmission_rate in [1.0, 1.5, 2.0] {
+                        for transmission_rate in [0.5, 1.0, 1.5, 2.0] {
                             for mix_data_msg_interval in [1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0]
                             {
                                 for num_mixes_sending_data in [1] {
