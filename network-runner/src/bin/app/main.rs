@@ -9,7 +9,8 @@ use clap::Parser;
 use nomos_simulations_network_runner::network::behaviour::create_behaviours;
 use nomos_simulations_network_runner::network::regions::{create_regions, RegionsData};
 use nomos_simulations_network_runner::network::Network;
-use nomos_simulations_network_runner::node::NodeId;
+use nomos_simulations_network_runner::node::mix::{MixMessage, MixNode, MixNodeState};
+use nomos_simulations_network_runner::node::{NodeId, NodeIdExt};
 use nomos_simulations_network_runner::output_processors::{OutData, Record};
 use nomos_simulations_network_runner::runner::{BoxedNode, SimulationRunnerHandle};
 #[cfg(feature = "polars")]
@@ -67,7 +68,7 @@ impl SimulationApp {
         });
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut node_ids: Vec<NodeId> = (0..simulation_settings.node_count)
-            .map(|_| todo!())
+            .map(NodeId::from_index)
             .collect();
         node_ids.shuffle(&mut rng);
 
@@ -76,7 +77,7 @@ impl SimulationApp {
         let regions_data = RegionsData::new(regions, behaviours);
 
         let ids = node_ids.clone();
-        let network = Arc::new(Mutex::new(Network::<()>::new(regions_data, seed)));
+        let network = Arc::new(Mutex::new(Network::<MixMessage>::new(regions_data, seed)));
 
         // if dump_overlay_info {
         //     dump_json_to_file(
@@ -89,17 +90,21 @@ impl SimulationApp {
         //     )?;
         // }
 
-        // let nodes: Vec<BoxedNode<_, _>> = node_ids
-        //     .par_iter()
-        //     .copied()
-        //     .map(|node_id| todo!())
-        //     .collect();
-        // let network = Arc::try_unwrap(network)
-        //     .expect("network is not used anywhere else")
-        //     .into_inner();
-        // run::<_, _, _>(network, nodes, simulation_settings, stream_type)?;
+        let nodes: Vec<BoxedNode<(), MixNodeState>> = node_ids
+            .par_iter()
+            .copied()
+            .map(|node_id| create_boxed_mixnode(node_id))
+            .collect();
+        let network = Arc::try_unwrap(network)
+            .expect("network is not used anywhere else")
+            .into_inner();
+        run::<_, _, _>(network, nodes, simulation_settings, stream_type)?;
         Ok(())
     }
+}
+
+fn create_boxed_mixnode(node_id: NodeId) -> BoxedNode<(), MixNodeState> {
+    Box::new(MixNode::new(node_id, ()))
 }
 
 fn run<M: std::fmt::Debug, S, T>(
