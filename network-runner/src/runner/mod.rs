@@ -166,6 +166,7 @@ where
 
         match self.runner_settings.clone() {
             RunnerSettings::Sync => sync_runner::simulate(self, step_time),
+            RunnerSettings::Async { chunks } => async_runner::simulate(self, chunks, step_time),
         }
     }
 }

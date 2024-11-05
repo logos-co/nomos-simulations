@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+use crate::network::{InMemoryNetworkInterface, NetworkInterface, PayloadSize};
+
 use super::{Node, NodeId};
 
 #[derive(Debug, Default, Copy, Clone, Serialize, Deserialize)]
@@ -13,6 +15,12 @@ pub enum MixMessage {
     Dummy(String),
 }
 
+impl PayloadSize for MixMessage {
+    fn size_bytes(&self) -> u32 {
+        todo!()
+    }
+}
+
 pub struct MixnodeSettings {
     pub connected_peers: Vec<NodeId>,
 }
@@ -21,15 +29,21 @@ pub struct MixnodeSettings {
 pub struct MixNode {
     id: NodeId,
     state: MixNodeState,
-    settings: MixnodeSettings,
+    _settings: MixnodeSettings,
+    network_interface: InMemoryNetworkInterface<MixMessage>,
 }
 
 impl MixNode {
-    pub fn new(id: NodeId, settings: MixnodeSettings) -> Self {
+    pub fn new(
+        id: NodeId,
+        settings: MixnodeSettings,
+        network_interface: InMemoryNetworkInterface<MixMessage>,
+    ) -> Self {
         Self {
             id,
+            network_interface,
+            _settings: settings,
             state: MixNodeState::default(),
-            settings,
         }
     }
 }
@@ -48,6 +62,12 @@ impl Node for MixNode {
     }
 
     fn step(&mut self, _: Duration) {
-        todo!()
+        let _messages = self.network_interface.receive_messages();
+
+        // Do stuff on the messages;
+        // Network interface can be passed into the functions for outputting the messages:
+        // ```rust
+        // self.network_interface.send_message(receiving_node_id, payload);
+        // ```
     }
 }

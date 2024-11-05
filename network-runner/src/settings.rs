@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 pub enum RunnerSettings {
     #[default]
     Sync,
+    Async {
+        chunks: usize,
+    },
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
