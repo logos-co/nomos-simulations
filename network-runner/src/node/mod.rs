@@ -82,34 +82,6 @@ pub type SharedState<S> = Arc<RwLock<S>>;
 
 pub type Step = usize;
 
-/// A state that represents how nodes are interconnected in the network.
-pub struct OverlayState {
-    pub all_nodes: Vec<NodeId>,
-    pub overlay: MixnetOverlay,
-}
-
-#[derive(Clone, Debug)]
-pub struct MixnetOverlay {
-    pub connections: HashMap<NodeId, Vec<NodeId>>,
-}
-
-pub trait OverlayGetter {
-    fn get_overlay(&self) -> MixnetOverlay;
-    fn get_all_nodes(&self) -> Vec<NodeId>;
-}
-
-impl OverlayGetter for SharedState<MixnetOverlay> {
-    fn get_overlay(&self) -> MixnetOverlay {
-        let overlay_state = self.read();
-        overlay_state.clone()
-    }
-
-    fn get_all_nodes(&self) -> Vec<NodeId> {
-        let overlay_state = self.read();
-        overlay_state.connections.keys().cloned().collect()
-    }
-}
-
 pub trait Node {
     type Settings;
     type State;
