@@ -13,16 +13,19 @@ pub enum MixMessage {
     Dummy(String),
 }
 
-/// This node implementation only used for testing different streaming implementation purposes.
-pub struct MixNode<S> {
-    id: NodeId,
-    state: MixNodeState,
-    #[allow(dead_code)]
-    settings: S,
+pub struct MixnodeSettings {
+    pub connected_peers: Vec<NodeId>,
 }
 
-impl<S: Send + Sync> MixNode<S> {
-    pub fn new(id: NodeId, settings: S) -> Self {
+/// This node implementation only used for testing different streaming implementation purposes.
+pub struct MixNode {
+    id: NodeId,
+    state: MixNodeState,
+    settings: MixnodeSettings,
+}
+
+impl MixNode {
+    pub fn new(id: NodeId, settings: MixnodeSettings) -> Self {
         Self {
             id,
             state: MixNodeState::default(),
@@ -31,11 +34,8 @@ impl<S: Send + Sync> MixNode<S> {
     }
 }
 
-impl<S> Node for MixNode<S>
-where
-    S: Send + Sync,
-{
-    type Settings = S;
+impl Node for MixNode {
+    type Settings = MixnodeSettings;
 
     type State = MixNodeState;
 

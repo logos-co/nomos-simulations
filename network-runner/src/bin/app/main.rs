@@ -9,8 +9,10 @@ use clap::Parser;
 use nomos_simulations_network_runner::network::behaviour::create_behaviours;
 use nomos_simulations_network_runner::network::regions::{create_regions, RegionsData};
 use nomos_simulations_network_runner::network::Network;
-use nomos_simulations_network_runner::node::mix::{MixMessage, MixNode, MixNodeState};
-use nomos_simulations_network_runner::node::{NodeId, NodeIdExt};
+use nomos_simulations_network_runner::node::mix::{
+    MixMessage, MixNode, MixNodeState, MixnodeSettings,
+};
+use nomos_simulations_network_runner::node::{Node, NodeId, NodeIdExt};
 use nomos_simulations_network_runner::output_processors::{OutData, Record};
 use nomos_simulations_network_runner::runner::{BoxedNode, SimulationRunnerHandle};
 #[cfg(feature = "polars")]
@@ -19,6 +21,7 @@ use nomos_simulations_network_runner::streaming::{
     io::IOSubscriber, naive::NaiveSubscriber, StreamType,
 };
 use parking_lot::Mutex;
+use rand::prelude::IteratorRandom;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
@@ -90,10 +93,21 @@ impl SimulationApp {
         //     )?;
         // }
 
-        let nodes: Vec<BoxedNode<(), MixNodeState>> = node_ids
-            .par_iter()
+        let nodes: Vec<_> = node_ids
+            .iter()
             .copied()
-            .map(|node_id| create_boxed_mixnode(node_id))
+            .map(|node_id| {
+                create_boxed_mixnode(
+                    node_id,
+                    MixnodeSettings {
+                        connected_peers: ids
+                            .iter()
+                            .filter(|&id| id != &node_id)
+                            .copied()
+                            .choose_multiple(&mut rng, 3),
+                    },
+                )
+            })
             .collect();
         let network = Arc::try_unwrap(network)
             .expect("network is not used anywhere else")
@@ -103,8 +117,11 @@ impl SimulationApp {
     }
 }
 
-fn create_boxed_mixnode(node_id: NodeId) -> BoxedNode<(), MixNodeState> {
-    Box::new(MixNode::new(node_id, ()))
+fn create_boxed_mixnode(
+    node_id: NodeId,
+    settings: MixnodeSettings,
+) -> BoxedNode<MixnodeSettings, MixNodeState> {
+    Box::new(MixNode::new(node_id, settings))
 }
 
 fn run<M: std::fmt::Debug, S, T>(
