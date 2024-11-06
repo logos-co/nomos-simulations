@@ -1,18 +1,25 @@
-use chrono::format::Item;
+use crossbeam::channel;
 use futures::Stream;
 use rand::RngCore;
 use std::pin::Pin;
-use std::sync::mpsc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-struct Interval {
+pub struct Interval {
     duration: Duration,
     current_elapsed: Duration,
-    update_time: mpsc::Receiver<Duration>,
+    update_time: channel::Receiver<Duration>,
 }
 
 impl Interval {
+    pub fn new(duration: Duration, update_time: channel::Receiver<Duration>) -> Self {
+        Self {
+            duration,
+            current_elapsed: Duration::from_secs(0),
+            update_time,
+        }
+    }
+
     pub fn update(&mut self, elapsed: Duration) -> bool {
         self.current_elapsed += elapsed;
         if self.current_elapsed >= self.duration {
@@ -37,17 +44,17 @@ impl Stream for Interval {
     }
 }
 
-struct TemporalRelease {
-    random_sleeps: Box<dyn Iterator<Item = Duration>>,
+pub struct TemporalRelease {
+    random_sleeps: Box<dyn Iterator<Item = Duration> + Send + Sync + 'static>,
     elapsed: Duration,
     current_sleep: Duration,
-    update_time: mpsc::Receiver<Duration>,
+    update_time: channel::Receiver<Duration>,
 }
 
 impl TemporalRelease {
-    pub fn new<Rng: RngCore + 'static>(
+    pub fn new<Rng: RngCore + Send + Sync + 'static>(
         mut rng: Rng,
-        update_time: mpsc::Receiver<Duration>,
+        update_time: channel::Receiver<Duration>,
         (min_delay, max_delay): (u64, u64),
     ) -> Self {
         let mut random_sleeps = Box::new(std::iter::repeat_with(move || {
