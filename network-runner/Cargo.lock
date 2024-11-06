@@ -1865,7 +1865,7 @@ dependencies = [
 [[package]]
 name = "nomos-mix"
 version = "0.1.0"
-source = "git+https://github.com/logos-co/nomos-node?rev=9b29c17#9b29c17e2f7e5da7f17c4d7a2b8e8749c0b32617"
+source = "git+https://github.com/logos-co/nomos-node?rev=e095964#e0959644a9927d3930197df281684615dee7a6ef"
 dependencies = [
  "cached",
  "futures",
@@ -1882,7 +1882,7 @@ dependencies = [
 [[package]]
 name = "nomos-mix-message"
 version = "0.1.0"
-source = "git+https://github.com/logos-co/nomos-node?rev=9b29c17#9b29c17e2f7e5da7f17c4d7a2b8e8749c0b32617"
+source = "git+https://github.com/logos-co/nomos-node?rev=e095964#e0959644a9927d3930197df281684615dee7a6ef"
 dependencies = [
  "serde",
  "sphinx-packet",

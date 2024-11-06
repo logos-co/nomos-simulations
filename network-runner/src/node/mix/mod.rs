@@ -29,9 +29,7 @@ use std::{
 use stream_wrapper::CrossbeamReceiverStream;
 
 #[derive(Debug, Clone)]
-pub enum MixMessage {
-    Dummy(Vec<u8>),
-}
+pub struct MixMessage(Vec<u8>);
 
 impl PayloadSize for MixMessage {
     fn size_bytes(&self) -> u32 {
@@ -79,12 +77,6 @@ impl MixNode {
         settings: MixnodeSettings,
         network_interface: InMemoryNetworkInterface<MixMessage>,
     ) -> Self {
-        let state = MixnodeState {
-            node_id: id,
-            mock_counter: 0,
-            step_id: 0,
-        };
-
         let mut rng_generator = ChaCha12Rng::seed_from_u64(settings.seed);
 
         // Init Tier-1: Persistent transmission
@@ -102,7 +94,7 @@ impl MixNode {
                 ),
             );
 
-        // Init Tier-2: Temporal processor
+        // Init Tier-2: message blend
         let (blend_sender, blend_receiver) = channel::unbounded();
         let (blend_update_time_sender, blend_update_time_receiver) = channel::unbounded();
         let nodes: Vec<
@@ -137,7 +129,11 @@ impl MixNode {
             id,
             network_interface,
             settings,
-            state,
+            state: MixnodeState {
+                node_id: id,
+                mock_counter: 0,
+                step_id: 0,
+            },
             persistent_sender,
             persistent_update_time_sender,
             persistent_transmission_messages,
@@ -187,15 +183,12 @@ impl Node for MixNode {
         let messages = self.network_interface.receive_messages();
         for message in messages {
             println!(">>>>> Node {}, message: {message:?}", self.id);
-            let MixMessage::Dummy(msg) = message.into_payload();
-            blend_sender.send(msg).unwrap();
+            blend_sender.send(message.into_payload().0).unwrap();
         }
-
-        self.state.step_id += 1;
-        self.state.mock_counter += 1;
 
         let waker = futures::task::noop_waker();
         let mut cx = futures::task::Context::from_waker(&waker);
+        // Proceed message blend
         if let Poll::Ready(Some(msg)) = pin::pin!(blend_messages).poll_next(&mut cx) {
             match msg {
                 MixOutgoingMessage::Outbound(msg) => {
@@ -206,11 +199,14 @@ impl Node for MixNode {
                 }
             }
         }
-
+        // Proceed persistent transmission
         if let Poll::Ready(Some(msg)) =
             pin::pin!(persistent_transmission_messages).poll_next(&mut cx)
         {
-            self.forward(MixMessage::Dummy(msg));
+            self.forward(MixMessage(msg));
         }
+
+        self.state.step_id += 1;
+        self.state.mock_counter += 1;
     }
 }
