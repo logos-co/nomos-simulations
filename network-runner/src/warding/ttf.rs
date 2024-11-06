@@ -11,7 +11,7 @@ pub struct MaxViewWard {
 
 impl<S, T> SimulationWard<S, T> for MaxViewWard {
     type SimulationState = SimulationState<S, T>;
-    fn analyze(&mut self, state: &Self::SimulationState) -> bool {
+    fn analyze(&mut self, _state: &Self::SimulationState) -> bool {
         // state.nodes.read().iter();
         //.all(|n| n.current_view() >= self.max_count)
         todo!()

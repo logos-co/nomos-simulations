@@ -1,9 +1,9 @@
 #[cfg(test)]
 pub mod dummy_streaming;
+pub mod mix;
 
 // std
 use std::{
-    collections::HashMap,
     ops::{Deref, DerefMut},
     sync::Arc,
     time::Duration,
