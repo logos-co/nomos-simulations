@@ -1,5 +1,5 @@
+mod scheduler;
 pub mod state;
-mod step_scheduler;
 mod stream_wrapper;
 
 use super::{Node, NodeId};
@@ -18,6 +18,7 @@ use nomos_mix::{
 use nomos_mix_message::mock::MockMixMessage;
 use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
+use scheduler::{Interval, TemporalRelease};
 use serde::Deserialize;
 use state::MixnodeState;
 use std::{
@@ -25,7 +26,6 @@ use std::{
     task::Poll,
     time::Duration,
 };
-use step_scheduler::{Interval, TemporalRelease};
 use stream_wrapper::CrossbeamReceiverStream;
 
 #[derive(Debug, Clone)]
