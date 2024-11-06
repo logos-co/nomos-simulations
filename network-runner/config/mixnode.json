@@ -23,7 +23,7 @@
   "step_time": "10ms",
   "runner_settings": "Sync",
   "stream_settings": {
-    "path": "test.csv"
+    "path": "test.json"
   },
   "node_count": 3,
   "seed": 0,
