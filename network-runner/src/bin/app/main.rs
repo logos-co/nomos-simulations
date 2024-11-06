@@ -7,6 +7,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use anyhow::Ok;
 use clap::Parser;
 use crossbeam::channel;
+use nomos_mix::message_blend::{
+    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
+};
+use nomos_mix::persistent_transmission::PersistentTransmissionSettings;
 use nomos_simulations_network_runner::network::behaviour::create_behaviours;
 use nomos_simulations_network_runner::network::regions::{create_regions, RegionsData};
 use nomos_simulations_network_runner::network::{InMemoryNetworkInterface, Network};
@@ -94,6 +98,21 @@ impl SimulationApp {
                             .filter(|&id| id != &node_id)
                             .copied()
                             .choose_multiple(&mut rng, 3),
+                        seed: 0,
+                        persistent_transmission: PersistentTransmissionSettings {
+                            max_emission_frequency: 1.0,
+                            drop_message_probability: 0.5,
+                        },
+                        message_blend: MessageBlendSettings {
+                            cryptographic_processor: CryptographicProcessorSettings {
+                                private_key: node_id.into(),
+                                num_mix_layers: 1,
+                            },
+                            temporal_processor: TemporalSchedulerSettings {
+                                max_delay_seconds: 10,
+                            },
+                        },
+                        membership: node_ids.iter().map(|&id| id.into()).collect(),
                     },
                 )
             })
