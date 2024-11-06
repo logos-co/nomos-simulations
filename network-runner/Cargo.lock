@@ -1909,6 +1909,7 @@ dependencies = [
  "getrandom",
  "humantime",
  "humantime-serde",
+ "multiaddr",
  "nomos-mix",
  "nomos-mix-message",
  "once_cell",

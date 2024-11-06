@@ -44,15 +44,15 @@ impl Stream for Interval {
     }
 }
 
-struct TemporalRelease {
-    random_sleeps: Box<dyn Iterator<Item = Duration>>,
+pub struct TemporalRelease {
+    random_sleeps: Box<dyn Iterator<Item = Duration> + Send + Sync + 'static>,
     elapsed: Duration,
     current_sleep: Duration,
     update_time: channel::Receiver<Duration>,
 }
 
 impl TemporalRelease {
-    pub fn new<Rng: RngCore + 'static>(
+    pub fn new<Rng: RngCore + Send + Sync + 'static>(
         mut rng: Rng,
         update_time: channel::Receiver<Duration>,
         (min_delay, max_delay): (u64, u64),
