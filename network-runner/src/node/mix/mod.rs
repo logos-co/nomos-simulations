@@ -1,12 +1,10 @@
+pub mod state;
+
 use super::{Node, NodeId};
 use crate::network::{InMemoryNetworkInterface, NetworkInterface, PayloadSize};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use state::MixnodeState;
 use std::time::Duration;
-
-#[derive(Debug, Default, Copy, Clone, Serialize, Deserialize)]
-pub struct MixNodeState {
-    pub mock_counter: usize,
-}
 
 #[derive(Debug, Clone)]
 pub enum MixMessage {
@@ -19,6 +17,7 @@ impl PayloadSize for MixMessage {
     }
 }
 
+#[derive(Clone, Default, Deserialize)]
 pub struct MixnodeSettings {
     pub connected_peers: Vec<NodeId>,
 }
@@ -26,7 +25,7 @@ pub struct MixnodeSettings {
 /// This node implementation only used for testing different streaming implementation purposes.
 pub struct MixNode {
     id: NodeId,
-    state: MixNodeState,
+    state: MixnodeState,
     settings: MixnodeSettings,
     network_interface: InMemoryNetworkInterface<MixMessage>,
 }
@@ -41,7 +40,11 @@ impl MixNode {
             id,
             network_interface,
             settings,
-            state: MixNodeState::default(),
+            state: MixnodeState {
+                node_id: id,
+                mock_counter: 0,
+                step_id: 0,
+            },
         }
     }
 }
@@ -49,7 +52,7 @@ impl MixNode {
 impl Node for MixNode {
     type Settings = MixnodeSettings;
 
-    type State = MixNodeState;
+    type State = MixnodeState;
 
     fn id(&self) -> NodeId {
         self.id
@@ -65,6 +68,7 @@ impl Node for MixNode {
             println!(">>>>> Node {}, message: {message:?}", self.id);
         }
 
+        self.state.step_id += 1;
         self.state.mock_counter += 1;
 
         for node_id in self.settings.connected_peers.iter() {

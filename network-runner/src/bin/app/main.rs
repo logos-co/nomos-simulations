@@ -10,11 +10,10 @@ use crossbeam::channel;
 use nomos_simulations_network_runner::network::behaviour::create_behaviours;
 use nomos_simulations_network_runner::network::regions::{create_regions, RegionsData};
 use nomos_simulations_network_runner::network::{InMemoryNetworkInterface, Network};
-use nomos_simulations_network_runner::node::mix::{
-    MixMessage, MixNode, MixNodeState, MixnodeSettings,
-};
+use nomos_simulations_network_runner::node::mix::state::{MixnodeRecord, MixnodeState};
+use nomos_simulations_network_runner::node::mix::{MixMessage, MixNode, MixnodeSettings};
 use nomos_simulations_network_runner::node::{NodeId, NodeIdExt};
-use nomos_simulations_network_runner::output_processors::{OutData, Record};
+use nomos_simulations_network_runner::output_processors::Record;
 use nomos_simulations_network_runner::runner::{BoxedNode, SimulationRunnerHandle};
 #[cfg(feature = "polars")]
 use nomos_simulations_network_runner::streaming::polars::PolarsSubscriber;
@@ -113,7 +112,7 @@ fn create_boxed_mixnode(
     simulation_settings: SimulationSettings,
     no_netcap: bool,
     mixnode_settings: MixnodeSettings,
-) -> BoxedNode<MixnodeSettings, MixNodeState> {
+) -> BoxedNode<MixnodeSettings, MixnodeState> {
     let (node_message_broadcast_sender, node_message_broadcast_receiver) = channel::unbounded();
     let (node_message_sender, node_message_receiver) = channel::unbounded();
     // Dividing milliseconds in second by milliseconds in the step.
@@ -156,22 +155,26 @@ where
     T: Serialize + Clone + 'static,
 {
     let stream_settings = settings.stream_settings.clone();
-    let runner =
-        SimulationRunner::<_, OutData, S, T>::new(network, nodes, Default::default(), settings)?;
+    let runner = SimulationRunner::<_, MixnodeRecord, S, T>::new(
+        network,
+        nodes,
+        Default::default(),
+        settings,
+    )?;
 
     let handle = match stream_type {
         Some(StreamType::Naive) => {
             let settings = stream_settings.unwrap_naive();
-            runner.simulate_and_subscribe::<NaiveSubscriber<OutData>>(settings)?
+            runner.simulate_and_subscribe::<NaiveSubscriber<MixnodeRecord>>(settings)?
         }
         Some(StreamType::IO) => {
             let settings = stream_settings.unwrap_io();
-            runner.simulate_and_subscribe::<IOSubscriber<OutData>>(settings)?
+            runner.simulate_and_subscribe::<IOSubscriber<MixnodeRecord>>(settings)?
         }
         #[cfg(feature = "polars")]
         Some(StreamType::Polars) => {
             let settings = stream_settings.unwrap_polars();
-            runner.simulate_and_subscribe::<PolarsSubscriber<OutData>>(settings)?
+            runner.simulate_and_subscribe::<PolarsSubscriber<MixnodeRecord>>(settings)?
         }
         None => runner.simulate()?,
     };
