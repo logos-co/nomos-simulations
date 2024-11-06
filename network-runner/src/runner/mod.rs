@@ -134,14 +134,11 @@ where
         let nodes = Arc::new(RwLock::new(nodes));
         let SimulationSettings {
             wards,
-            overlay_settings: _,
             node_settings: _,
             runner_settings,
             stream_settings: _,
             node_count: _,
             seed: _,
-            views_count: _,
-            leaders_count: _,
             network_settings: _,
             step_time,
             record_settings: _,

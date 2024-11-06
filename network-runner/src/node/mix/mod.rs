@@ -63,6 +63,8 @@ impl Node for MixNode {
 
     fn step(&mut self, _: Duration) {
         let _messages = self.network_interface.receive_messages();
+        self.state.mock_counter += 1;
+        println!(">>>>> Node {}, Step: {}", self.id, self.state.mock_counter);
 
         // Do stuff on the messages;
         // Network interface can be passed into the functions for outputting the messages:

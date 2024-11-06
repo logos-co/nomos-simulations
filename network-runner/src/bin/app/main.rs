@@ -144,14 +144,14 @@ fn create_boxed_mixnode(
     Box::new(MixNode::new(node_id, mixnode_settings, network_interface))
 }
 
-fn run<M: std::fmt::Debug, S, T>(
+fn run<M, S, T>(
     network: Network<M>,
     nodes: Vec<BoxedNode<S, T>>,
     settings: SimulationSettings,
     stream_type: Option<StreamType>,
 ) -> anyhow::Result<()>
 where
-    M: Clone + Send + Sync + 'static,
+    M: std::fmt::Debug + Clone + Send + Sync + 'static,
     S: 'static,
     T: Serialize + Clone + 'static,
 {

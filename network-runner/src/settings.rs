@@ -47,7 +47,6 @@ pub struct SimulationSettings {
     #[serde(default)]
     pub record_settings: BTreeMap<String, bool>,
     pub network_settings: NetworkSettings,
-    pub overlay_settings: OverlaySettings,
     pub node_settings: NodeSettings,
     #[serde(default)]
     pub runner_settings: RunnerSettings,
@@ -55,7 +54,5 @@ pub struct SimulationSettings {
     #[serde(with = "humantime_serde")]
     pub step_time: std::time::Duration,
     pub node_count: usize,
-    pub views_count: usize,
-    pub leaders_count: usize,
     pub seed: Option<u64>,
 }
