@@ -1,3 +1,4 @@
+mod lottery;
 mod scheduler;
 pub mod state;
 mod stream_wrapper;
@@ -6,6 +7,7 @@ use super::{Node, NodeId};
 use crate::network::{InMemoryNetworkInterface, NetworkInterface, PayloadSize};
 use crossbeam::channel;
 use futures::Stream;
+use lottery::StakeLottery;
 use multiaddr::Multiaddr;
 use nomos_mix::{
     membership::Membership,
@@ -18,7 +20,7 @@ use nomos_mix::{
     MixOutgoingMessage,
 };
 use nomos_mix_message::mock::MockMixMessage;
-use rand::{Rng, RngCore, SeedableRng};
+use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use scheduler::{Interval, TemporalRelease};
 use serde::Deserialize;
@@ -42,6 +44,8 @@ impl PayloadSize for MixMessage {
 #[derive(Clone, Deserialize)]
 pub struct MixnodeSettings {
     pub connected_peers: Vec<NodeId>,
+    pub data_message_lottery_interval: Duration,
+    pub stake_proportion: f64,
     pub seed: u64,
     pub persistent_transmission: PersistentTransmissionSettings,
     pub message_blend: MessageBlendSettings<MockMixMessage>,
@@ -55,7 +59,9 @@ pub struct MixNode {
     settings: MixnodeSettings,
     network_interface: InMemoryNetworkInterface<MixMessage>,
 
-    msg_gen_rng: ChaCha12Rng,
+    data_msg_lottery_update_time_sender: channel::Sender<Duration>,
+    data_msg_lottery_interval: Interval,
+    data_msg_lottery: StakeLottery<ChaCha12Rng>,
 
     persistent_sender: channel::Sender<Vec<u8>>,
     persistent_update_time_sender: channel::Sender<Duration>,
@@ -83,6 +89,18 @@ impl MixNode {
         network_interface: InMemoryNetworkInterface<MixMessage>,
     ) -> Self {
         let mut rng_generator = ChaCha12Rng::seed_from_u64(settings.seed);
+
+        // Init Interval for data message lottery
+        let (data_msg_lottery_update_time_sender, data_msg_lottery_update_time_receiver) =
+            channel::unbounded();
+        let data_msg_lottery_interval = Interval::new(
+            settings.data_message_lottery_interval,
+            data_msg_lottery_update_time_receiver,
+        );
+        let data_msg_lottery = StakeLottery::new(
+            ChaCha12Rng::from_rng(&mut rng_generator).unwrap(),
+            settings.stake_proportion,
+        );
 
         // Init Tier-1: Persistent transmission
         let (persistent_sender, persistent_receiver) = channel::unbounded();
@@ -145,7 +163,9 @@ impl MixNode {
                 step_id: 0,
                 num_messages_broadcasted: 0,
             },
-            msg_gen_rng: ChaCha12Rng::from_rng(&mut rng_generator).unwrap(),
+            data_msg_lottery_update_time_sender,
+            data_msg_lottery_interval,
+            data_msg_lottery,
             persistent_sender,
             persistent_update_time_sender,
             persistent_transmission_messages,
@@ -164,6 +184,9 @@ impl MixNode {
     }
 
     fn update_time(&mut self, elapsed: Duration) {
+        self.data_msg_lottery_update_time_sender
+            .send(elapsed)
+            .unwrap();
         self.persistent_update_time_sender.send(elapsed).unwrap();
         self.blend_update_time_sender.send(elapsed).unwrap();
     }
@@ -186,6 +209,8 @@ impl Node for MixNode {
         self.update_time(elapsed);
 
         let Self {
+            data_msg_lottery_interval,
+            data_msg_lottery,
             persistent_sender,
             persistent_transmission_messages,
             crypto_processor,
@@ -193,15 +218,19 @@ impl Node for MixNode {
             blend_messages,
             ..
         } = self;
+        let waker = futures::task::noop_waker();
+        let mut cx = futures::task::Context::from_waker(&waker);
 
-        // Generate a message probabilistically (1 % chance)
-        // TODO: Replace this with the actual cover message generation
-        if self.msg_gen_rng.gen_range(0..100) == 0 {
-            let mut payload = [0u8; 1024];
-            self.msg_gen_rng.fill_bytes(&mut payload);
-            let message = crypto_processor.wrap_message(&payload).unwrap();
-            persistent_sender.send(message).unwrap();
+        if let Poll::Ready(Some(_)) = pin::pin!(data_msg_lottery_interval).poll_next(&mut cx) {
+            if data_msg_lottery.run() {
+                // TODO: Include a meaningful information in the payload (such as, step_id) to
+                // measure the latency until the message reaches the last mix node.
+                let message = crypto_processor.wrap_message(&[1u8; 1024]).unwrap();
+                persistent_sender.send(message).unwrap();
+            }
         }
+
+        // TODO: Generate cover message with probability
 
         let messages = self.network_interface.receive_messages();
         for message in messages {
@@ -209,8 +238,6 @@ impl Node for MixNode {
             blend_sender.send(message.into_payload().0).unwrap();
         }
 
-        let waker = futures::task::noop_waker();
-        let mut cx = futures::task::Context::from_waker(&waker);
         // Proceed message blend
         if let Poll::Ready(Some(msg)) = pin::pin!(blend_messages).poll_next(&mut cx) {
             match msg {
