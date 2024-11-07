@@ -5,7 +5,7 @@ mod stream_wrapper;
 use super::{Node, NodeId};
 use crate::{
     network::{InMemoryNetworkInterface, NetworkInterface, PayloadSize},
-    warding::Ward,
+    warding::WardCondition,
 };
 use crossbeam::channel;
 use futures::Stream;
@@ -213,9 +213,13 @@ impl Node for MixNode {
         self.state.mock_counter += 1;
     }
 
-    fn analyze(&self, ward: Ward) -> bool {
+    fn analyze(&self, ward: &mut WardCondition) -> bool {
         match ward {
-            Ward::Max(condition) => self.state.mock_counter >= condition.max_count,
+            WardCondition::Max(condition) => self.state.mock_counter >= condition.max_count,
+            WardCondition::Sum(condition) => {
+                *condition.step_result.borrow_mut() += self.state.mock_counter;
+                false
+            }
         }
     }
 }

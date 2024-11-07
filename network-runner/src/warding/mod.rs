@@ -34,6 +34,12 @@ pub trait SimulationWard<S, T> {
 #[serde(rename_all = "snake_case")]
 pub enum Ward {
     Max(ttf::MaxWard),
+    Sum(ttf::SumWard),
+}
+
+pub enum WardCondition<'a> {
+    Max(&'a ttf::MaxWard),
+    Sum(&'a ttf::SumWardCondition),
 }
 
 impl Ward {
@@ -42,6 +48,7 @@ impl Ward {
     ) -> &mut dyn SimulationWard<S, T, SimulationState = SimulationState<S, T>> {
         match self {
             Ward::Max(ward) => ward,
+            Ward::Sum(ward) => ward,
         }
     }
 }

@@ -12,7 +12,7 @@ use std::{
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
-use crate::warding::Ward;
+use crate::warding::WardCondition;
 // internal
 
 #[serde_with::serde_as]
@@ -91,7 +91,7 @@ pub trait Node {
     fn id(&self) -> NodeId;
     fn state(&self) -> &Self::State;
     fn step(&mut self, elapsed: Duration);
-    fn analyze(&self, ward: Ward) -> bool;
+    fn analyze(&self, ward: &mut WardCondition) -> bool;
 }
 
 #[derive(
@@ -164,7 +164,7 @@ impl Node for usize {
         self.add_assign(1);
     }
 
-    fn analyze(&self, _: Ward) -> bool {
+    fn analyze(&self, _: &mut WardCondition) -> bool {
         todo!()
     }
 }
