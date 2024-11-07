@@ -133,6 +133,7 @@ impl MixNode {
                 node_id: id,
                 mock_counter: 0,
                 step_id: 0,
+                num_messages_broadcasted: 0,
             },
             persistent_sender,
             persistent_update_time_sender,
@@ -195,7 +196,8 @@ impl Node for MixNode {
                     persistent_sender.send(msg).unwrap();
                 }
                 MixOutgoingMessage::FullyUnwrapped(_) => {
-                    //TODO: increase counter and create a tracing event
+                    self.state.num_messages_broadcasted += 1;
+                    //TODO: create a tracing event
                 }
             }
         }
