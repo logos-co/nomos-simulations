@@ -1,3 +1,4 @@
+mod consensus_streams;
 mod scheduler;
 pub mod state;
 mod stream_wrapper;
