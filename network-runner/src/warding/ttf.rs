@@ -1,3 +1,4 @@
+use super::Ward::Max;
 use crate::warding::{SimulationState, SimulationWard};
 use serde::{Deserialize, Serialize};
 
@@ -5,29 +6,27 @@ use serde::{Deserialize, Serialize};
 /// the set threshold.
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 #[serde(transparent)]
-pub struct MaxViewWard {
-    max_count: usize,
+pub struct MaxWard {
+    pub max_count: usize,
 }
 
-impl<S, T> SimulationWard<S, T> for MaxViewWard {
+impl<S, T> SimulationWard<S, T> for MaxWard {
     type SimulationState = SimulationState<S, T>;
-    fn analyze(&mut self, _state: &Self::SimulationState) -> bool {
-        // state.nodes.read().iter();
-        //.all(|n| n.current_view() >= self.max_count)
-        todo!()
+    fn analyze(&mut self, state: &Self::SimulationState) -> bool {
+        state.nodes.read().iter().all(|n| n.analyze(Max(*self)))
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::warding::ttf::MaxViewWard;
+    use crate::warding::ttf::MaxWard;
     use crate::warding::{SimulationState, SimulationWard};
     use parking_lot::RwLock;
     use std::sync::Arc;
 
     #[test]
     fn rebase_threshold() {
-        let mut ttf = MaxViewWard { max_count: 10 };
+        let mut ttf = MaxWard { max_count: 10 };
 
         let node = 11;
         let state = SimulationState {

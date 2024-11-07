@@ -3,7 +3,10 @@ pub mod state;
 mod stream_wrapper;
 
 use super::{Node, NodeId};
-use crate::network::{InMemoryNetworkInterface, NetworkInterface, PayloadSize};
+use crate::{
+    network::{InMemoryNetworkInterface, NetworkInterface, PayloadSize},
+    warding::Ward,
+};
 use crossbeam::channel;
 use futures::Stream;
 use multiaddr::Multiaddr;
@@ -208,5 +211,11 @@ impl Node for MixNode {
 
         self.state.step_id += 1;
         self.state.mock_counter += 1;
+    }
+
+    fn analyze(&self, ward: Ward) -> bool {
+        match ward {
+            Ward::Max(condition) => self.state.mock_counter >= condition.max_count,
+        }
     }
 }
