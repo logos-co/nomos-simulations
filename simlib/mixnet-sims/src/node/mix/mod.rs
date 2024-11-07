@@ -1,18 +1,18 @@
-mod lottery;
-mod consensus_streams;
-mod scheduler;
+pub mod consensus_streams;
+pub mod lottery;
+pub mod scheduler;
 pub mod state;
-mod stream_wrapper;
+pub mod stream_wrapper;
 
-use super::{Node, NodeId};
-use crate::{
-    network::{InMemoryNetworkInterface, NetworkInterface, PayloadSize},
-    warding::WardCondition,
-};
 use crossbeam::channel;
 use futures::Stream;
 use lottery::StakeLottery;
 use multiaddr::Multiaddr;
+use netrunner::node::{Node, NodeId};
+use netrunner::{
+    network::{InMemoryNetworkInterface, NetworkInterface, PayloadSize},
+    warding::WardCondition,
+};
 use nomos_mix::{
     membership::Membership,
     message_blend::{

@@ -1,22 +1,16 @@
 [package]
-name = "nomos-simulations-network-runner"
+name = "netrunner"
 version = "0.1.0"
 edition = "2021"
-
-[[bin]]
-name = "simulation"
-path = "src/bin/app/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = "1"
 blake2 = "0.10"
-bls-signatures = "0.14"
 digest = "0.10"
 csv = "1"
 clap = { version = "4", features = ["derive"] }
-ctrlc = "3.4"
 chrono = { version = "0.4", features = ["serde"] }
 crc32fast = "1.3"
 crossbeam = { version = "0.8.2", features = ["crossbeam-channel"] }
@@ -24,10 +18,8 @@ fixed-slice-deque = "0.1.0-beta2"
 futures = "0.3"
 humantime = "2.1"
 humantime-serde = "1"
-nomos-tracing = { git = "https://github.com/logos-co/nomos-node.git", rev = "cc5fef6" }
 once_cell = "1.17"
 parking_lot = "0.12"
-polars = { version = "0.27", features = ["serde", "object", "json", "csv-file", "parquet", "dtype-struct"], optional = true }
 rand = { version = "0.8", features = ["small_rng"] }
 rayon = "1.7"
 scopeguard = "1"
@@ -36,14 +28,6 @@ serde_with = "2.3"
 serde_json = "1.0"
 thiserror = "1"
 tracing = { version = "0.1", default-features = false, features = ["log", "attributes"] }
-tracing-subscriber = { version = "0.3", features = ["json", "env-filter", "tracing-log"]}
-nomos-mix = { git = "https://github.com/logos-co/nomos-node", rev = "e095964", package = "nomos-mix" }
-nomos-mix-message = { git = "https://github.com/logos-co/nomos-node", rev = "e095964", package = "nomos-mix-message" }
-rand_chacha = "0.3"
-multiaddr = "0.18"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
-
-[features]
-polars = ["dep:polars"]

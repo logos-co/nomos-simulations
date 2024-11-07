@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "netrunner",
+    "mixnet-sims"
+
+]
+resolver = "2"

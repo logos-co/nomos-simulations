@@ -3,5 +3,5 @@ __pycache__/
 *$py.class
 *.so
 simulation
-network-runner/target
+simlib/netrunner/target
 .idea/
