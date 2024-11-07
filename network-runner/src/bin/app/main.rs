@@ -104,7 +104,7 @@ impl SimulationApp {
                         seed: 0,
                         persistent_transmission: PersistentTransmissionSettings {
                             max_emission_frequency: 1.0,
-                            drop_message_probability: 0.5,
+                            drop_message_probability: 0.0,
                         },
                         message_blend: MessageBlendSettings {
                             cryptographic_processor: CryptographicProcessorSettings {
