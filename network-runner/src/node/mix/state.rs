@@ -14,6 +14,7 @@ pub struct MixnodeState {
     pub node_id: NodeId,
     pub mock_counter: usize,
     pub step_id: usize,
+    pub num_messages_broadcasted: usize,
 }
 
 #[derive(Serialize)]
