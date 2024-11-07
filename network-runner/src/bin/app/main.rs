@@ -101,6 +101,8 @@ impl SimulationApp {
                             .filter(|&id| id != &node_id)
                             .copied()
                             .choose_multiple(&mut rng, 3),
+                        data_message_lottery_interval: Duration::from_secs(20),
+                        stake_proportion: 1.0 / node_ids.len() as f64,
                         seed: 0,
                         persistent_transmission: PersistentTransmissionSettings {
                             max_emission_frequency: 1.0,
