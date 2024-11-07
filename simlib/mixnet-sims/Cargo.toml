@@ -22,4 +22,4 @@ nomos-mix-message = { git = "https://github.com/logos-co/nomos-node", rev = "e09
 futures = "0.3.31"
 rand_chacha = "0.3"
 multiaddr = "0.18"
-
+x25519-dalek = { version = "2", features = ["static_secrets"] }

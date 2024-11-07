@@ -29,11 +29,7 @@ use rand_chacha::ChaCha12Rng;
 use scheduler::{Interval, TemporalRelease};
 use serde::Deserialize;
 use state::MixnodeState;
-use std::{
-    pin::{self},
-    task::Poll,
-    time::Duration,
-};
+use std::{pin::pin, task::Poll, time::Duration};
 use stream_wrapper::CrossbeamReceiverStream;
 
 #[derive(Debug, Clone)]
@@ -136,7 +132,11 @@ impl MixNode {
                 public_key,
             })
             .collect();
-        let membership = Membership::<MockMixMessage>::new(nodes, id.into());
+        let local_private_key: [u8; 32] = id.into();
+        let local_public_key =
+            x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(local_private_key))
+                .to_bytes();
+        let membership = Membership::<MockMixMessage>::new(nodes, local_public_key);
         let crypto_processor = CryptographicProcessor::new(
             settings.message_blend.cryptographic_processor.clone(),
             membership.clone(),
@@ -186,6 +186,14 @@ impl MixNode {
         }
     }
 
+    fn receive(&self) -> Vec<MixMessage> {
+        self.network_interface
+            .receive_messages()
+            .into_iter()
+            .map(|msg| msg.into_payload())
+            .collect()
+    }
+
     fn update_time(&mut self, elapsed: Duration) {
         self.data_msg_lottery_update_time_sender
             .send(elapsed)
@@ -211,43 +219,39 @@ impl Node for MixNode {
     fn step(&mut self, elapsed: Duration) {
         self.update_time(elapsed);
 
-        let Self {
-            data_msg_lottery_interval,
-            data_msg_lottery,
-            persistent_sender,
-            persistent_transmission_messages,
-            crypto_processor,
-            blend_sender,
-            blend_messages,
-            ..
-        } = self;
         let waker = futures::task::noop_waker();
         let mut cx = futures::task::Context::from_waker(&waker);
 
-        if let Poll::Ready(Some(_)) = pin::pin!(data_msg_lottery_interval).poll_next(&mut cx) {
-            if data_msg_lottery.run() {
+        if let Poll::Ready(Some(_)) = pin!(&mut self.data_msg_lottery_interval).poll_next(&mut cx) {
+            if self.data_msg_lottery.run() {
+                println!("GENERATE DATA MESSAGE: Node:{}", self.id);
                 // TODO: Include a meaningful information in the payload (such as, step_id) to
                 // measure the latency until the message reaches the last mix node.
-                let message = crypto_processor.wrap_message(&[1u8; 1024]).unwrap();
-                persistent_sender.send(message).unwrap();
+                let message = self.crypto_processor.wrap_message(&[1u8; 1024]).unwrap();
+                self.persistent_sender.send(message).unwrap();
+            } else {
+                println!("STAKE LOTTERY FAILURE: Node:{}", self.id);
             }
         }
 
         // TODO: Generate cover message with probability
 
-        let messages = self.network_interface.receive_messages();
-        for message in messages {
-            println!(">>>>> Node {}, message: {message:?}", self.id);
-            blend_sender.send(message.into_payload().0).unwrap();
+        for message in self.receive() {
+            // println!(">>>>> Node {}, message: {message:?}", self.id);
+            // TODO: use cache to deduplicate messages already forwarded or processed
+            self.forward(message.clone());
+            self.blend_sender.send(message.0).unwrap();
         }
 
         // Proceed message blend
-        if let Poll::Ready(Some(msg)) = pin::pin!(blend_messages).poll_next(&mut cx) {
+        if let Poll::Ready(Some(msg)) = pin!(&mut self.blend_messages).poll_next(&mut cx) {
             match msg {
                 MixOutgoingMessage::Outbound(msg) => {
-                    persistent_sender.send(msg).unwrap();
+                    println!("MSG FROM BLEND");
+                    self.persistent_sender.send(msg).unwrap();
                 }
                 MixOutgoingMessage::FullyUnwrapped(_) => {
+                    println!("FULLY UNWRAPPED: Node:{}", self.id);
                     self.state.num_messages_broadcasted += 1;
                     //TODO: create a tracing event
                 }
@@ -255,8 +259,9 @@ impl Node for MixNode {
         }
         // Proceed persistent transmission
         if let Poll::Ready(Some(msg)) =
-            pin::pin!(persistent_transmission_messages).poll_next(&mut cx)
+            pin!(&mut self.persistent_transmission_messages).poll_next(&mut cx)
         {
+            // TODO: use cache to deduplicate messages already forwarded
             self.forward(MixMessage(msg));
         }
 

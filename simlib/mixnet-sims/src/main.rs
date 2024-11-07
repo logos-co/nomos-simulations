@@ -99,11 +99,11 @@ impl SimulationApp {
                             .filter(|&id| id != &node_id)
                             .copied()
                             .choose_multiple(&mut rng, 3),
-                        data_message_lottery_interval: Duration::from_secs(20),
+                        data_message_lottery_interval: Duration::from_secs(2),
                         stake_proportion: 1.0 / node_ids.len() as f64,
                         seed: 0,
                         persistent_transmission: PersistentTransmissionSettings {
-                            max_emission_frequency: 1.0,
+                            max_emission_frequency: 10.0,
                             drop_message_probability: 0.0,
                         },
                         message_blend: MessageBlendSettings {
@@ -112,10 +112,19 @@ impl SimulationApp {
                                 num_mix_layers: 1,
                             },
                             temporal_processor: TemporalSchedulerSettings {
-                                max_delay_seconds: 10,
+                                max_delay_seconds: 2,
                             },
                         },
-                        membership: node_ids.iter().map(|&id| id.into()).collect(),
+                        membership: node_ids
+                            .iter()
+                            .map(|&id| {
+                                let private_key: [u8; 32] = id.into();
+                                x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(
+                                    private_key,
+                                ))
+                                .to_bytes()
+                            })
+                            .collect(),
                     },
                 )
             })
