@@ -9,14 +9,16 @@ use futures::Stream;
 use multiaddr::Multiaddr;
 use nomos_mix::{
     membership::Membership,
-    message_blend::{MessageBlendExt, MessageBlendSettings, MessageBlendStream},
+    message_blend::{
+        crypto::CryptographicProcessor, MessageBlendExt, MessageBlendSettings, MessageBlendStream,
+    },
     persistent_transmission::{
         PersistentTransmissionExt, PersistentTransmissionSettings, PersistentTransmissionStream,
     },
     MixOutgoingMessage,
 };
 use nomos_mix_message::mock::MockMixMessage;
-use rand::SeedableRng;
+use rand::{Rng, RngCore, SeedableRng};
 use rand_chacha::ChaCha12Rng;
 use scheduler::{Interval, TemporalRelease};
 use serde::Deserialize;
@@ -53,6 +55,8 @@ pub struct MixNode {
     settings: MixnodeSettings,
     network_interface: InMemoryNetworkInterface<MixMessage>,
 
+    msg_gen_rng: ChaCha12Rng,
+
     persistent_sender: channel::Sender<Vec<u8>>,
     persistent_update_time_sender: channel::Sender<Duration>,
     persistent_transmission_messages: PersistentTransmissionStream<
@@ -61,6 +65,7 @@ pub struct MixNode {
         MockMixMessage,
         Interval,
     >,
+    crypto_processor: CryptographicProcessor<ChaCha12Rng, MockMixMessage>,
     blend_sender: channel::Sender<Vec<u8>>,
     blend_update_time_sender: channel::Sender<Duration>,
     blend_messages: MessageBlendStream<
@@ -110,6 +115,11 @@ impl MixNode {
             })
             .collect();
         let membership = Membership::<MockMixMessage>::new(nodes, id.into());
+        let crypto_processor = CryptographicProcessor::new(
+            settings.message_blend.cryptographic_processor.clone(),
+            membership.clone(),
+            ChaCha12Rng::from_rng(&mut rng_generator).unwrap(),
+        );
         let temporal_release = TemporalRelease::new(
             ChaCha12Rng::from_rng(&mut rng_generator).unwrap(),
             blend_update_time_receiver,
@@ -134,9 +144,11 @@ impl MixNode {
                 mock_counter: 0,
                 step_id: 0,
             },
+            msg_gen_rng: ChaCha12Rng::from_rng(&mut rng_generator).unwrap(),
             persistent_sender,
             persistent_update_time_sender,
             persistent_transmission_messages,
+            crypto_processor,
             blend_sender,
             blend_update_time_sender,
             blend_messages,
@@ -175,10 +187,20 @@ impl Node for MixNode {
         let Self {
             persistent_sender,
             persistent_transmission_messages,
+            crypto_processor,
             blend_sender,
             blend_messages,
             ..
         } = self;
+
+        // Generate a message probabilistically (1 % chance)
+        // TODO: Replace this with the actual cover message generation
+        if self.msg_gen_rng.gen_range(0..100) == 0 {
+            let mut payload = [0u8; 1024];
+            self.msg_gen_rng.fill_bytes(&mut payload);
+            let message = crypto_processor.wrap_message(&payload).unwrap();
+            persistent_sender.send(message).unwrap();
+        }
 
         let messages = self.network_interface.receive_messages();
         for message in messages {
