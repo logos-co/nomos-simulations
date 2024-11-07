@@ -5,3 +5,5 @@ __pycache__/
 simulation
 simlib/netrunner/target
 .idea/
+target/
+Cargo.lock

@@ -62,11 +62,12 @@ mod tests {
     #[test]
     fn counter_interval() {
         let waker = futures::task::noop_waker();
-        let mut cx = futures::task::Context::from_waker(&waker);
+        let mut cx = Context::from_waker(&waker);
 
         let (update_sender, update_receiver) = channel::unbounded();
         let mut interval = CounterInterval::new(Duration::from_secs(1), update_receiver);
 
+        update_sender.send(Duration::from_secs(0)).unwrap();
         assert_eq!(interval.poll_next_unpin(&mut cx), Poll::Pending);
         update_sender.send(Duration::from_millis(999)).unwrap();
         assert_eq!(interval.poll_next_unpin(&mut cx), Poll::Pending);
@@ -81,11 +82,12 @@ mod tests {
     #[test]
     fn slot_interval() {
         let waker = futures::task::noop_waker();
-        let mut cx = futures::task::Context::from_waker(&waker);
+        let mut cx = Context::from_waker(&waker);
 
         let (update_sender, update_receiver) = channel::unbounded();
         let mut slot = Slot::new(3, Duration::from_secs(1), update_receiver);
 
+        update_sender.send(Duration::from_secs(0)).unwrap();
         assert_eq!(slot.poll_next_unpin(&mut cx), Poll::Pending);
         update_sender.send(Duration::from_millis(999)).unwrap();
         assert_eq!(slot.poll_next_unpin(&mut cx), Poll::Pending);
