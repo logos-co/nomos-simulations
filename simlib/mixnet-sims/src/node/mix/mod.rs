@@ -1,8 +1,8 @@
-mod lottery;
-mod consensus_streams;
-mod scheduler;
+pub mod scheduler;
+pub mod lottery;
+pub mod consensus_streams;
 pub mod state;
-mod stream_wrapper;
+pub mod stream_wrapper;
 
 use super::{Node, NodeId};
 use crate::{
@@ -13,6 +13,8 @@ use crossbeam::channel;
 use futures::Stream;
 use lottery::StakeLottery;
 use multiaddr::Multiaddr;
+use netrunner::network::{InMemoryNetworkInterface, NetworkInterface, PayloadSize};
+use netrunner::node::{Node, NodeId};
 use nomos_mix::{
     membership::Membership,
     message_blend::{
@@ -24,7 +26,7 @@ use nomos_mix::{
     MixOutgoingMessage,
 };
 use nomos_mix_message::mock::MockMixMessage;
-use rand::SeedableRng;
+use rand::{Rng, RngCore, SeedableRng};
 use rand_chacha::ChaCha12Rng;
 use scheduler::{Interval, TemporalRelease};
 use serde::Deserialize;

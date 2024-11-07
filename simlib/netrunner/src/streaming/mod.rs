@@ -11,8 +11,6 @@ use crate::output_processors::{Record, RecordType, Runtime};
 
 pub mod io;
 pub mod naive;
-#[cfg(feature = "polars")]
-pub mod polars;
 pub mod runtime_subscriber;
 pub mod settings_subscriber;
 
@@ -84,8 +82,6 @@ pub enum StreamType {
     #[default]
     IO,
     Naive,
-    #[cfg(feature = "polars")]
-    Polars,
 }
 
 impl FromStr for StreamType {
@@ -95,8 +91,6 @@ impl FromStr for StreamType {
         match s.trim().to_ascii_lowercase().as_str() {
             "io" => Ok(Self::IO),
             "naive" => Ok(Self::Naive),
-            #[cfg(feature = "polars")]
-            "polars" => Ok(Self::Polars),
             tag => Err(format!(
                 "Invalid {tag} streaming type, only [naive, polars] are supported",
             )),
@@ -119,8 +113,6 @@ impl<'de> serde::Deserialize<'de> for StreamType {
 pub enum StreamSettings {
     Naive(naive::NaiveSettings),
     IO(io::IOStreamSettings),
-    #[cfg(feature = "polars")]
-    Polars(polars::PolarsSettings),
 }
 
 impl Default for StreamSettings {
@@ -141,14 +133,6 @@ impl StreamSettings {
         match self {
             StreamSettings::IO(settings) => settings,
             _ => panic!("unwrap io failed"),
-        }
-    }
-
-    #[cfg(feature = "polars")]
-    pub fn unwrap_polars(self) -> polars::PolarsSettings {
-        match self {
-            StreamSettings::Polars(settings) => settings,
-            _ => panic!("unwrap polars failed"),
         }
     }
 }

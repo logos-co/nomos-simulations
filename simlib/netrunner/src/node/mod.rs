@@ -1,6 +1,5 @@
 #[cfg(test)]
 pub mod dummy_streaming;
-pub mod mix;
 
 // std
 use std::{

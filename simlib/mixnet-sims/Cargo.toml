@@ -1,0 +1,25 @@
+[package]
+name = "mixnet-sims"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.93"
+clap = { version = "4.5.20", features = ["derive"] }
+crossbeam = "0.8.4"
+ctrlc = "3.4"
+parking_lot = "0.12.3"
+rand = "0.8"
+serde = { version = "1.0.214", features = ["derive"] }
+log = "0.4.22"
+serde_json = "1.0.132"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter", "tracing-log"] }
+netrunner = { path = "../netrunner" }
+nomos-tracing = { git = "https://github.com/logos-co/nomos-node.git", rev = "cc5fef6" }
+nomos-mix = { git = "https://github.com/logos-co/nomos-node", rev = "e095964", package = "nomos-mix" }
+nomos-mix-message = { git = "https://github.com/logos-co/nomos-node", rev = "e095964", package = "nomos-mix-message" }
+futures = "0.3.31"
+rand_chacha = "0.3"
+multiaddr = "0.18"
+

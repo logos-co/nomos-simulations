@@ -2,7 +2,7 @@ use std::any::Any;
 
 use serde::Serialize;
 
-use crate::{
+use netrunner::{
     node::NodeId,
     output_processors::{Record, RecordType, Runtime},
     settings::SimulationSettings,

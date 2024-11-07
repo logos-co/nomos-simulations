@@ -4,26 +4,22 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 // crates
+use crate::node::mix::state::{MixnodeRecord, MixnodeState};
+use crate::node::mix::{MixMessage, MixnodeSettings};
 use anyhow::Ok;
 use clap::Parser;
 use crossbeam::channel;
+use netrunner::network::behaviour::create_behaviours;
+use netrunner::network::regions::{create_regions, RegionsData};
+use netrunner::network::{InMemoryNetworkInterface, Network};
+use netrunner::node::{NodeId, NodeIdExt};
+use netrunner::output_processors::Record;
+use netrunner::runner::{BoxedNode, SimulationRunnerHandle};
+use netrunner::streaming::{io::IOSubscriber, naive::NaiveSubscriber, StreamType};
 use nomos_mix::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
 use nomos_mix::persistent_transmission::PersistentTransmissionSettings;
-use nomos_simulations_network_runner::network::behaviour::create_behaviours;
-use nomos_simulations_network_runner::network::regions::{create_regions, RegionsData};
-use nomos_simulations_network_runner::network::{InMemoryNetworkInterface, Network};
-use nomos_simulations_network_runner::node::mix::state::{MixnodeRecord, MixnodeState};
-use nomos_simulations_network_runner::node::mix::{MixMessage, MixNode, MixnodeSettings};
-use nomos_simulations_network_runner::node::{NodeId, NodeIdExt};
-use nomos_simulations_network_runner::output_processors::Record;
-use nomos_simulations_network_runner::runner::{BoxedNode, SimulationRunnerHandle};
-#[cfg(feature = "polars")]
-use nomos_simulations_network_runner::streaming::polars::PolarsSubscriber;
-use nomos_simulations_network_runner::streaming::{
-    io::IOSubscriber, naive::NaiveSubscriber, StreamType,
-};
 use parking_lot::Mutex;
 use rand::prelude::IteratorRandom;
 use rand::rngs::SmallRng;
@@ -32,9 +28,11 @@ use rand::SeedableRng;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 // internal
-use nomos_simulations_network_runner::{runner::SimulationRunner, settings::SimulationSettings};
-mod log;
+use crate::node::mix::MixNode;
+use netrunner::{runner::SimulationRunner, settings::SimulationSettings};
 
+mod log;
+mod node;
 /// Main simulation wrapper
 /// Pipes together the cli arguments with the execution
 #[derive(Parser)]
@@ -194,11 +192,6 @@ where
         Some(StreamType::IO) => {
             let settings = stream_settings.unwrap_io();
             runner.simulate_and_subscribe::<IOSubscriber<MixnodeRecord>>(settings)?
-        }
-        #[cfg(feature = "polars")]
-        Some(StreamType::Polars) => {
-            let settings = stream_settings.unwrap_polars();
-            runner.simulate_and_subscribe::<PolarsSubscriber<MixnodeRecord>>(settings)?
         }
         None => runner.simulate()?,
     };
