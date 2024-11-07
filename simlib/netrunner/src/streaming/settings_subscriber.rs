@@ -101,9 +101,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
     use std::{collections::HashMap, time::Duration};
 
-    use consensus_engine::View;
+    type View = usize;
 
     use crate::{
         network::{
@@ -123,7 +124,7 @@ mod tests {
     use super::*;
     #[derive(Debug, Clone, Serialize)]
     struct SettingsRecord {
-        states: HashMap<NodeId, View>,
+        states: HashSet<NodeId>,
     }
 
     impl<S, T: Serialize> TryFrom<&SimulationState<S, T>> for SettingsRecord {
@@ -131,12 +132,7 @@ mod tests {
 
         fn try_from(value: &SimulationState<S, T>) -> Result<Self, Self::Error> {
             Ok(Self {
-                states: value
-                    .nodes
-                    .read()
-                    .iter()
-                    .map(|node| (node.id(), node.current_view()))
-                    .collect(),
+                states: value.nodes.read().iter().map(|node| node.id()).collect(),
             })
         }
     }
