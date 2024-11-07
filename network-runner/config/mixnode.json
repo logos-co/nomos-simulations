@@ -27,5 +27,13 @@
   },
   "node_count": 3,
   "seed": 0,
-  "record_settings": {}
+  "record_settings": {},
+  "wards": [
+      {
+          "max": 10
+      },
+      {
+          "sum": 10
+      }
+  ]
 }
