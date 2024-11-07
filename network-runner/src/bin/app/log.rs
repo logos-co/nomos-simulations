@@ -1,10 +1,9 @@
-use std::{
-    fs::File,
-    io::{stderr, stdout},
-    path::PathBuf,
-    str::FromStr,
+use nomos_tracing::{
+    logging::local::{create_file_layer, create_writer_layer},
+    metrics::otlp::{create_otlp_metrics_layer, OtlpMetricsConfig},
 };
-use tracing_subscriber::fmt::{format::Format, FormatEvent, FormatFields, SubscriberBuilder};
+use std::{path::PathBuf, str::FromStr};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Default, Copy, Clone)]
 pub enum LogFormat {
@@ -45,42 +44,29 @@ impl FromStr for LogOutput {
     }
 }
 
-pub fn config_tracing(fmt: LogFormat, file: &LogOutput) {
-    let filter = std::env::var("SIMULATION_LOG").unwrap_or_else(|_| "info".to_owned());
+pub fn config_tracing(_fmt: LogFormat, log_to: &LogOutput, with_metrics: bool) {
+    let mut layers: Vec<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = vec![];
 
-    let subscriber = tracing_subscriber::fmt::fmt()
-        .without_time()
-        .with_line_number(true)
-        .with_env_filter(filter)
-        .with_file(false)
-        .with_target(true);
+    let (log_layer, _) = match log_to {
+        LogOutput::StdOut => create_writer_layer(std::io::stdout()),
+        LogOutput::StdErr => create_writer_layer(std::io::stderr()),
+        LogOutput::File(path) => create_file_layer(nomos_tracing::logging::local::FileConfig {
+            directory: path.parent().unwrap().to_owned(),
+            prefix: None,
+        }),
+    };
 
-    if let LogFormat::Json = fmt {
-        set_global(subscriber.json(), file);
-    } else {
-        set_global(subscriber, file);
+    layers.push(Box::new(log_layer));
+
+    if with_metrics {
+        let metrics_layer = create_otlp_metrics_layer(OtlpMetricsConfig {
+            endpoint: "http://127.0.0.1:9090/api/v1/otlp/v1/metrics"
+                .try_into()
+                .unwrap(),
+            host_identifier: "network_simulator".to_string(),
+        })
+        .unwrap();
+        layers.push(Box::new(metrics_layer));
     }
-}
-
-fn set_global<N, L, T>(
-    subscriber: SubscriberBuilder<N, Format<L, T>, tracing_subscriber::EnvFilter>,
-    output: &LogOutput,
-) where
-    N: for<'writer> FormatFields<'writer> + 'static + Send + Sync,
-    Format<L, T>: FormatEvent<tracing_subscriber::Registry, N>,
-    L: Send + Sync + 'static,
-    T: Send + Sync + 'static,
-{
-    use tracing::subscriber::set_global_default;
-    match output {
-        LogOutput::StdOut => set_global_default(subscriber.with_writer(stdout).finish()),
-        LogOutput::StdErr => set_global_default(subscriber.with_writer(stderr).finish()),
-        LogOutput::File(path) => set_global_default(
-            subscriber
-                .with_ansi(false)
-                .with_writer(File::create(path).expect("Unable to create log file"))
-                .finish(),
-        ),
-    }
-    .expect("Unable to set global default subscriber")
+    tracing_subscriber::registry().with(layers).init();
 }

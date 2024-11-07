@@ -50,6 +50,8 @@ pub struct SimulationApp {
     log_to: log::LogOutput,
     #[clap(long)]
     no_netcap: bool,
+    #[clap(long)]
+    with_metrics: bool,
 }
 
 impl SimulationApp {
@@ -60,6 +62,7 @@ impl SimulationApp {
             log_format: _,
             log_to: _,
             no_netcap,
+            with_metrics: _,
         } = self;
         let simulation_settings: SimulationSettings = load_json_from_file(&input_settings)?;
 
@@ -234,7 +237,7 @@ fn load_json_from_file<T: DeserializeOwned>(path: &Path) -> anyhow::Result<T> {
 
 fn main() -> anyhow::Result<()> {
     let app: SimulationApp = SimulationApp::parse();
-    log::config_tracing(app.log_format, &app.log_to);
+    log::config_tracing(app.log_format, &app.log_to, app.with_metrics);
 
     if let Err(e) = app.run() {
         tracing::error!("error: {}", e);
