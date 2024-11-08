@@ -16,8 +16,8 @@ pub struct MixnodeState {
     #[serde(serialize_with = "serialize_node_id_as_index")]
     pub node_id: NodeId,
     pub step_id: usize,
-    pub data_messages_generated: HashMap<PayloadId, usize>,
-    pub data_messages_fully_unwrapped: HashMap<PayloadId, usize>,
+    pub messages_generated: HashMap<PayloadId, usize>,
+    pub messages_fully_unwrapped: HashMap<PayloadId, usize>,
 }
 
 #[derive(Serialize)]
