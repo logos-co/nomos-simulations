@@ -20,7 +20,6 @@ use nomos_mix::cover_traffic::CoverTrafficSettings;
 use nomos_mix::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
-use nomos_mix::persistent_transmission::PersistentTransmissionSettings;
 use parking_lot::Mutex;
 use rand::prelude::IteratorRandom;
 use rand::rngs::SmallRng;
@@ -30,10 +29,13 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 // internal
 use crate::node::mix::MixNode;
+use crate::settings::SimSettings;
 use netrunner::{runner::SimulationRunner, settings::SimulationSettings};
 
 mod log;
 mod node;
+mod settings;
+
 /// Main simulation wrapper
 /// Pipes together the cli arguments with the execution
 #[derive(Parser)]
@@ -63,22 +65,26 @@ impl SimulationApp {
             no_netcap,
             with_metrics: _,
         } = self;
-        let simulation_settings: SimulationSettings = load_json_from_file(&input_settings)?;
+        let settings: SimSettings = load_json_from_file(&input_settings)?;
 
-        let seed = simulation_settings.seed.unwrap_or_else(|| {
+        let seed = settings.simulation_settings.seed.unwrap_or_else(|| {
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("Time went backwards")
                 .as_secs()
         });
         let mut rng = SmallRng::seed_from_u64(seed);
-        let mut node_ids: Vec<NodeId> = (0..simulation_settings.node_count)
+        let mut node_ids: Vec<NodeId> = (0..settings.simulation_settings.node_count)
             .map(NodeId::from_index)
             .collect();
         node_ids.shuffle(&mut rng);
 
-        let regions = create_regions(&node_ids, &mut rng, &simulation_settings.network_settings);
-        let behaviours = create_behaviours(&simulation_settings.network_settings);
+        let regions = create_regions(
+            &node_ids,
+            &mut rng,
+            &settings.simulation_settings.network_settings,
+        );
+        let behaviours = create_behaviours(&settings.simulation_settings.network_settings);
         let regions_data = RegionsData::new(regions, behaviours);
 
         let ids = node_ids.clone();
@@ -92,36 +98,33 @@ impl SimulationApp {
                 create_boxed_mixnode(
                     node_id,
                     &mut network,
-                    simulation_settings.clone(),
+                    settings.simulation_settings.clone(),
                     no_netcap,
                     MixnodeSettings {
                         connected_peers: ids
                             .iter()
                             .filter(|&id| id != &node_id)
                             .copied()
-                            .choose_multiple(&mut rng, 3),
-                        data_message_lottery_interval: Duration::from_secs(20),
-                        stake_proportion: 1.0 / node_ids.len() as f64,
-                        seed: 0,
-                        epoch_duration: Duration::from_secs(86400 * 5), // 5 days seconds
-                        slot_duration: Duration::from_secs(20),
-                        persistent_transmission: PersistentTransmissionSettings {
-                            max_emission_frequency: 1.0,
-                            drop_message_probability: 0.0,
-                        },
+                            .choose_multiple(&mut rng, settings.connected_peers_count),
+                        data_message_lottery_interval: settings.data_message_lottery_interval,
+                        stake_proportion: settings.stake_proportion / node_ids.len() as f64,
+                        seed: settings.seed,
+                        epoch_duration: settings.epoch_duration, // 5 days seconds
+                        slot_duration: settings.slot_duration,
+                        persistent_transmission: settings.persistent_transmission,
                         message_blend: MessageBlendSettings {
                             cryptographic_processor: CryptographicProcessorSettings {
                                 private_key: node_id.into(),
-                                num_mix_layers: 4,
+                                num_mix_layers: settings.number_of_mix_layers,
                             },
                             temporal_processor: TemporalSchedulerSettings {
-                                max_delay_seconds: 10,
+                                max_delay_seconds: settings.max_delay_secconds,
                             },
                         },
                         cover_traffic_settings: CoverTrafficSettings {
                             node_id: node_id.0,
-                            number_of_hops: 4,
-                            slots_per_epoch: 21600,
+                            number_of_hops: settings.number_of_mix_layers,
+                            slots_per_epoch: settings.slots_per_epoch,
                             network_size: node_ids.len(),
                         },
                         membership: node_ids.iter().map(|&id| id.into()).collect(),
@@ -132,7 +135,7 @@ impl SimulationApp {
         let network = Arc::try_unwrap(network)
             .expect("network is not used anywhere else")
             .into_inner();
-        run::<_, _, _>(network, nodes, simulation_settings, stream_type)?;
+        run::<_, _, _>(network, nodes, settings.simulation_settings, stream_type)?;
         Ok(())
     }
 }
