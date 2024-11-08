@@ -76,7 +76,7 @@ pub fn config_tracing(
     }
 
     tracing_subscriber::registry()
-        .with(LevelFilter::from(Level::DEBUG))
+        .with(LevelFilter::from(Level::INFO))
         .with(layers)
         .init();
 
