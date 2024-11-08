@@ -190,8 +190,8 @@ impl MixNode {
             state: MixnodeState {
                 node_id: id,
                 step_id: 0,
-                data_messages_generated: HashMap::new(),
-                data_messages_fully_unwrapped: HashMap::new(),
+                messages_generated: HashMap::new(),
+                messages_fully_unwrapped: HashMap::new(),
             },
             data_msg_lottery_update_time_sender,
             data_msg_lottery_interval,
@@ -268,11 +268,12 @@ impl Node for MixNode {
         let waker = futures::task::noop_waker();
         let mut cx = futures::task::Context::from_waker(&waker);
 
+        // Generate a data message probabilistically
         if let Poll::Ready(Some(_)) = pin!(&mut self.data_msg_lottery_interval).poll_next(&mut cx) {
             if self.data_msg_lottery.run() {
                 let payload = Payload::new();
                 self.state
-                    .data_messages_generated
+                    .messages_generated
                     .insert(payload.id(), self.state.step_id);
                 let message = self
                     .crypto_processor
@@ -281,9 +282,9 @@ impl Node for MixNode {
                 self.persistent_sender.send(message).unwrap();
             }
         }
-        // TODO: Generate cover message with probability
+
+        // Handle incoming messages
         for network_message in self.receive() {
-            // println!(">>>>> Node {}, message: {message:?}", self.id);
             self.forward(
                 network_message.payload().clone(),
                 Some(network_message.from),
@@ -302,14 +303,23 @@ impl Node for MixNode {
                 MixOutgoingMessage::FullyUnwrapped(payload) => {
                     let payload = Payload::load(payload);
                     self.state
-                        .data_messages_fully_unwrapped
+                        .messages_fully_unwrapped
                         .insert(payload.id(), self.state.step_id);
                     //TODO: create a tracing event
                 }
             }
         }
-        if let Poll::Ready(Some(msg)) = pin!(&mut self.cover_traffic).poll_next(&mut cx) {
-            let message = self.crypto_processor.wrap_message(&msg).unwrap();
+
+        // Generate a cover message probabilistically
+        if let Poll::Ready(Some(_)) = pin!(&mut self.cover_traffic).poll_next(&mut cx) {
+            let payload = Payload::new();
+            self.state
+                .messages_generated
+                .insert(payload.id(), self.state.step_id);
+            let message = self
+                .crypto_processor
+                .wrap_message(payload.as_bytes())
+                .unwrap();
             self.persistent_sender.send(message).unwrap();
         }
 
@@ -327,8 +337,7 @@ impl Node for MixNode {
         match ward {
             WardCondition::Max(_) => false,
             WardCondition::Sum(condition) => {
-                *condition.step_result.borrow_mut() +=
-                    self.state.data_messages_fully_unwrapped.len();
+                *condition.step_result.borrow_mut() += self.state.messages_fully_unwrapped.len();
                 false
             }
         }
