@@ -263,7 +263,7 @@ impl Node for MixNode {
                     self.persistent_sender.send(msg).unwrap();
                 }
                 MixOutgoingMessage::FullyUnwrapped(_) => {
-                    println!("fully unwrapped message: Node:{}", self.id);
+                    tracing::info!("fully unwrapped message: Node:{}", self.id);
                     self.state.num_messages_broadcasted += 1;
                     //TODO: create a tracing event
                 }

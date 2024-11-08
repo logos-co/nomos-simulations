@@ -3,6 +3,8 @@ use nomos_tracing::{
     metrics::otlp::{create_otlp_metrics_layer, OtlpMetricsConfig},
 };
 use std::{path::PathBuf, str::FromStr};
+use tracing::{level_filters::LevelFilter, Level};
+use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Default, Copy, Clone)]
@@ -44,10 +46,14 @@ impl FromStr for LogOutput {
     }
 }
 
-pub fn config_tracing(_fmt: LogFormat, log_to: &LogOutput, with_metrics: bool) {
+pub fn config_tracing(
+    _fmt: LogFormat,
+    log_to: &LogOutput,
+    with_metrics: bool,
+) -> Option<WorkerGuard> {
     let mut layers: Vec<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = vec![];
 
-    let (log_layer, _) = match log_to {
+    let (log_layer, guard) = match log_to {
         LogOutput::StdOut => create_writer_layer(std::io::stdout()),
         LogOutput::StdErr => create_writer_layer(std::io::stderr()),
         LogOutput::File(path) => create_file_layer(nomos_tracing::logging::local::FileConfig {
@@ -68,5 +74,11 @@ pub fn config_tracing(_fmt: LogFormat, log_to: &LogOutput, with_metrics: bool) {
         .unwrap();
         layers.push(Box::new(metrics_layer));
     }
-    tracing_subscriber::registry().with(layers).init();
+
+    tracing_subscriber::registry()
+        .with(LevelFilter::from(Level::DEBUG))
+        .with(layers)
+        .init();
+
+    Some(guard)
 }
