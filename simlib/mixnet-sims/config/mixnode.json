@@ -38,12 +38,12 @@
   ],
   "connected_peers_count": 3,
   "data_message_lottery_interval": "20s",
-  "stake_proportion": "1.0",
+  "stake_proportion": 1.0,
   "epoch_duration": "432000s",
   "slot_duration": "20s",
   "persistent_transmission": {
-    "max_emission_frequency": "1.0",
-    "drop_message_probability": "0.0"
+    "max_emission_frequency": 1.0,
+    "drop_message_probability": 0.0
   },
   "number_of_mix_layers": 4,
   "max_delay_seconds": 10,
