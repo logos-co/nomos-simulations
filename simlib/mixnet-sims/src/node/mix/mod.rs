@@ -8,6 +8,7 @@ use crossbeam::channel;
 use futures::Stream;
 use lottery::StakeLottery;
 use multiaddr::Multiaddr;
+use netrunner::network::NetworkMessage;
 use netrunner::node::{Node, NodeId};
 use netrunner::{
     network::{InMemoryNetworkInterface, NetworkInterface, PayloadSize},
@@ -182,23 +183,27 @@ impl MixNode {
         }
     }
 
-    fn forward(&mut self, message: MixMessage) {
+    fn forward(&mut self, message: MixMessage, exclude_node: Option<NodeId>) {
         if !self.message_cache.insert(Self::sha256(&message.0)) {
             return;
         }
-        for node_id in self.settings.connected_peers.iter() {
+        for node_id in self
+            .settings
+            .connected_peers
+            .iter()
+            .filter(|&id| Some(*id) != exclude_node)
+        {
             self.network_interface
                 .send_message(*node_id, message.clone())
         }
     }
 
-    fn receive(&mut self) -> Vec<MixMessage> {
+    fn receive(&mut self) -> Vec<NetworkMessage<MixMessage>> {
         self.network_interface
             .receive_messages()
             .into_iter()
-            .map(|msg| msg.into_payload())
             // Retain only messages that have not been seen before
-            .filter(|msg| self.message_cache.insert(Self::sha256(&msg.0)))
+            .filter(|msg| self.message_cache.insert(Self::sha256(&msg.payload().0)))
             .collect()
     }
 
@@ -250,10 +255,15 @@ impl Node for MixNode {
 
         // TODO: Generate cover message with probability
 
-        for message in self.receive() {
+        for network_message in self.receive() {
             // println!(">>>>> Node {}, message: {message:?}", self.id);
-            self.forward(message.clone());
-            self.blend_sender.send(message.0).unwrap();
+            self.forward(
+                network_message.payload().clone(),
+                Some(network_message.from),
+            );
+            self.blend_sender
+                .send(network_message.into_payload().0)
+                .unwrap();
         }
 
         // Proceed message blend
@@ -273,7 +283,7 @@ impl Node for MixNode {
         if let Poll::Ready(Some(msg)) =
             pin!(&mut self.persistent_transmission_messages).poll_next(&mut cx)
         {
-            self.forward(MixMessage(msg));
+            self.forward(MixMessage(msg), None);
         }
 
         self.state.step_id += 1;
