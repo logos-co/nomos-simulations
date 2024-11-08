@@ -11,7 +11,7 @@ use clap::Parser;
 use crossbeam::channel;
 use netrunner::network::behaviour::create_behaviours;
 use netrunner::network::regions::{create_regions, RegionsData};
-use netrunner::network::{InMemoryNetworkInterface, Network};
+use netrunner::network::{InMemoryNetworkInterface, Network, PayloadSize};
 use netrunner::node::{NodeId, NodeIdExt};
 use netrunner::output_processors::Record;
 use netrunner::runner::{BoxedNode, SimulationRunnerHandle};
@@ -184,7 +184,7 @@ fn run<M, S, T>(
     stream_type: Option<StreamType>,
 ) -> anyhow::Result<()>
 where
-    M: std::fmt::Debug + Clone + Send + Sync + 'static,
+    M: std::fmt::Debug + PayloadSize + Clone + Send + Sync + 'static,
     S: 'static,
     T: Serialize + Clone + 'static,
 {
@@ -244,10 +244,11 @@ fn load_json_from_file<T: DeserializeOwned>(path: &Path) -> anyhow::Result<T> {
 
 fn main() -> anyhow::Result<()> {
     let app: SimulationApp = SimulationApp::parse();
-    let _maybe_guard = log::config_tracing(app.log_format, &app.log_to, app.with_metrics);
+    let maybe_guard = log::config_tracing(app.log_format, &app.log_to, app.with_metrics);
 
     if let Err(e) = app.run() {
         tracing::error!("error: {}", e);
+        drop(maybe_guard);
         std::process::exit(1);
     }
     Ok(())

@@ -95,7 +95,7 @@ where
     }
 
     fn subscribe_data_type() -> RecordType {
-        RecordType::Data
+        RecordType::Meta
     }
 }
 

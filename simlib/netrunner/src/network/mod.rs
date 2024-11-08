@@ -133,6 +133,8 @@ impl NodeNetworkCapacity {
                 false
             }
         } else {
+            let mut current_load = self.current_load.lock();
+            *current_load += load;
             true
         }
     }
@@ -141,19 +143,20 @@ impl NodeNetworkCapacity {
         self.load_to_flush.fetch_add(load, Ordering::Relaxed);
     }
 
-    fn flush_load(&self) {
-        if self.capacity_bps.is_none() {
-            return;
-        }
-
+    fn flush_load(&self) -> u32 {
         let mut s = self.current_load.lock();
+        let previous_load = *s;
         *s -= self.load_to_flush.load(Ordering::Relaxed);
         self.load_to_flush.store(0, Ordering::Relaxed);
+        previous_load
     }
 }
 
 #[derive(Debug)]
-pub struct Network<M: std::fmt::Debug> {
+pub struct Network<M>
+where
+    M: std::fmt::Debug + PayloadSize,
+{
     pub regions: regions::RegionsData,
     network_time: NetworkTime,
     messages: Vec<(NetworkTime, NetworkMessage<M>)>,
@@ -161,12 +164,19 @@ pub struct Network<M: std::fmt::Debug> {
     from_node_receivers: HashMap<NodeId, Receiver<NetworkMessage<M>>>,
     from_node_broadcast_receivers: HashMap<NodeId, Receiver<NetworkMessage<M>>>,
     to_node_senders: HashMap<NodeId, Sender<NetworkMessage<M>>>,
+    state: NetworkState,
     seed: u64,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+pub struct NetworkState {
+    pub total_outbound_bandwidth: u64,
+    pub total_inbound_bandwidth: u64,
 }
 
 impl<M> Network<M>
 where
-    M: std::fmt::Debug + Send + Sync + Clone,
+    M: std::fmt::Debug + PayloadSize + Send + Sync + Clone,
 {
     pub fn new(regions: regions::RegionsData, seed: u64) -> Self {
         Self {
@@ -177,8 +187,13 @@ where
             from_node_receivers: HashMap::new(),
             from_node_broadcast_receivers: HashMap::new(),
             to_node_senders: HashMap::new(),
+            state: NetworkState::default(),
             seed,
         }
+    }
+
+    pub fn bandwidth_results(&self) -> NetworkState {
+        self.state.clone()
     }
 
     fn send_message_cost<R: Rng>(
@@ -219,7 +234,9 @@ where
 
     /// Receive and store all messages from nodes.
     pub fn collect_messages(&mut self) {
-        let mut adhoc_messages = self
+        let mut total_step_outbound_bandwidth = 0u64;
+
+        let mut adhoc_messages: Vec<(Instant, NetworkMessage<M>)> = self
             .from_node_receivers
             .par_iter()
             .flat_map(|(_, from_node)| {
@@ -229,6 +246,10 @@ where
                     .collect::<Vec<_>>()
             })
             .collect();
+        total_step_outbound_bandwidth += adhoc_messages
+            .iter()
+            .map(|(_, m)| m.payload().size_bytes() as u64)
+            .sum::<u64>();
         self.messages.append(&mut adhoc_messages);
 
         let mut broadcast_messages = self
@@ -245,7 +266,13 @@ where
             })
             .map(|m| (self.network_time, m))
             .collect::<Vec<_>>();
+        total_step_outbound_bandwidth += broadcast_messages
+            .iter()
+            .map(|(_, m)| m.payload().size_bytes() as u64)
+            .sum::<u64>();
         self.messages.append(&mut broadcast_messages);
+
+        self.state.total_outbound_bandwidth += total_step_outbound_bandwidth;
     }
 
     /// Reiterate all messages and send to appropriate nodes if simulated
@@ -262,12 +289,14 @@ where
             })
             .cloned()
             .collect();
+        self.messages = delayed;
 
+        let mut total_step_inbound_bandwidth = 0u64;
         for (_, c) in self.node_network_capacity.iter() {
-            c.flush_load();
+            total_step_inbound_bandwidth += c.flush_load() as u64;
         }
 
-        self.messages = delayed;
+        self.state.total_inbound_bandwidth += total_step_inbound_bandwidth;
     }
 
     /// Returns true if message needs to be delayed and be dispatched in future.
@@ -325,6 +354,7 @@ where
             }
             remaining
         } else {
+            node_capacity.decrease_load(message.remaining_size());
             0
         }
     }
@@ -428,7 +458,7 @@ mod tests {
     use super::{
         behaviour::NetworkBehaviour,
         regions::{Region, RegionsData},
-        Network, NetworkInterface, NetworkMessage,
+        Network, NetworkInterface, NetworkMessage, PayloadSize,
     };
     use crate::{
         network::NetworkBehaviourKey,
@@ -460,6 +490,12 @@ mod tests {
                 receiver,
                 message_size,
             }
+        }
+    }
+
+    impl PayloadSize for () {
+        fn size_bytes(&self) -> u32 {
+            todo!()
         }
     }
 

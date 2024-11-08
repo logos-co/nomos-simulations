@@ -3,6 +3,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 
+use crate::network::NetworkState;
 use crate::settings::SimulationSettings;
 use crate::warding::SimulationState;
 
@@ -36,23 +37,29 @@ pub trait Record: From<Runtime> + From<SimulationSettings> + Send + Sync + 'stat
 pub type SerializedNodeState = serde_json::Value;
 
 #[derive(Serialize)]
-pub struct Runtime {
+pub struct Simulation {
     start: DateTime<Utc>,
     end: DateTime<Utc>,
     elapsed: Duration,
+}
+
+#[derive(Serialize)]
+pub enum Runtime {
+    Simulation(Simulation),
+    Network(NetworkState),
 }
 
 impl Runtime {
     pub(crate) fn load() -> anyhow::Result<Self> {
         let elapsed = crate::START_TIME.elapsed();
         let end = Utc::now();
-        Ok(Self {
+        Ok(Self::Simulation(Simulation {
             start: end
                 .checked_sub_signed(chrono::Duration::from_std(elapsed)?)
                 .unwrap(),
             end,
             elapsed,
-        })
+        }))
     }
 }
 
