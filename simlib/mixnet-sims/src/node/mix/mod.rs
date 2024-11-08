@@ -192,6 +192,7 @@ impl MixNode {
                 step_id: 0,
                 data_messages_generated: HashMap::new(),
                 data_messages_fully_unwrapped: HashMap::new(),
+                accum_num_inbound_messages: 0,
             },
             data_msg_lottery_update_time_sender,
             data_msg_lottery_interval,
@@ -225,8 +226,9 @@ impl MixNode {
     }
 
     fn receive(&mut self) -> Vec<NetworkMessage<MixMessage>> {
-        self.network_interface
-            .receive_messages()
+        let received_messages = self.network_interface.receive_messages();
+        self.state.accum_num_inbound_messages += received_messages.len();
+        received_messages
             .into_iter()
             // Retain only messages that have not been seen before
             .filter(|msg| self.message_cache.insert(Self::sha256(&msg.payload().0)))
