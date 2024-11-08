@@ -1,3 +1,4 @@
+use crate::network::PayloadSize;
 use crate::node::NodeId;
 use crate::output_processors::Record;
 use crate::runner::SimulationRunner;
@@ -19,7 +20,7 @@ pub fn simulate<M, R, S, T>(
     step_time: Duration,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
-    M: std::fmt::Debug + Clone + Send + Sync + 'static,
+    M: std::fmt::Debug + PayloadSize + Clone + Send + Sync + 'static,
     R: Record
         + for<'a> TryFrom<&'a SimulationState<S, T>, Error = anyhow::Error>
         + Send

@@ -19,7 +19,7 @@ use rayon::prelude::*;
 use serde::Serialize;
 
 // internal
-use crate::network::Network;
+use crate::network::{Network, PayloadSize};
 use crate::node::Node;
 use crate::settings::{RunnerSettings, SimulationSettings};
 use crate::warding::{SimulationState, SimulationWard, Ward};
@@ -66,7 +66,10 @@ impl<R: Record> SimulationRunnerHandle<R> {
     }
 }
 
-pub(crate) struct SimulationRunnerInner<M: std::fmt::Debug> {
+pub(crate) struct SimulationRunnerInner<M>
+where
+    M: std::fmt::Debug + PayloadSize,
+{
     network: Network<M>,
     wards: Vec<Ward>,
     rng: SmallRng,
@@ -74,7 +77,7 @@ pub(crate) struct SimulationRunnerInner<M: std::fmt::Debug> {
 
 impl<M> SimulationRunnerInner<M>
 where
-    M: std::fmt::Debug + Send + Sync + Clone,
+    M: std::fmt::Debug + PayloadSize + Send + Sync + Clone,
 {
     fn check_wards<S, T>(&mut self, state: &SimulationState<S, T>) -> bool {
         self.wards
@@ -94,7 +97,10 @@ where
 
 /// Encapsulation solution for the simulations runner
 /// Holds the network state, the simulating nodes and the simulation settings.
-pub struct SimulationRunner<M: std::fmt::Debug, R, S, T> {
+pub struct SimulationRunner<M, R, S, T>
+where
+    M: std::fmt::Debug + PayloadSize,
+{
     inner: SimulationRunnerInner<M>,
     nodes: Arc<RwLock<Vec<BoxedNode<S, T>>>>,
     runner_settings: RunnerSettings,
@@ -104,7 +110,7 @@ pub struct SimulationRunner<M: std::fmt::Debug, R, S, T> {
 
 impl<M, R, S, T> SimulationRunner<M, R, S, T>
 where
-    M: std::fmt::Debug + Clone + Send + Sync + 'static,
+    M: std::fmt::Debug + PayloadSize + Clone + Send + Sync + 'static,
     R: Record
         + for<'a> TryFrom<&'a SimulationState<S, T>, Error = anyhow::Error>
         + Send
@@ -170,7 +176,7 @@ where
 
 impl<M, R, S, T> SimulationRunner<M, R, S, T>
 where
-    M: std::fmt::Debug + Clone + Send + Sync + 'static,
+    M: std::fmt::Debug + PayloadSize + Clone + Send + Sync + 'static,
     R: Record
         + serde::Serialize
         + for<'a> TryFrom<&'a SimulationState<S, T>, Error = anyhow::Error>

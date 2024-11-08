@@ -1,4 +1,5 @@
 use super::{SimulationRunner, SimulationRunnerHandle};
+use crate::network::PayloadSize;
 use crate::output_processors::Record;
 use crate::warding::SimulationState;
 use crossbeam::channel::{bounded, select};
@@ -11,7 +12,7 @@ pub fn simulate<M, R, S, T>(
     step_time: Duration,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
-    M: std::fmt::Debug + Send + Sync + Clone + 'static,
+    M: std::fmt::Debug + PayloadSize + Send + Sync + Clone + 'static,
     R: Record
         + for<'a> TryFrom<&'a SimulationState<S, T>, Error = anyhow::Error>
         + Send
@@ -35,7 +36,7 @@ where
         loop {
             select! {
                 recv(stop_rx) -> _ => {
-                    return Ok(());
+                    break;
                 }
                 default => {
                     // we must use a code block to make sure once the step call is finished then the write lock will be released, because in Record::try_from(&state),
@@ -49,11 +50,16 @@ where
                     p.send(R::try_from(&state)?)?;
                     // check if any condition makes the simulation stop
                     if inner_runner.check_wards(&state) {
-                        return Ok(());
+                        break;
                     }
                 }
             }
         }
+        tracing::info!(
+            "Total bandwidth results: {:?}",
+            inner_runner.network.bandwidth_results()
+        );
+        Ok(())
     });
     Ok(SimulationRunnerHandle {
         producer: p1,
