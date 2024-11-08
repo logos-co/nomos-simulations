@@ -118,6 +118,7 @@ mod tests {
         let (tx, rx) = channel::unbounded();
         let mut interval = Interval::new(Duration::from_secs(2), rx);
 
+        tx.send(Duration::from_secs(0)).unwrap();
         assert_eq!(interval.poll_next_unpin(&mut cx), Poll::Ready(Some(())));
         tx.send(Duration::from_secs(0)).unwrap();
         assert_eq!(interval.poll_next_unpin(&mut cx), Poll::Pending);
@@ -133,7 +134,7 @@ mod tests {
     fn temporal_release_update() {
         let (_tx, rx) = channel::unbounded();
         let mut temporal_release =
-            TemporalRelease::new(rand_chacha::ChaCha8Rng::from_entropy(), rx, (1, 2));
+            TemporalRelease::new(rand_chacha::ChaCha8Rng::from_entropy(), rx, (1, 1));
 
         assert!(!temporal_release.update(Duration::from_secs(0)));
         assert!(!temporal_release.update(Duration::from_millis(999)));
@@ -148,12 +149,8 @@ mod tests {
 
         let (tx, rx) = channel::unbounded();
         let mut temporal_release =
-            TemporalRelease::new(rand_chacha::ChaCha8Rng::from_entropy(), rx, (1, 2));
+            TemporalRelease::new(rand_chacha::ChaCha8Rng::from_entropy(), rx, (1, 1));
 
-        assert_eq!(
-            temporal_release.poll_next_unpin(&mut cx),
-            Poll::Ready(Some(()))
-        );
         tx.send(Duration::from_secs(0)).unwrap();
         assert_eq!(temporal_release.poll_next_unpin(&mut cx), Poll::Pending);
         tx.send(Duration::from_millis(999)).unwrap();
