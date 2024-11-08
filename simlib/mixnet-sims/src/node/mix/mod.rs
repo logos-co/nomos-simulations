@@ -4,6 +4,7 @@ pub mod scheduler;
 pub mod state;
 pub mod stream_wrapper;
 
+use crate::node::mix::consensus_streams::{Epoch, Slot};
 use crossbeam::channel;
 use futures::Stream;
 use lottery::StakeLottery;
@@ -14,6 +15,7 @@ use netrunner::{
     warding::WardCondition,
 };
 use nomos_mix::{
+    cover_traffic::{CoverTraffic, CoverTrafficSettings},
     membership::Membership,
     message_blend::{
         crypto::CryptographicProcessor, MessageBlendExt, MessageBlendSettings, MessageBlendStream,
@@ -28,13 +30,17 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use scheduler::{Interval, TemporalRelease};
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use state::MixnodeState;
+use std::collections::HashSet;
+use std::pin::pin;
 use std::{
     pin::{self},
     task::Poll,
     time::Duration,
 };
 use stream_wrapper::CrossbeamReceiverStream;
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct MixMessage(Vec<u8>);
@@ -45,16 +51,21 @@ impl PayloadSize for MixMessage {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Deserialize)]
 pub struct MixnodeSettings {
     pub connected_peers: Vec<NodeId>,
     pub data_message_lottery_interval: Duration,
     pub stake_proportion: f64,
     pub seed: u64,
+    pub epoch_duration: Duration,
+    pub slot_duration: Duration,
     pub persistent_transmission: PersistentTransmissionSettings,
     pub message_blend: MessageBlendSettings<MockMixMessage>,
+    pub cover_traffic_settings: CoverTrafficSettings,
     pub membership: Vec<<MockMixMessage as nomos_mix_message::MixMessage>::PublicKey>,
 }
+
+type Sha256Hash = [u8; 32];
 
 /// This node implementation only used for testing different streaming implementation purposes.
 pub struct MixNode {
@@ -62,6 +73,7 @@ pub struct MixNode {
     state: MixnodeState,
     settings: MixnodeSettings,
     network_interface: InMemoryNetworkInterface<MixMessage>,
+    message_cache: HashSet<Sha256Hash>,
 
     data_msg_lottery_update_time_sender: channel::Sender<Duration>,
     data_msg_lottery_interval: Interval,
@@ -84,6 +96,9 @@ pub struct MixNode {
         MockMixMessage,
         TemporalRelease,
     >,
+    epoch_update_sender: channel::Sender<Duration>,
+    slot_update_sender: channel::Sender<Duration>,
+    cover_traffic: CoverTraffic<Epoch, Slot, MockMixMessage>,
 }
 
 impl MixNode {
@@ -157,13 +172,26 @@ impl MixNode {
             ChaCha12Rng::from_rng(&mut rng_generator).unwrap(),
         );
 
+        // tier 3 cover traffic
+        let (epoch_update_sender, epoch_updater_update_receiver) = channel::unbounded();
+        let (slot_update_sender, slot_updater_update_receiver) = channel::unbounded();
+        let cover_traffic: CoverTraffic<Epoch, Slot, MockMixMessage> = CoverTraffic::new(
+            settings.cover_traffic_settings,
+            Epoch::new(settings.epoch_duration, epoch_updater_update_receiver),
+            Slot::new(
+                settings.cover_traffic_settings.slots_per_epoch,
+                settings.slot_duration,
+                slot_updater_update_receiver,
+            ),
+        );
+
         Self {
             id,
             network_interface,
+            message_cache: HashSet::new(),
             settings,
             state: MixnodeState {
                 node_id: id,
-                mock_counter: 0,
                 step_id: 0,
                 num_messages_broadcasted: 0,
             },
@@ -177,14 +205,36 @@ impl MixNode {
             blend_sender,
             blend_update_time_sender,
             blend_messages,
+            epoch_update_sender,
+            slot_update_sender,
+            cover_traffic,
         }
     }
 
-    fn forward(&self, message: MixMessage) {
+    fn forward(&mut self, message: MixMessage) {
+        if !self.message_cache.insert(Self::sha256(&message.0)) {
+            return;
+        }
         for node_id in self.settings.connected_peers.iter() {
             self.network_interface
                 .send_message(*node_id, message.clone())
         }
+    }
+
+    fn receive(&mut self) -> Vec<MixMessage> {
+        self.network_interface
+            .receive_messages()
+            .into_iter()
+            .map(|msg| msg.into_payload())
+            // Retain only messages that have not been seen before
+            .filter(|msg| self.message_cache.insert(Self::sha256(&msg.0)))
+            .collect()
+    }
+
+    fn sha256(message: &[u8]) -> Sha256Hash {
+        let mut hasher = Sha256::new();
+        hasher.update(message);
+        hasher.finalize().into()
     }
 
     fn update_time(&mut self, elapsed: Duration) {
@@ -193,6 +243,12 @@ impl MixNode {
             .unwrap();
         self.persistent_update_time_sender.send(elapsed).unwrap();
         self.blend_update_time_sender.send(elapsed).unwrap();
+        self.epoch_update_sender.send(elapsed).unwrap();
+        self.slot_update_sender.send(elapsed).unwrap();
+    }
+
+    fn build_message_payload() -> [u8; 16] {
+        Uuid::new_v4().into_bytes()
     }
 }
 
@@ -211,65 +267,56 @@ impl Node for MixNode {
 
     fn step(&mut self, elapsed: Duration) {
         self.update_time(elapsed);
-
-        let Self {
-            data_msg_lottery_interval,
-            data_msg_lottery,
-            persistent_sender,
-            persistent_transmission_messages,
-            crypto_processor,
-            blend_sender,
-            blend_messages,
-            ..
-        } = self;
         let waker = futures::task::noop_waker();
         let mut cx = futures::task::Context::from_waker(&waker);
 
-        if let Poll::Ready(Some(_)) = pin::pin!(data_msg_lottery_interval).poll_next(&mut cx) {
-            if data_msg_lottery.run() {
-                // TODO: Include a meaningful information in the payload (such as, step_id) to
-                // measure the latency until the message reaches the last mix node.
-                let message = crypto_processor.wrap_message(&[1u8; 1024]).unwrap();
-                persistent_sender.send(message).unwrap();
+        if let Poll::Ready(Some(_)) = pin!(&mut self.data_msg_lottery_interval).poll_next(&mut cx) {
+            if self.data_msg_lottery.run() {
+                let payload = Self::build_message_payload();
+                let message = self.crypto_processor.wrap_message(&payload).unwrap();
+                self.persistent_sender.send(message).unwrap();
             }
         }
-
-        // TODO: Generate cover message with probability
-
-        let messages = self.network_interface.receive_messages();
-        for message in messages {
-            println!(">>>>> Node {}, message: {message:?}", self.id);
-            blend_sender.send(message.into_payload().0).unwrap();
+        let received_messages = self.receive();
+        for message in received_messages {
+            // println!(">>>>> Node {}, message: {message:?}", self.id);
+            self.forward(message.clone());
+            self.blend_sender.send(message.0).unwrap();
         }
 
         // Proceed message blend
-        if let Poll::Ready(Some(msg)) = pin::pin!(blend_messages).poll_next(&mut cx) {
+        if let Poll::Ready(Some(msg)) = pin!(&mut self.blend_messages).poll_next(&mut cx) {
             match msg {
                 MixOutgoingMessage::Outbound(msg) => {
-                    persistent_sender.send(msg).unwrap();
+                    self.persistent_sender.send(msg).unwrap();
                 }
                 MixOutgoingMessage::FullyUnwrapped(_) => {
+                    tracing::info!("fully unwrapped message: Node:{}", self.id);
                     self.state.num_messages_broadcasted += 1;
                     //TODO: create a tracing event
                 }
             }
         }
+        if let Poll::Ready(Some(msg)) = pin::pin!(&mut self.cover_traffic).poll_next(&mut cx) {
+            let message = self.crypto_processor.wrap_message(&msg).unwrap();
+            self.persistent_sender.send(message).unwrap();
+        }
+
         // Proceed persistent transmission
         if let Poll::Ready(Some(msg)) =
-            pin::pin!(persistent_transmission_messages).poll_next(&mut cx)
+            pin!(&mut self.persistent_transmission_messages).poll_next(&mut cx)
         {
             self.forward(MixMessage(msg));
         }
 
         self.state.step_id += 1;
-        self.state.mock_counter += 1;
     }
 
     fn analyze(&self, ward: &mut WardCondition) -> bool {
         match ward {
-            WardCondition::Max(condition) => self.state.mock_counter >= condition.max_count,
+            WardCondition::Max(_) => false,
             WardCondition::Sum(condition) => {
-                *condition.step_result.borrow_mut() += self.state.mock_counter;
+                *condition.step_result.borrow_mut() += self.state.num_messages_broadcasted;
                 false
             }
         }

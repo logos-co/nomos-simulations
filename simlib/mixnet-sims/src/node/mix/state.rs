@@ -12,7 +12,6 @@ use netrunner::{
 #[derive(Debug, Clone, Serialize)]
 pub struct MixnodeState {
     pub node_id: NodeId,
-    pub mock_counter: usize,
     pub step_id: usize,
     pub num_messages_broadcasted: usize,
 }
@@ -22,6 +21,7 @@ pub struct MixnodeState {
 pub enum MixnodeRecord {
     Runtime(Runtime),
     Settings(Box<SimulationSettings>),
+    #[allow(clippy::vec_box)] // we downcast stuff and we need the extra boxing
     Data(Vec<Box<MixnodeState>>),
 }
 

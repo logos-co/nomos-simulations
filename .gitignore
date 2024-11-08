@@ -7,3 +7,6 @@ simlib/netrunner/target
 .idea/
 target/
 Cargo.lock
+simlib/**/target
+simlib/**/Cargo.lock
+simlib/test.json

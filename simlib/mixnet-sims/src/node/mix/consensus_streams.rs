@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 pub struct CounterInterval {
-    interval: Box<dyn Stream<Item = usize> + Unpin>,
+    interval: Box<dyn Stream<Item = usize> + Unpin + Send + Sync>,
 }
 
 impl CounterInterval {
@@ -31,7 +31,7 @@ impl Stream for CounterInterval {
 pub type Epoch = CounterInterval;
 
 pub struct Slot {
-    interval: Box<dyn Stream<Item = usize> + Unpin>,
+    interval: Box<dyn Stream<Item = usize> + Unpin + Send + Sync>,
 }
 
 impl Slot {
