@@ -11,7 +11,7 @@ from json_stream.base import TransientStreamingJSONObject
 JsonStream = Iterable[TransientStreamingJSONObject]
 
 
-class Record:
+class Message:
     def __hash__(self):
         return self.id
 
@@ -19,30 +19,30 @@ class Record:
             self,
             message_id: str,
             generator_node: Optional[str],
-            generated_step: Optional[int],
+            generator_step: Optional[int],
             unwrapper_node: Optional[str],
             unwrapper_step: Optional[int]
     ):
         self.id = message_id
         self.generator_node = generator_node
-        self.generated_step = int(generated_step) if generated_step is not None else None
+        self.generator_step = int(generator_step) if generator_step is not None else None
         self.unwrapper_node = unwrapper_node
         self.unwrapper_step = int(unwrapper_step) if unwrapper_step is not None else None
 
     def __repr__(self):
-        return f"[{self.id}] {self.generator_node}-{self.generated_step} -> {self.unwrapper_node}-{self.unwrapper_step}"
+        return f"[{self.id}] {self.generator_node}-{self.generator_step} -> {self.unwrapper_node}-{self.unwrapper_step}"
 
     @property
     def latency(self) -> Optional[int]:
-        if self.unwrapper_step is not None and self.generated_step is not None:
-            return self.unwrapper_step - self.generated_step
+        if self.unwrapper_step is not None and self.generator_step is not None:
+            return self.unwrapper_step - self.generator_step
 
 
-RecordStorage = Dict[str, Record]
+MessageStorage = Dict[str, Message]
 
 
-def print_results(records: RecordStorage, step_duration: int):
-    latencies = [message_record.latency for message_record in records.values()]
+def print_results(message_storage: MessageStorage, step_duration: int):
+    latencies = [message_record.latency for message_record in message_storage.values()]
     valued_latencies = [latency for latency in latencies if latency is not None]
     incomplete_latencies = sum((1 for latency in latencies if latency is None))
 
@@ -61,10 +61,10 @@ def print_results(records: RecordStorage, step_duration: int):
     print("    - Duration: {:.2f}ms".format(latency_median_steps * step_duration))
 
 
-def parse_record_stream(stream: JsonStream) -> RecordStorage:
-    storage: RecordStorage = {}
+def parse_record_stream(record_stream: JsonStream) -> MessageStorage:
+    storage: MessageStorage = {}
 
-    for record in stream:
+    for record in record_stream:
         node_id = record["node_id"]
         _step_id = record["step_id"]
 
@@ -73,9 +73,9 @@ def parse_record_stream(stream: JsonStream) -> RecordStorage:
             stored_message = storage.get(generated_message_id)
             if stored_message:
                 stored_message.generator_node = node_id
-                stored_message.generated_step = generated_message_step_id
+                stored_message.generator_step = generated_message_step_id
             else:
-                storage[generated_message_id] = Record(
+                storage[generated_message_id] = Message(
                     generated_message_id, node_id, generated_message_step_id, None, None
                 )
 
@@ -86,7 +86,7 @@ def parse_record_stream(stream: JsonStream) -> RecordStorage:
                 stored_message.unwrapper_node = node_id
                 stored_message.unwrapper_step = generated_message_step_id
             else:
-                storage[generated_message_id] = Record(
+                storage[generated_message_id] = Message(
                     generated_message_id, None, None, node_id, generated_message_step_id
                 )
 
@@ -130,6 +130,6 @@ if __name__ == "__main__":
     arguments = argument_parser.parse_args()
 
     input_stream = get_input_stream(arguments.input_file)
-    parsed_records = parse_record_stream(input_stream)
+    messages = parse_record_stream(input_stream)
 
-    print_results(parsed_records, arguments.step_duration)
+    print_results(messages, arguments.step_duration)
