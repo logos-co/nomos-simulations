@@ -10,7 +10,7 @@ use cached::{Cached, TimedCache};
 use crossbeam::channel;
 use futures::Stream;
 use lottery::StakeLottery;
-use message::Payload;
+use message::{Payload, PayloadId};
 use multiaddr::Multiaddr;
 use netrunner::network::NetworkMessage;
 use netrunner::node::{Node, NodeId};
@@ -33,10 +33,9 @@ use nomos_mix_message::mock::MockMixMessage;
 use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use scheduler::{Interval, TemporalRelease};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use state::MixnodeState;
-use std::collections::HashMap;
 use std::{pin::pin, task::Poll, time::Duration};
 use stream_wrapper::CrossbeamReceiverStream;
 
@@ -193,8 +192,7 @@ impl MixNode {
             state: MixnodeState {
                 node_id: id,
                 step_id: 0,
-                messages_generated: HashMap::new(),
-                messages_fully_unwrapped: HashMap::new(),
+                num_messages_fully_unwrapped: 0,
             },
             data_msg_lottery_update_time_sender,
             data_msg_lottery_interval,
@@ -259,6 +257,22 @@ impl MixNode {
         self.epoch_update_sender.send(elapsed).unwrap();
         self.slot_update_sender.send(elapsed).unwrap();
     }
+
+    fn log_message_generated(&self, payload: &Payload) {
+        self.log_message("MessageGenerated", payload);
+    }
+
+    fn log_message_fully_unwrapped(&self, payload: &Payload) {
+        self.log_message("MessageFullyUnwrapped", payload);
+    }
+
+    fn log_message(&self, tag: &str, payload: &Payload) {
+        let log = MessageLog {
+            payload_id: payload.id(),
+            step_id: self.state.step_id,
+        };
+        tracing::info!("{}: {}", tag, serde_json::to_string(&log).unwrap());
+    }
 }
 
 impl Node for MixNode {
@@ -283,9 +297,7 @@ impl Node for MixNode {
         if let Poll::Ready(Some(_)) = pin!(&mut self.data_msg_lottery_interval).poll_next(&mut cx) {
             if self.data_msg_lottery.run() {
                 let payload = Payload::new();
-                self.state
-                    .messages_generated
-                    .insert(payload.id(), self.state.step_id);
+                self.log_message_generated(&payload);
                 let message = self
                     .crypto_processor
                     .wrap_message(payload.as_bytes())
@@ -313,9 +325,8 @@ impl Node for MixNode {
                 }
                 MixOutgoingMessage::FullyUnwrapped(payload) => {
                     let payload = Payload::load(payload);
-                    self.state
-                        .messages_fully_unwrapped
-                        .insert(payload.id(), self.state.step_id);
+                    self.log_message_fully_unwrapped(&payload);
+                    self.state.num_messages_fully_unwrapped += 1;
                     //TODO: create a tracing event
                 }
             }
@@ -324,9 +335,7 @@ impl Node for MixNode {
         // Generate a cover message probabilistically
         if let Poll::Ready(Some(_)) = pin!(&mut self.cover_traffic).poll_next(&mut cx) {
             let payload = Payload::new();
-            self.state
-                .messages_generated
-                .insert(payload.id(), self.state.step_id);
+            self.log_message_generated(&payload);
             let message = self
                 .crypto_processor
                 .wrap_message(payload.as_bytes())
@@ -348,9 +357,15 @@ impl Node for MixNode {
         match ward {
             WardCondition::Max(_) => false,
             WardCondition::Sum(condition) => {
-                *condition.step_result.borrow_mut() += self.state.messages_fully_unwrapped.len();
+                *condition.step_result.borrow_mut() += self.state.num_messages_fully_unwrapped;
                 false
             }
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct MessageLog {
+    payload_id: PayloadId,
+    step_id: usize,
 }

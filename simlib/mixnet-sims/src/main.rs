@@ -59,7 +59,7 @@ impl SimulationApp {
     pub fn run(self) -> anyhow::Result<()> {
         let Self {
             input_settings,
-            stream_type,
+            stream_type: _,
             log_format: _,
             log_to: _,
             no_netcap,
@@ -135,7 +135,7 @@ impl SimulationApp {
         let network = Arc::try_unwrap(network)
             .expect("network is not used anywhere else")
             .into_inner();
-        run::<_, _, _>(network, nodes, settings.simulation_settings, stream_type)?;
+        run::<_, _, _>(network, nodes, settings.simulation_settings, None)?;
         Ok(())
     }
 }
