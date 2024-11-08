@@ -123,7 +123,7 @@ impl SimulationApp {
                         },
                         cover_traffic_settings: CoverTrafficSettings {
                             node_id: node_id.0,
-                            number_of_hops: settings.number_of_mix_layers,
+                            number_of_hops: settings.number_of_hops,
                             slots_per_epoch: settings.slots_per_epoch,
                             network_size: node_ids.len(),
                         },
