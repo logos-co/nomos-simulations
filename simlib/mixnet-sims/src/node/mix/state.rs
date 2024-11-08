@@ -21,6 +21,7 @@ pub struct MixnodeState {
 pub enum MixnodeRecord {
     Runtime(Runtime),
     Settings(Box<SimulationSettings>),
+    #[allow(clippy::vec_box)] // we downcast stuff and we need the extra boxing
     Data(Vec<Box<MixnodeState>>),
 }
 
