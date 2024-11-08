@@ -28,13 +28,12 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use scheduler::{Interval, TemporalRelease};
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use state::MixnodeState;
-use std::{
-    pin::{self},
-    task::Poll,
-    time::Duration,
-};
+use std::collections::HashSet;
+use std::{pin::pin, task::Poll, time::Duration};
 use stream_wrapper::CrossbeamReceiverStream;
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct MixMessage(Vec<u8>);
@@ -56,12 +55,15 @@ pub struct MixnodeSettings {
     pub membership: Vec<<MockMixMessage as nomos_mix_message::MixMessage>::PublicKey>,
 }
 
+type Sha256Hash = [u8; 32];
+
 /// This node implementation only used for testing different streaming implementation purposes.
 pub struct MixNode {
     id: NodeId,
     state: MixnodeState,
     settings: MixnodeSettings,
     network_interface: InMemoryNetworkInterface<MixMessage>,
+    message_cache: HashSet<Sha256Hash>,
 
     data_msg_lottery_update_time_sender: channel::Sender<Duration>,
     data_msg_lottery_interval: Interval,
@@ -160,6 +162,7 @@ impl MixNode {
         Self {
             id,
             network_interface,
+            message_cache: HashSet::new(),
             settings,
             state: MixnodeState {
                 node_id: id,
@@ -179,11 +182,30 @@ impl MixNode {
         }
     }
 
-    fn forward(&self, message: MixMessage) {
+    fn forward(&mut self, message: MixMessage) {
+        if !self.message_cache.insert(Self::sha256(&message.0)) {
+            return;
+        }
         for node_id in self.settings.connected_peers.iter() {
             self.network_interface
                 .send_message(*node_id, message.clone())
         }
+    }
+
+    fn receive(&mut self) -> Vec<MixMessage> {
+        self.network_interface
+            .receive_messages()
+            .into_iter()
+            .map(|msg| msg.into_payload())
+            // Retain only messages that have not been seen before
+            .filter(|msg| self.message_cache.insert(Self::sha256(&msg.0)))
+            .collect()
+    }
+
+    fn sha256(message: &[u8]) -> Sha256Hash {
+        let mut hasher = Sha256::new();
+        hasher.update(message);
+        hasher.finalize().into()
     }
 
     fn update_time(&mut self, elapsed: Duration) {
@@ -192,6 +214,10 @@ impl MixNode {
             .unwrap();
         self.persistent_update_time_sender.send(elapsed).unwrap();
         self.blend_update_time_sender.send(elapsed).unwrap();
+    }
+
+    fn build_message_payload(&self) -> [u8; 16] {
+        Uuid::new_v4().into_bytes()
     }
 }
 
@@ -211,43 +237,33 @@ impl Node for MixNode {
     fn step(&mut self, elapsed: Duration) {
         self.update_time(elapsed);
 
-        let Self {
-            data_msg_lottery_interval,
-            data_msg_lottery,
-            persistent_sender,
-            persistent_transmission_messages,
-            crypto_processor,
-            blend_sender,
-            blend_messages,
-            ..
-        } = self;
         let waker = futures::task::noop_waker();
         let mut cx = futures::task::Context::from_waker(&waker);
 
-        if let Poll::Ready(Some(_)) = pin::pin!(data_msg_lottery_interval).poll_next(&mut cx) {
-            if data_msg_lottery.run() {
-                // TODO: Include a meaningful information in the payload (such as, step_id) to
-                // measure the latency until the message reaches the last mix node.
-                let message = crypto_processor.wrap_message(&[1u8; 1024]).unwrap();
-                persistent_sender.send(message).unwrap();
+        if let Poll::Ready(Some(_)) = pin!(&mut self.data_msg_lottery_interval).poll_next(&mut cx) {
+            if self.data_msg_lottery.run() {
+                let payload = self.build_message_payload();
+                let message = self.crypto_processor.wrap_message(&payload).unwrap();
+                self.persistent_sender.send(message).unwrap();
             }
         }
 
         // TODO: Generate cover message with probability
 
-        let messages = self.network_interface.receive_messages();
-        for message in messages {
-            println!(">>>>> Node {}, message: {message:?}", self.id);
-            blend_sender.send(message.into_payload().0).unwrap();
+        for message in self.receive() {
+            // println!(">>>>> Node {}, message: {message:?}", self.id);
+            self.forward(message.clone());
+            self.blend_sender.send(message.0).unwrap();
         }
 
         // Proceed message blend
-        if let Poll::Ready(Some(msg)) = pin::pin!(blend_messages).poll_next(&mut cx) {
+        if let Poll::Ready(Some(msg)) = pin!(&mut self.blend_messages).poll_next(&mut cx) {
             match msg {
                 MixOutgoingMessage::Outbound(msg) => {
-                    persistent_sender.send(msg).unwrap();
+                    self.persistent_sender.send(msg).unwrap();
                 }
                 MixOutgoingMessage::FullyUnwrapped(_) => {
+                    println!("fully unwrapped message: Node:{}", self.id);
                     self.state.num_messages_broadcasted += 1;
                     //TODO: create a tracing event
                 }
@@ -255,7 +271,7 @@ impl Node for MixNode {
         }
         // Proceed persistent transmission
         if let Poll::Ready(Some(msg)) =
-            pin::pin!(persistent_transmission_messages).poll_next(&mut cx)
+            pin!(&mut self.persistent_transmission_messages).poll_next(&mut cx)
         {
             self.forward(MixMessage(msg));
         }
