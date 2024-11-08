@@ -24,3 +24,4 @@ rand_chacha = "0.3"
 multiaddr = "0.18"
 sha2 = "0.10"
 uuid = { version = "1", features = ["fast-rng", "v4"] }
+tracing-appender = "0.2"

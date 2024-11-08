@@ -232,7 +232,7 @@ fn load_json_from_file<T: DeserializeOwned>(path: &Path) -> anyhow::Result<T> {
 
 fn main() -> anyhow::Result<()> {
     let app: SimulationApp = SimulationApp::parse();
-    log::config_tracing(app.log_format, &app.log_to, app.with_metrics);
+    let maybe_guard = log::config_tracing(app.log_format, &app.log_to, app.with_metrics);
 
     if let Err(e) = app.run() {
         tracing::error!("error: {}", e);
