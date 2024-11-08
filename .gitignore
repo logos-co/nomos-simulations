@@ -1,3 +1,4 @@
+.venv/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -10,3 +11,4 @@ Cargo.lock
 simlib/**/target
 simlib/**/Cargo.lock
 simlib/test.json
+*.ignore*
