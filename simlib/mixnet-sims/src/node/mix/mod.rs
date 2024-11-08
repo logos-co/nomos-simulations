@@ -1,6 +1,6 @@
-pub mod consensus_streams;
-pub mod lottery;
-pub mod scheduler;
+mod consensus_streams;
+mod lottery;
+mod scheduler;
 pub mod state;
 pub mod stream_wrapper;
 
@@ -163,7 +163,6 @@ impl MixNode {
             settings,
             state: MixnodeState {
                 node_id: id,
-                mock_counter: 0,
                 step_id: 0,
                 num_messages_broadcasted: 0,
             },
@@ -262,14 +261,13 @@ impl Node for MixNode {
         }
 
         self.state.step_id += 1;
-        self.state.mock_counter += 1;
     }
 
     fn analyze(&self, ward: &mut WardCondition) -> bool {
         match ward {
-            WardCondition::Max(condition) => self.state.mock_counter >= condition.max_count,
+            WardCondition::Max(_) => false,
             WardCondition::Sum(condition) => {
-                *condition.step_result.borrow_mut() += self.state.mock_counter;
+                *condition.step_result.borrow_mut() += self.state.num_messages_broadcasted;
                 false
             }
         }
