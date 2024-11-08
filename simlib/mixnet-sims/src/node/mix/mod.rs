@@ -32,6 +32,8 @@ use scheduler::{Interval, TemporalRelease};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use state::MixnodeState;
+use std::collections::HashSet;
+use std::pin::pin;
 use std::{
     pin::{self},
     task::Poll,
@@ -245,7 +247,7 @@ impl MixNode {
         self.slot_update_sender.send(elapsed).unwrap();
     }
 
-    fn build_message_payload(&self) -> [u8; 16] {
+    fn build_message_payload() -> [u8; 16] {
         Uuid::new_v4().into_bytes()
     }
 }
@@ -265,32 +267,18 @@ impl Node for MixNode {
 
     fn step(&mut self, elapsed: Duration) {
         self.update_time(elapsed);
-
-        let Self {
-            data_msg_lottery_interval,
-            data_msg_lottery,
-            persistent_sender,
-            persistent_transmission_messages,
-            crypto_processor,
-            blend_sender,
-            blend_messages,
-            cover_traffic,
-            ..
-        } = self;
         let waker = futures::task::noop_waker();
         let mut cx = futures::task::Context::from_waker(&waker);
 
         if let Poll::Ready(Some(_)) = pin!(&mut self.data_msg_lottery_interval).poll_next(&mut cx) {
             if self.data_msg_lottery.run() {
-                let payload = self.build_message_payload();
+                let payload = Self::build_message_payload();
                 let message = self.crypto_processor.wrap_message(&payload).unwrap();
                 self.persistent_sender.send(message).unwrap();
             }
         }
-
-        // TODO: Generate cover message with probability
-
-        for message in self.receive() {
+        let received_messages = self.receive();
+        for message in received_messages {
             // println!(">>>>> Node {}, message: {message:?}", self.id);
             self.forward(message.clone());
             self.blend_sender.send(message.0).unwrap();
@@ -309,9 +297,9 @@ impl Node for MixNode {
                 }
             }
         }
-        if let Poll::Ready(Some(msg)) = pin::pin!(cover_traffic).poll_next(&mut cx) {
-            let message = crypto_processor.wrap_message(&msg).unwrap();
-            persistent_sender.send(message).unwrap();
+        if let Poll::Ready(Some(msg)) = pin::pin!(&mut self.cover_traffic).poll_next(&mut cx) {
+            let message = self.crypto_processor.wrap_message(&msg).unwrap();
+            self.persistent_sender.send(message).unwrap();
         }
 
         // Proceed persistent transmission
