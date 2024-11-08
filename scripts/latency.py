@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from typing import Dict, Optional
 import json_stream
 import statistics
+import argparse
 
 from json_stream.base import TransientStreamingJSONObject
 
@@ -11,12 +12,6 @@ JsonStream = Iterable[TransientStreamingJSONObject]
 
 
 class Record:
-    id: str
-    generator_node: Optional[str]
-    generated_step: Optional[int]
-    unwrapper_node: Optional[str]
-    unwrapper_step: Optional[int]
-
     def __hash__(self):
         return self.id
 
@@ -44,6 +39,31 @@ class Record:
 
 
 RecordStorage = Dict[str, Record]
+
+
+class RecordResults:
+    def __init__(self, record_storage: RecordStorage, step_duration: int):
+        self.records: RecordStorage = record_storage
+        self.step_duration = step_duration
+
+    def print(self):
+        latencies = [message_record.latency for message_record in self.records.values()]
+        valued_latencies = [latency for latency in latencies if latency is not None]
+        incomplete_latencies = sum((1 for latency in latencies if latency is None))
+
+        latency_average_steps = statistics.mean(valued_latencies)
+        latency_median_steps = statistics.median(valued_latencies)
+
+        print("[Results]")
+        print(f"- Total messages: {len(latencies)}")
+        print(f"    - Full latencies: {len(valued_latencies)}")
+        print(f"    - Incomplete latencies: {incomplete_latencies}")
+        print("- Average")
+        print(f"    - Steps: {latency_average_steps}")
+        print("    - Duration: {:.2f}ms".format(latency_average_steps * self.step_duration))
+        print("- Median")
+        print(f"    - Steps: {latency_median_steps}")
+        print("    - Duration: {:.2f}ms".format(latency_median_steps * self.step_duration))
 
 
 def parse_record_stream(stream: JsonStream) -> RecordStorage:
@@ -88,29 +108,33 @@ def from_file(input_filename) -> JsonStream:
         yield from data["records"]
 
 
-def get_input_stream(arguments) -> JsonStream:
-    if len(arguments) == 0:
-        # If no arguments are provided, assume pipe
-        return from_pipe()
-    elif len(arguments) == 1:
-        # If more than argument is provided, assume the argument in pos 0 is the name of the file to parse
-        return from_file(arguments[0])
-    else:
-        raise NotImplementedError(f"Unsupported number of arguments: {len(args)}")
+def get_input_stream(input_filename: Optional[str]) -> JsonStream:
+    if input_filename is not None:
+        return from_file(input_filename)
+    return from_pipe()
+
+
+def build_argument_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Log analysis for nomos-simulations.")
+    parser.add_argument(
+        "--step-duration",
+        type=int,
+        default=100,
+        help="Duration (in ms) of each step in the simulation."
+    )
+    parser.add_argument(
+        "input_file",
+        nargs="?",
+        help="The file to parse. If not provided, input will be read from stdin."
+    )
+    return parser
 
 
 if __name__ == "__main__":
-    script, *args = sys.argv
-    input_stream = get_input_stream(args)
-    record_storage = parse_record_stream(input_stream)
+    argument_parser = build_argument_parser()
+    arguments = argument_parser.parse_args()
 
-    latencies = [message_record.latency for message_record in record_storage.values()]
-    valued_latencies = [latency for latency in latencies if latency is not None]
-    incomplete_latencies = sum((1 for latency in latencies if latency is None))
+    input_stream = get_input_stream(arguments.input_file)
+    parsed_records = parse_record_stream(input_stream)
 
-    print("[Results]")
-    print("- Total messages: ", len(latencies))
-    print("    - Full latencies: ", len(valued_latencies))
-    print("    - Incomplete latencies: ", incomplete_latencies)
-    print("- Average: ", statistics.mean(valued_latencies))
-    print("- Median: ", statistics.median(valued_latencies))
+    RecordResults(parsed_records, arguments.step_duration).print()
