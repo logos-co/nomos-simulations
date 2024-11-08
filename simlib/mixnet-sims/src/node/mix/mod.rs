@@ -29,11 +29,7 @@ use rand_chacha::ChaCha12Rng;
 use scheduler::{Interval, TemporalRelease};
 use serde::Deserialize;
 use state::MixnodeState;
-use std::{
-    pin::{self},
-    task::Poll,
-    time::Duration,
-};
+use std::{pin::pin, task::Poll, time::Duration};
 use stream_wrapper::CrossbeamReceiverStream;
 
 #[derive(Debug, Clone)]
@@ -124,19 +120,7 @@ impl MixNode {
         // Init Tier-2: message blend
         let (blend_sender, blend_receiver) = channel::unbounded();
         let (blend_update_time_sender, blend_update_time_receiver) = channel::unbounded();
-        let nodes: Vec<
-            nomos_mix::membership::Node<
-                <MockMixMessage as nomos_mix_message::MixMessage>::PublicKey,
-            >,
-        > = settings
-            .membership
-            .iter()
-            .map(|&public_key| nomos_mix::membership::Node {
-                address: Multiaddr::empty(),
-                public_key,
-            })
-            .collect();
-        let membership = Membership::<MockMixMessage>::new(nodes, id.into());
+        let membership = Self::build_membership(&settings.membership, id);
         let crypto_processor = CryptographicProcessor::new(
             settings.message_blend.cryptographic_processor.clone(),
             membership.clone(),
@@ -177,6 +161,28 @@ impl MixNode {
             blend_update_time_sender,
             blend_messages,
         }
+    }
+
+    fn build_membership(
+        public_keys: &[<MockMixMessage as nomos_mix_message::MixMessage>::PublicKey],
+        local_id: NodeId,
+    ) -> Membership<MockMixMessage> {
+        let nodes: Vec<
+            nomos_mix::membership::Node<
+                <MockMixMessage as nomos_mix_message::MixMessage>::PublicKey,
+            >,
+        > = public_keys
+            .iter()
+            .map(|&public_key| nomos_mix::membership::Node {
+                address: Multiaddr::empty(),
+                public_key,
+            })
+            .collect();
+        let local_private_key: [u8; 32] = local_id.into();
+        let local_public_key =
+            x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(local_private_key))
+                .to_bytes();
+        Membership::<MockMixMessage>::new(nodes, local_public_key)
     }
 
     fn forward(&self, message: MixMessage) {

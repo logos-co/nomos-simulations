@@ -115,7 +115,16 @@ impl SimulationApp {
                                 max_delay_seconds: 10,
                             },
                         },
-                        membership: node_ids.iter().map(|&id| id.into()).collect(),
+                        membership: node_ids
+                            .iter()
+                            .map(|&id| {
+                                let private_key: [u8; 32] = id.into();
+                                x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(
+                                    private_key,
+                                ))
+                                .to_bytes()
+                            })
+                            .collect(),
                     },
                 )
             })
