@@ -187,6 +187,7 @@ impl MixNode {
             id,
             network_interface,
             // We're not coupling this lifespan with the steps now, but it's okay
+            // We expected that a message will be delivered to most of nodes within 60s.
             message_cache: TimedCache::with_lifespan(60),
             settings,
             state: MixnodeState {
