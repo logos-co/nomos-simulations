@@ -10,11 +10,10 @@ pub struct SimSettings {
     pub connected_peers_count: usize,
     pub data_message_lottery_interval: Duration,
     pub stake_proportion: f64,
-    pub seed: u64,
     pub epoch_duration: Duration,
     pub slot_duration: Duration,
     pub persistent_transmission: PersistentTransmissionSettings,
     pub number_of_mix_layers: usize,
-    pub max_delay_secconds: u64,
+    pub max_delay_seconds: u64,
     pub slots_per_epoch: usize,
 }

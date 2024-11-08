@@ -24,7 +24,7 @@ use parking_lot::Mutex;
 use rand::prelude::IteratorRandom;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
-use rand::SeedableRng;
+use rand::{RngCore, SeedableRng};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 // internal
@@ -108,7 +108,7 @@ impl SimulationApp {
                             .choose_multiple(&mut rng, settings.connected_peers_count),
                         data_message_lottery_interval: settings.data_message_lottery_interval,
                         stake_proportion: settings.stake_proportion / node_ids.len() as f64,
-                        seed: settings.seed,
+                        seed: rng.next_u64(),
                         epoch_duration: settings.epoch_duration, // 5 days seconds
                         slot_duration: settings.slot_duration,
                         persistent_transmission: settings.persistent_transmission,
@@ -118,7 +118,7 @@ impl SimulationApp {
                                 num_mix_layers: settings.number_of_mix_layers,
                             },
                             temporal_processor: TemporalSchedulerSettings {
-                                max_delay_seconds: settings.max_delay_secconds,
+                                max_delay_seconds: settings.max_delay_seconds,
                             },
                         },
                         cover_traffic_settings: CoverTrafficSettings {
