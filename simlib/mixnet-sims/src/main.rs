@@ -112,7 +112,7 @@ impl SimulationApp {
                         message_blend: MessageBlendSettings {
                             cryptographic_processor: CryptographicProcessorSettings {
                                 private_key: node_id.into(),
-                                num_mix_layers: 1,
+                                num_mix_layers: 4,
                             },
                             temporal_processor: TemporalSchedulerSettings {
                                 max_delay_seconds: 10,
@@ -121,7 +121,7 @@ impl SimulationApp {
                         cover_traffic_settings: CoverTrafficSettings {
                             node_id: node_id.0,
                             number_of_hops: 4,
-                            slots_per_epoch: 200,
+                            slots_per_epoch: 21600,
                             network_size: node_ids.len(),
                         },
                         membership: node_ids.iter().map(|&id| id.into()).collect(),
