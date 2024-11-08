@@ -189,3 +189,10 @@ impl NodeIdExt for NodeId {
         NodeId::new(bytes)
     }
 }
+
+pub fn serialize_node_id_as_index<S>(id: &NodeId, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    s.serialize_u64(id.index() as u64)
+}

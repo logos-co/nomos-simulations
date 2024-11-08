@@ -3,7 +3,7 @@ use std::any::Any;
 use serde::Serialize;
 
 use netrunner::{
-    node::NodeId,
+    node::{serialize_node_id_as_index, NodeId},
     output_processors::{Record, RecordType, Runtime},
     settings::SimulationSettings,
     warding::SimulationState,
@@ -11,6 +11,7 @@ use netrunner::{
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MixnodeState {
+    #[serde(serialize_with = "serialize_node_id_as_index")]
     pub node_id: NodeId,
     pub step_id: usize,
     pub num_messages_broadcasted: usize,
