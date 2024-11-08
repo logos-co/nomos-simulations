@@ -5,3 +5,5 @@ __pycache__/
 simulation
 simlib/**/target
 .idea/
+simlib/**/Cargo.lock
+simlib/test.json
