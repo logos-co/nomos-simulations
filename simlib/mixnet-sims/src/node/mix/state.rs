@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::{any::Any, collections::HashMap};
 
 use serde::Serialize;
 
@@ -9,12 +9,15 @@ use netrunner::{
     warding::SimulationState,
 };
 
+use super::message::PayloadId;
+
 #[derive(Debug, Clone, Serialize)]
 pub struct MixnodeState {
     #[serde(serialize_with = "serialize_node_id_as_index")]
     pub node_id: NodeId,
     pub step_id: usize,
-    pub num_messages_broadcasted: usize,
+    pub data_messages_generated: HashMap<PayloadId, usize>,
+    pub data_messages_fully_unwrapped: HashMap<PayloadId, usize>,
 }
 
 #[derive(Serialize)]
