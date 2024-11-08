@@ -16,8 +16,12 @@ pub struct MixnodeState {
     #[serde(serialize_with = "serialize_node_id_as_index")]
     pub node_id: NodeId,
     pub step_id: usize,
+    // For latency measurement
     pub data_messages_generated: HashMap<PayloadId, usize>,
     pub data_messages_fully_unwrapped: HashMap<PayloadId, usize>,
+    // For anonymity measurement
+    pub accum_num_inbound_messages: usize,
+    pub accum_num_outbound_messages: usize,
 }
 
 #[derive(Serialize)]
