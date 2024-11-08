@@ -27,12 +27,13 @@ use nomos_mix_message::mock::MockMixMessage;
 use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use scheduler::{Interval, TemporalRelease};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use state::MixnodeState;
 use std::collections::HashSet;
 use std::{pin::pin, task::Poll, time::Duration};
 use stream_wrapper::CrossbeamReceiverStream;
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct MixMessage(Vec<u8>);
@@ -215,12 +216,8 @@ impl MixNode {
         self.blend_update_time_sender.send(elapsed).unwrap();
     }
 
-    fn build_message_payload(&self) -> Vec<u8> {
-        let payload = MessagePayload {
-            node_id: self.id.into(),
-            step_id: self.state.step_id,
-        };
-        bincode::serialize(&payload).unwrap()
+    fn build_message_payload(&self) -> [u8; 16] {
+        Uuid::new_v4().into_bytes()
     }
 }
 
@@ -291,10 +288,4 @@ impl Node for MixNode {
             }
         }
     }
-}
-
-#[derive(Serialize, Deserialize)]
-struct MessagePayload {
-    node_id: [u8; 32],
-    step_id: usize,
 }

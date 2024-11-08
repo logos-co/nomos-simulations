@@ -23,4 +23,4 @@ futures = "0.3.31"
 rand_chacha = "0.3"
 multiaddr = "0.18"
 sha2 = "0.10"
-bincode = "1"
+uuid = { version = "1", features = ["fast-rng", "v4"] }
