@@ -16,6 +16,7 @@ use netrunner::node::{NodeId, NodeIdExt};
 use netrunner::output_processors::Record;
 use netrunner::runner::{BoxedNode, SimulationRunnerHandle};
 use netrunner::streaming::{io::IOSubscriber, naive::NaiveSubscriber, StreamType};
+use nomos_mix::cover_traffic::CoverTrafficSettings;
 use nomos_mix::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
@@ -102,6 +103,8 @@ impl SimulationApp {
                         data_message_lottery_interval: Duration::from_secs(20),
                         stake_proportion: 1.0 / node_ids.len() as f64,
                         seed: 0,
+                        epoch_duration: Duration::from_secs(86400 * 5), // 5 days seconds
+                        slot_duration: Duration::from_secs(20),
                         persistent_transmission: PersistentTransmissionSettings {
                             max_emission_frequency: 1.0,
                             drop_message_probability: 0.0,
@@ -114,6 +117,12 @@ impl SimulationApp {
                             temporal_processor: TemporalSchedulerSettings {
                                 max_delay_seconds: 10,
                             },
+                        },
+                        cover_traffic_settings: CoverTrafficSettings {
+                            node_id: node_id.0,
+                            number_of_hops: 4,
+                            slots_per_epoch: 200,
+                            network_size: node_ids.len(),
                         },
                         membership: node_ids.iter().map(|&id| id.into()).collect(),
                     },
