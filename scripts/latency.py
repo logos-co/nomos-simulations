@@ -41,29 +41,24 @@ class Record:
 RecordStorage = Dict[str, Record]
 
 
-class RecordResults:
-    def __init__(self, record_storage: RecordStorage, step_duration: int):
-        self.records: RecordStorage = record_storage
-        self.step_duration = step_duration
+def print_results(records: RecordStorage, step_duration: int):
+    latencies = [message_record.latency for message_record in records.values()]
+    valued_latencies = [latency for latency in latencies if latency is not None]
+    incomplete_latencies = sum((1 for latency in latencies if latency is None))
 
-    def print(self):
-        latencies = [message_record.latency for message_record in self.records.values()]
-        valued_latencies = [latency for latency in latencies if latency is not None]
-        incomplete_latencies = sum((1 for latency in latencies if latency is None))
+    latency_average_steps = statistics.mean(valued_latencies)
+    latency_median_steps = statistics.median(valued_latencies)
 
-        latency_average_steps = statistics.mean(valued_latencies)
-        latency_median_steps = statistics.median(valued_latencies)
-
-        print("[Results]")
-        print(f"- Total messages: {len(latencies)}")
-        print(f"    - Full latencies: {len(valued_latencies)}")
-        print(f"    - Incomplete latencies: {incomplete_latencies}")
-        print("- Average")
-        print(f"    - Steps: {latency_average_steps}")
-        print("    - Duration: {:.2f}ms".format(latency_average_steps * self.step_duration))
-        print("- Median")
-        print(f"    - Steps: {latency_median_steps}")
-        print("    - Duration: {:.2f}ms".format(latency_median_steps * self.step_duration))
+    print("[Results]")
+    print(f"- Total messages: {len(latencies)}")
+    print(f"    - Full latencies: {len(valued_latencies)}")
+    print(f"    - Incomplete latencies: {incomplete_latencies}")
+    print("- Average")
+    print(f"    - Steps: {latency_average_steps}")
+    print("    - Duration: {:.2f}ms".format(latency_average_steps * step_duration))
+    print("- Median")
+    print(f"    - Steps: {latency_median_steps}")
+    print("    - Duration: {:.2f}ms".format(latency_median_steps * step_duration))
 
 
 def parse_record_stream(stream: JsonStream) -> RecordStorage:
@@ -137,4 +132,4 @@ if __name__ == "__main__":
     input_stream = get_input_stream(arguments.input_file)
     parsed_records = parse_record_stream(input_stream)
 
-    RecordResults(parsed_records, arguments.step_duration).print()
+    print_results(parsed_records, arguments.step_duration)
