@@ -243,6 +243,11 @@ impl Node for MixNode {
         if let Poll::Ready(Some(_)) = pin!(&mut self.data_msg_lottery_interval).poll_next(&mut cx) {
             if self.data_msg_lottery.run() {
                 let payload = self.build_message_payload();
+                tracing::info!(
+                    "Publishing message: node:{}, payload:{:?}",
+                    self.id,
+                    payload
+                );
                 let message = self.crypto_processor.wrap_message(&payload).unwrap();
                 self.persistent_sender.send(message).unwrap();
             }
@@ -251,7 +256,6 @@ impl Node for MixNode {
         // TODO: Generate cover message with probability
 
         for message in self.receive() {
-            // println!(">>>>> Node {}, message: {message:?}", self.id);
             self.forward(message.clone());
             self.blend_sender.send(message.0).unwrap();
         }
@@ -262,8 +266,12 @@ impl Node for MixNode {
                 MixOutgoingMessage::Outbound(msg) => {
                     self.persistent_sender.send(msg).unwrap();
                 }
-                MixOutgoingMessage::FullyUnwrapped(_) => {
-                    println!("fully unwrapped message: Node:{}", self.id);
+                MixOutgoingMessage::FullyUnwrapped(payload) => {
+                    tracing::info!(
+                        "Fully unwrapped message: node:{}, payload:{:?}",
+                        self.id,
+                        payload,
+                    );
                     self.state.num_messages_broadcasted += 1;
                     //TODO: create a tracing event
                 }
