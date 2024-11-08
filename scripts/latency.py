@@ -50,7 +50,7 @@ def parse_record_stream(stream: JsonStream) -> RecordStorage:
     storage: RecordStorage = {}
 
     for record in stream:
-        node_id = list(record["node_id"])
+        node_id = record["node_id"]
         _step_id = record["step_id"]
 
         data_messages_generated = record["data_messages_generated"]
@@ -103,6 +103,14 @@ if __name__ == "__main__":
     script, *args = sys.argv
     input_stream = get_input_stream(args)
     record_storage = parse_record_stream(input_stream)
-    latencies = (message_record.latency for message_record in record_storage.values())
-    print("[Average]")
-    print("- Latency: ", statistics.mean(latencies))
+
+    latencies = [message_record.latency for message_record in record_storage.values()]
+    valued_latencies = [latency for latency in latencies if latency is not None]
+    incomplete_latencies = sum((1 for latency in latencies if latency is None))
+
+    print("[Results]")
+    print("- Total messages: ", len(latencies))
+    print("    - Full latencies: ", len(valued_latencies))
+    print("    - Incomplete latencies: ", incomplete_latencies)
+    print("- Average: ", statistics.mean(valued_latencies))
+    print("- Median: ", statistics.median(valued_latencies))
