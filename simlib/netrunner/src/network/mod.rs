@@ -12,7 +12,8 @@ use std::{
 // crates
 use crossbeam::channel::{self, Receiver, Sender};
 use parking_lot::Mutex;
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha12Rng;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 // internal
@@ -284,7 +285,7 @@ where
             .messages
             .par_iter()
             .filter(|(network_time, message)| {
-                let mut rng = SmallRng::seed_from_u64(self.seed);
+                let mut rng = ChaCha12Rng::seed_from_u64(self.seed);
                 self.send_or_drop_message(&mut rng, network_time, message)
             })
             .cloned()

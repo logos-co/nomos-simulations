@@ -38,11 +38,12 @@
   "stake_proportion": 1.0,
   "epoch_duration": "432000s",
   "slot_duration": "1s",
+  "slots_per_epoch": 432000,
+  "number_of_hops": 1,
   "persistent_transmission": {
     "max_emission_frequency": 1.0,
     "drop_message_probability": 0.0
   },
   "number_of_mix_layers": 1,
-  "max_delay_seconds": 10,
-  "slots_per_epoch": 432000
+  "max_delay_seconds": 10
 }

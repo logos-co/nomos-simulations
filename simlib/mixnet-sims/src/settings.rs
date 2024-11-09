@@ -11,14 +11,18 @@ pub struct SimSettings {
     #[serde(deserialize_with = "deserialize_duration_with_human_time")]
     pub data_message_lottery_interval: Duration,
     pub stake_proportion: f64,
+    // For tier 3: cover traffic
     #[serde(deserialize_with = "deserialize_duration_with_human_time")]
     pub epoch_duration: Duration,
     #[serde(deserialize_with = "deserialize_duration_with_human_time")]
     pub slot_duration: Duration,
+    pub slots_per_epoch: usize,
+    pub number_of_hops: usize,
+    // For tier 1
     pub persistent_transmission: PersistentTransmissionSettings,
+    // For tier 2
     pub number_of_mix_layers: usize,
     pub max_delay_seconds: u64,
-    pub slots_per_epoch: usize,
 }
 
 fn deserialize_duration_with_human_time<'de, D>(deserializer: D) -> Result<Duration, D::Error>

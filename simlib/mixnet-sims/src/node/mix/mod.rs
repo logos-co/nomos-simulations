@@ -211,13 +211,6 @@ impl MixNode {
     }
 
     fn forward(&mut self, message: MixMessage, exclude_node: Option<NodeId>, log: EmissionLog) {
-        if self
-            .message_cache
-            .cache_set(Self::sha256(&message.0), ())
-            .is_some()
-        {
-            return;
-        }
         for (i, node_id) in self
             .settings
             .connected_peers
@@ -231,6 +224,7 @@ impl MixNode {
             self.network_interface
                 .send_message(*node_id, message.clone())
         }
+        self.message_cache.cache_set(Self::sha256(&message.0), ());
     }
 
     fn receive(&mut self) -> Vec<NetworkMessage<MixMessage>> {
@@ -262,8 +256,8 @@ impl MixNode {
         self.slot_update_sender.send(elapsed).unwrap();
     }
 
-    fn log_message_generated(&self, payload: &Payload) {
-        self.log_message("MessageGenerated", payload);
+    fn log_message_generated(&self, msg_type: &str, payload: &Payload) {
+        self.log_message(format!("{}MessageGenerated", msg_type).as_str(), payload);
     }
 
     fn log_message_fully_unwrapped(&self, payload: &Payload) {
@@ -314,7 +308,7 @@ impl Node for MixNode {
         if let Poll::Ready(Some(_)) = pin!(&mut self.data_msg_lottery_interval).poll_next(&mut cx) {
             if self.data_msg_lottery.run() {
                 let payload = Payload::new();
-                self.log_message_generated(&payload);
+                self.log_message_generated("Data", &payload);
                 let message = self
                     .crypto_processor
                     .wrap_message(payload.as_bytes())
@@ -353,7 +347,7 @@ impl Node for MixNode {
         // Generate a cover message probabilistically
         if let Poll::Ready(Some(_)) = pin!(&mut self.cover_traffic).poll_next(&mut cx) {
             let payload = Payload::new();
-            self.log_message_generated(&payload);
+            self.log_message_generated("Cover", &payload);
             let message = self
                 .crypto_processor
                 .wrap_message(payload.as_bytes())

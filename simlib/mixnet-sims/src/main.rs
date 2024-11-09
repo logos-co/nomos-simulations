@@ -22,9 +22,9 @@ use nomos_mix::message_blend::{
 };
 use parking_lot::Mutex;
 use rand::prelude::IteratorRandom;
-use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{RngCore, SeedableRng};
+use rand_chacha::ChaCha12Rng;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 // internal
@@ -73,7 +73,7 @@ impl SimulationApp {
                 .expect("Time went backwards")
                 .as_secs()
         });
-        let mut rng = SmallRng::seed_from_u64(seed);
+        let mut rng = ChaCha12Rng::seed_from_u64(seed);
         let mut node_ids: Vec<NodeId> = (0..settings.simulation_settings.node_count)
             .map(NodeId::from_index)
             .collect();
@@ -123,7 +123,7 @@ impl SimulationApp {
                         },
                         cover_traffic_settings: CoverTrafficSettings {
                             node_id: node_id.0,
-                            number_of_hops: settings.number_of_mix_layers,
+                            number_of_hops: settings.number_of_hops,
                             slots_per_epoch: settings.slots_per_epoch,
                             network_size: node_ids.len(),
                         },
