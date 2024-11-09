@@ -15,7 +15,7 @@ impl Interval {
     pub fn new(duration: Duration, update_time: channel::Receiver<Duration>) -> Self {
         Self {
             duration,
-            current_elapsed: Duration::from_secs(0),
+            current_elapsed: duration, // to immediately release at the interval 0
             update_time,
         }
     }
@@ -104,7 +104,7 @@ mod tests {
         let (_tx, rx) = channel::unbounded();
         let mut interval = Interval::new(Duration::from_secs(2), rx);
 
-        assert!(!interval.update(Duration::from_secs(0)));
+        assert!(interval.update(Duration::from_secs(0)));
         assert!(!interval.update(Duration::from_secs(1)));
         assert!(interval.update(Duration::from_secs(1)));
         assert!(interval.update(Duration::from_secs(3)));
@@ -119,6 +119,8 @@ mod tests {
         let mut interval = Interval::new(Duration::from_secs(2), rx);
 
         tx.send(Duration::from_secs(0)).unwrap();
+        assert_eq!(interval.poll_next_unpin(&mut cx), Poll::Ready(Some(())));
+        tx.send(Duration::from_secs(0)).unwrap();
         assert_eq!(interval.poll_next_unpin(&mut cx), Poll::Pending);
         tx.send(Duration::from_secs(1)).unwrap();
         assert_eq!(interval.poll_next_unpin(&mut cx), Poll::Pending);
@@ -132,7 +134,7 @@ mod tests {
     fn temporal_release_update() {
         let (_tx, rx) = channel::unbounded();
         let mut temporal_release =
-            TemporalRelease::new(rand_chacha::ChaCha8Rng::from_entropy(), rx, (1, 2));
+            TemporalRelease::new(rand_chacha::ChaCha8Rng::from_entropy(), rx, (1, 1));
 
         assert!(!temporal_release.update(Duration::from_secs(0)));
         assert!(!temporal_release.update(Duration::from_millis(999)));
@@ -147,7 +149,7 @@ mod tests {
 
         let (tx, rx) = channel::unbounded();
         let mut temporal_release =
-            TemporalRelease::new(rand_chacha::ChaCha8Rng::from_entropy(), rx, (1, 2));
+            TemporalRelease::new(rand_chacha::ChaCha8Rng::from_entropy(), rx, (1, 1));
 
         tx.send(Duration::from_secs(0)).unwrap();
         assert_eq!(temporal_release.poll_next_unpin(&mut cx), Poll::Pending);
