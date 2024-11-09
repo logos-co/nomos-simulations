@@ -4,7 +4,7 @@ use std::{
     ops::Add,
     str::FromStr,
     sync::{
-        atomic::{AtomicU32, Ordering},
+        atomic::{AtomicU32, AtomicU64, Ordering},
         Arc,
     },
     time::{Duration, Instant},
@@ -113,6 +113,7 @@ struct NodeNetworkCapacity {
     capacity_bps: Option<u32>,
     current_load: Mutex<u32>,
     load_to_flush: AtomicU32,
+    total_incomming_bandwidth: AtomicU64,
 }
 
 impl NodeNetworkCapacity {
@@ -121,10 +122,13 @@ impl NodeNetworkCapacity {
             capacity_bps,
             current_load: Mutex::new(0),
             load_to_flush: AtomicU32::new(0),
+            total_incomming_bandwidth: AtomicU64::new(0),
         }
     }
 
     fn increase_load(&self, load: u32) -> bool {
+        self.total_incomming_bandwidth
+            .fetch_add(load as u64, Ordering::Relaxed);
         if let Some(capacity_bps) = self.capacity_bps {
             let mut current_load = self.current_load.lock();
             if *current_load + load <= capacity_bps {
@@ -173,6 +177,9 @@ where
 pub struct NetworkState {
     pub total_outbound_bandwidth: u64,
     pub total_inbound_bandwidth: u64,
+    pub min_node_total_bandwidth: f64,
+    pub max_node_total_bandwidth: f64,
+    pub avg_node_total_bandwidth: f64,
 }
 
 impl<M> Network<M>
@@ -193,7 +200,28 @@ where
         }
     }
 
-    pub fn bandwidth_results(&self) -> NetworkState {
+    pub fn network_state(&mut self) -> NetworkState {
+        self.state.min_node_total_bandwidth = self
+            .node_network_capacity
+            .values()
+            .map(|c| c.total_incomming_bandwidth.load(Ordering::Relaxed) as f64)
+            .min_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap_or(f64::INFINITY); // Default to INFINITY if no elements are present
+
+        self.state.max_node_total_bandwidth = self
+            .node_network_capacity
+            .values()
+            .map(|c| c.total_incomming_bandwidth.load(Ordering::Relaxed) as f64)
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap_or(f64::NEG_INFINITY);
+
+        self.state.avg_node_total_bandwidth = self
+            .node_network_capacity
+            .values()
+            .map(|c| c.total_incomming_bandwidth.load(Ordering::Relaxed) as f64)
+            .sum::<f64>()
+            / self.node_network_capacity.len() as f64;
+
         self.state.clone()
     }
 

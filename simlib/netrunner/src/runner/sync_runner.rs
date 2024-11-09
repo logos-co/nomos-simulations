@@ -55,10 +55,7 @@ where
                 }
             }
         }
-        tracing::info!(
-            "Total bandwidth results: {:?}",
-            inner_runner.network.bandwidth_results()
-        );
+        tracing::info!("Network state: {:?}", inner_runner.network.network_state());
         Ok(())
     });
     Ok(SimulationRunnerHandle {
