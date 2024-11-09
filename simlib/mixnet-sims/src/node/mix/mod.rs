@@ -211,13 +211,6 @@ impl MixNode {
     }
 
     fn forward(&mut self, message: MixMessage, exclude_node: Option<NodeId>) {
-        if self
-            .message_cache
-            .cache_set(Self::sha256(&message.0), ())
-            .is_some()
-        {
-            return;
-        }
         for node_id in self
             .settings
             .connected_peers
@@ -227,6 +220,7 @@ impl MixNode {
             self.network_interface
                 .send_message(*node_id, message.clone())
         }
+        self.message_cache.cache_set(Self::sha256(&message.0), ());
     }
 
     fn receive(&mut self) -> Vec<NetworkMessage<MixMessage>> {
