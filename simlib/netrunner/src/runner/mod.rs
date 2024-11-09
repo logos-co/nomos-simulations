@@ -13,8 +13,8 @@ use crate::streaming::{
 };
 use crossbeam::channel::Sender;
 use parking_lot::RwLock;
-use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
+use rand_chacha::ChaCha12Rng;
 use rayon::prelude::*;
 use serde::Serialize;
 
@@ -72,7 +72,7 @@ where
 {
     network: Network<M>,
     wards: Vec<Ward>,
-    rng: SmallRng,
+    rng: ChaCha12Rng,
 }
 
 impl<M> SimulationRunnerInner<M>
@@ -136,7 +136,7 @@ where
         // Store the settings to the producer so that we can collect them later
         producer.send(R::from(settings.clone()))?;
 
-        let rng = SmallRng::seed_from_u64(seed);
+        let rng = ChaCha12Rng::seed_from_u64(seed);
         let nodes = Arc::new(RwLock::new(nodes));
         let SimulationSettings {
             wards,
