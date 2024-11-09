@@ -210,13 +210,17 @@ impl MixNode {
         }
     }
 
-    fn forward(&mut self, message: MixMessage, exclude_node: Option<NodeId>) {
-        for node_id in self
+    fn forward(&mut self, message: MixMessage, exclude_node: Option<NodeId>, log: EmissionLog) {
+        for (i, node_id) in self
             .settings
             .connected_peers
             .iter()
             .filter(|&id| Some(*id) != exclude_node)
+            .enumerate()
         {
+            if i == 0 {
+                Self::log_emission(&log);
+            }
             self.network_interface
                 .send_message(*node_id, message.clone())
         }
@@ -264,8 +268,21 @@ impl MixNode {
         let log = MessageLog {
             payload_id: payload.id(),
             step_id: self.state.step_id,
+            node_id: format!("{}", self.id),
         };
         tracing::info!("{}: {}", tag, serde_json::to_string(&log).unwrap());
+    }
+
+    fn log_emission(log: &EmissionLog) {
+        tracing::info!("Emission: {}", serde_json::to_string(log).unwrap());
+    }
+
+    fn new_emission_log(&self, emission_type: &str) -> EmissionLog {
+        EmissionLog {
+            emission_type: emission_type.to_string(),
+            step_id: self.state.step_id,
+            node_id: format!("{}", self.id),
+        }
     }
 }
 
@@ -305,6 +322,7 @@ impl Node for MixNode {
             self.forward(
                 network_message.payload().clone(),
                 Some(network_message.from),
+                self.new_emission_log("ImmediateForwarding"),
             );
             self.blend_sender
                 .send(network_message.into_payload().0)
@@ -341,7 +359,11 @@ impl Node for MixNode {
         if let Poll::Ready(Some(msg)) =
             pin!(&mut self.persistent_transmission_messages).poll_next(&mut cx)
         {
-            self.forward(MixMessage(msg), None);
+            self.forward(
+                MixMessage(msg),
+                None,
+                self.new_emission_log("FromPersistent"),
+            );
         }
 
         self.state.step_id += 1;
@@ -362,4 +384,12 @@ impl Node for MixNode {
 struct MessageLog {
     payload_id: PayloadId,
     step_id: usize,
+    node_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct EmissionLog {
+    emission_type: String,
+    step_id: usize,
+    node_id: String,
 }
