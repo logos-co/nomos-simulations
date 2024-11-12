@@ -210,7 +210,12 @@ impl MixNode {
         }
     }
 
-    fn forward(&mut self, message: MixMessage, exclude_node: Option<NodeId>, log: EmissionLog) {
+    fn forward(
+        &mut self,
+        message: MixMessage,
+        exclude_node: Option<NodeId>,
+        log: Option<EmissionLog>,
+    ) {
         for (i, node_id) in self
             .settings
             .connected_peers
@@ -219,7 +224,9 @@ impl MixNode {
             .enumerate()
         {
             if i == 0 {
-                Self::log_emission(&log);
+                if let Some(log) = &log {
+                    Self::log_emission(log);
+                }
             }
             self.network_interface
                 .send_message(*node_id, message.clone())
@@ -322,7 +329,7 @@ impl Node for MixNode {
             self.forward(
                 network_message.payload().clone(),
                 Some(network_message.from),
-                self.new_emission_log("ImmediateForwarding"),
+                None,
             );
             self.blend_sender
                 .send(network_message.into_payload().0)
@@ -362,7 +369,7 @@ impl Node for MixNode {
             self.forward(
                 MixMessage(msg),
                 None,
-                self.new_emission_log("FromPersistent"),
+                Some(self.new_emission_log("FromPersistent")),
             );
         }
 
