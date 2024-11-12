@@ -13,7 +13,7 @@ use lottery::StakeLottery;
 use message::{Payload, PayloadId};
 use multiaddr::Multiaddr;
 use netrunner::network::NetworkMessage;
-use netrunner::node::{Node, NodeId};
+use netrunner::node::{Node, NodeId, NodeIdExt};
 use netrunner::{
     network::{InMemoryNetworkInterface, NetworkInterface, PayloadSize},
     warding::WardCondition,
@@ -268,7 +268,7 @@ impl MixNode {
         let log = MessageLog {
             payload_id: payload.id(),
             step_id: self.state.step_id,
-            node_id: format!("{}", self.id),
+            node_id: self.id.index(),
         };
         tracing::info!("{}: {}", tag, serde_json::to_string(&log).unwrap());
     }
@@ -281,7 +281,7 @@ impl MixNode {
         EmissionLog {
             emission_type: emission_type.to_string(),
             step_id: self.state.step_id,
-            node_id: format!("{}", self.id),
+            node_id: self.id.index(),
         }
     }
 }
@@ -384,12 +384,12 @@ impl Node for MixNode {
 struct MessageLog {
     payload_id: PayloadId,
     step_id: usize,
-    node_id: String,
+    node_id: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct EmissionLog {
     emission_type: String,
     step_id: usize,
-    node_id: String,
+    node_id: usize,
 }
