@@ -6,10 +6,6 @@ from typing import Dict, Optional
 import statistics
 import argparse
 
-from json_stream.base import TransientStreamingJSONObject
-
-JsonStream = Iterable[TransientStreamingJSONObject]
-
 
 class Message:
     def __init__(self, message_id: str, step_a: Optional[int]):
@@ -71,8 +67,13 @@ def parse_record_stream(record_stream: Iterable[str]) -> MessageStorage:
     storage: MessageStorage = {}
 
     for record in record_stream:
-        json_record = json.loads(record)
-        payload_id = json_record["payload_id"]
+        try:
+            json_record = json.loads(record)
+        except json.decoder.JSONDecodeError:
+            continue
+
+        if (payload_id := json_record.get("payload_id")) is None:
+            continue
         step_id = json_record["step_id"]
 
         if (stored_message := storage.get(payload_id)) is None:
