@@ -6,6 +6,8 @@ from typing import Dict, Optional
 import statistics
 import argparse
 
+import mixlog
+
 from json_stream.base import TransientStreamingJSONObject
 
 JsonStream = Iterable[TransientStreamingJSONObject]
@@ -83,26 +85,6 @@ def parse_record_stream(record_stream: Iterable[str]) -> MessageStorage:
     return storage
 
 
-def line_to_json_stream(record_stream: Iterable[str]) -> Iterable[str]:
-    for record in record_stream:
-        bracket_pos = record.rfind("{")
-        yield record[bracket_pos:]
-
-
-def get_pipe_stream() -> Iterable[str]:
-    yield from sys.stdin
-
-
-def get_file_stream(input_filename) -> Iterable[str]:
-    with open(input_filename, "r") as file:
-        yield from file
-
-
-def get_input_stream(input_filename: Optional[str]) -> Iterable[str]:
-    stream = get_file_stream(input_filename) if input_filename is not None else get_pipe_stream()
-    return line_to_json_stream(stream)
-
-
 def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Log analysis for nomos-simulations.")
     parser.add_argument(
@@ -123,7 +105,7 @@ if __name__ == "__main__":
     argument_parser = build_argument_parser()
     arguments = argument_parser.parse_args()
 
-    input_stream = get_input_stream(arguments.input_file)
+    input_stream = mixlog.get_input_stream(arguments.input_file)
     messages = parse_record_stream(input_stream)
 
     results = compute_results(messages, arguments.step_duration)
