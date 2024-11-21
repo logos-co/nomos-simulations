@@ -20,7 +20,7 @@
   "node_settings": {
     "timeout": "1000ms"
   },
-  "step_time": "10ms",
+  "step_time": "40ms",
   "runner_settings": "Sync",
   "stream_settings": {
     "path": "test.json"
@@ -30,20 +30,20 @@
   "record_settings": {},
   "wards": [
     {
-      "sum":2 
+      "sum": 10
     }
   ],
   "connected_peers_count": 4,
   "data_message_lottery_interval": "20s",
   "stake_proportion": 1.0,
   "epoch_duration": "432000s",
-  "slot_duration": "1s",
-  "slots_per_epoch": 432000,
-  "number_of_hops": 1,
+  "slot_duration": "20s",
+  "slots_per_epoch": 21600,
+  "number_of_hops": 2,
   "persistent_transmission": {
     "max_emission_frequency": 1.0,
     "drop_message_probability": 0.0
   },
-  "number_of_mix_layers": 1,
+  "number_of_mix_layers": 2,
   "max_delay_seconds": 10
 }

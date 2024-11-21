@@ -217,12 +217,14 @@ impl<R> Default for StreamProducerInner<R> {
 #[derive(Debug)]
 pub struct StreamProducer<R> {
     inner: Arc<Mutex<StreamProducerInner<R>>>,
+    with_cache: bool,
 }
 
 impl<R> Default for StreamProducer<R> {
     fn default() -> Self {
         Self {
             inner: Arc::new(Mutex::new(StreamProducerInner::default())),
+            with_cache: false,
         }
     }
 }
@@ -231,6 +233,7 @@ impl<R> Clone for StreamProducer<R> {
     fn clone(&self) -> Self {
         Self {
             inner: Arc::clone(&self.inner),
+            with_cache: self.with_cache,
         }
     }
 }
@@ -247,7 +250,7 @@ where
 {
     pub fn send(&self, record: R) -> anyhow::Result<()> {
         let mut inner = self.inner.lock().unwrap();
-        if inner.senders.is_empty() {
+        if inner.senders.is_empty() && self.with_cache {
             inner.record_cache.push(Arc::new(record));
             Ok(())
         } else {
