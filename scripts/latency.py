@@ -1,12 +1,12 @@
 # !/usr/bin/env python
+import argparse
 import json
-import sys
+import statistics
 from collections.abc import Iterable
 from typing import Dict, Optional
-import statistics
-import argparse
 
 import mixlog
+
 
 class Message:
     def __init__(self, message_id: str, step_a: Optional[int]):
@@ -91,12 +91,12 @@ def build_argument_parser() -> argparse.ArgumentParser:
         "--step-duration",
         type=int,
         default=100,
-        help="Duration (in ms) of each step in the simulation."
+        help="Duration (in ms) of each step in the simulation.",
     )
     parser.add_argument(
         "input_file",
         nargs="?",
-        help="The file to parse. If not provided, input will be read from stdin."
+        help="The file to parse. If not provided, input will be read from stdin.",
     )
     return parser
 
