@@ -15,7 +15,7 @@
 
 ## Configurations
 
-The simulation can be configured by [config/mixnode.json](./config/mixnode.json).
+The simulation can be configured by [config/blendnet.json](./config/blendnet.json).
 
 ### `step_time` and `network_settings`
 
@@ -76,7 +76,7 @@ at the beginning of each epoch. At every selected slot, the node generates a cov
 
 ```bash
 cargo build --release
-../target/release/mixnet-sims --input-settings ./config/mixnode.json
+../target/release/blendnet-sims --input-settings ./config/blendnet.json
 ```
 The simulation prints a bunch of logs that can be used for analysis.
 We recommend piping logs to a file.
