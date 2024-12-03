@@ -1,6 +1,6 @@
 # Nomos Blend Simulation Result Analysis
 
-First of all, run the Nomos Blend simulation by following the [instruction](../simlib/mixnet-sims/).
+First of all, run the Nomos Blend simulation by following the [instruction](../simlib/blendnet-sims/).
 
 ## Latency Analysis
 
