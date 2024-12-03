@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "netrunner",
-    "mixnet-sims"
-
+    "blendnet-sims"
 ]
 resolver = "2"
