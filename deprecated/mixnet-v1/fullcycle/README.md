@@ -1,4 +1,4 @@
-# NomMix Simulation
+# Mixnet v1 Full Cycle Simulation
 
 * [Project Structure](#project-structure)
 * [Features](#features)

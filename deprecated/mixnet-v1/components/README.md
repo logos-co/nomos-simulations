@@ -1,4 +1,4 @@
-# Mixnet Simulations
+# Mixnet v1 Component Simulations
 
 ## Structure
 
