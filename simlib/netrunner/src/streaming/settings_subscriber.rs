@@ -102,9 +102,7 @@ where
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
-    use std::{collections::HashMap, time::Duration};
-
-    type View = usize;
+    use std::time::Duration;
 
     use crate::{
         network::{
