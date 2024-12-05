@@ -524,7 +524,7 @@ mod tests {
 
     impl PayloadSize for () {
         fn size_bytes(&self) -> u32 {
-            todo!()
+            0
         }
     }
 
