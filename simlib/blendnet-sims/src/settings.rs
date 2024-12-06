@@ -1,5 +1,8 @@
 use netrunner::settings::SimulationSettings;
-use nomos_mix::persistent_transmission::PersistentTransmissionSettings;
+use nomos_mix::{
+    conn_maintenance::ConnectionMaintenanceSettings,
+    persistent_transmission::PersistentTransmissionSettings,
+};
 use serde::{Deserialize, Deserializer};
 use std::time::Duration;
 
@@ -7,7 +10,6 @@ use std::time::Duration;
 pub struct SimSettings {
     #[serde(flatten)]
     pub simulation_settings: SimulationSettings,
-    pub connected_peers_count: usize,
     #[serde(deserialize_with = "deserialize_duration_with_human_time")]
     pub data_message_lottery_interval: Duration,
     pub stake_proportion: f64,
@@ -19,6 +21,7 @@ pub struct SimSettings {
     pub slots_per_epoch: usize,
     pub number_of_hops: usize,
     // For tier 1
+    pub conn_maintenance: ConnectionMaintenanceSettings,
     pub persistent_transmission: PersistentTransmissionSettings,
     // For tier 2
     pub number_of_mix_layers: usize,

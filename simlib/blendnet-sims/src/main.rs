@@ -21,7 +21,6 @@ use nomos_mix::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
 use parking_lot::Mutex;
-use rand::prelude::IteratorRandom;
 use rand::seq::SliceRandom;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha12Rng;
@@ -87,7 +86,6 @@ impl SimulationApp {
         let behaviours = create_behaviours(&settings.simulation_settings.network_settings);
         let regions_data = RegionsData::new(regions, behaviours);
 
-        let ids = node_ids.clone();
         let network = Arc::new(Mutex::new(Network::<MixMessage>::new(regions_data, seed)));
 
         let nodes: Vec<_> = node_ids
@@ -101,16 +99,13 @@ impl SimulationApp {
                     settings.simulation_settings.clone(),
                     no_netcap,
                     MixnodeSettings {
-                        connected_peers: ids
-                            .iter()
-                            .filter(|&id| id != &node_id)
-                            .copied()
-                            .choose_multiple(&mut rng, settings.connected_peers_count),
+                        membership: node_ids.clone(),
                         data_message_lottery_interval: settings.data_message_lottery_interval,
                         stake_proportion: settings.stake_proportion / node_ids.len() as f64,
                         seed: rng.next_u64(),
                         epoch_duration: settings.epoch_duration, // 5 days seconds
                         slot_duration: settings.slot_duration,
+                        conn_maintenance: settings.conn_maintenance,
                         persistent_transmission: settings.persistent_transmission,
                         message_blend: MessageBlendSettings {
                             cryptographic_processor: CryptographicProcessorSettings {
@@ -127,7 +122,6 @@ impl SimulationApp {
                             slots_per_epoch: settings.slots_per_epoch,
                             network_size: node_ids.len(),
                         },
-                        membership: node_ids.iter().map(|&id| id.into()).collect(),
                     },
                 )
             })

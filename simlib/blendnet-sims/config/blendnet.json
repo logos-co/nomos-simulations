@@ -33,9 +33,19 @@
       "sum": 10
     }
   ],
-  "connected_peers_count": 4,
   "data_message_lottery_interval": "20s",
   "stake_proportion": 1.0,
+  "conn_maintenance": {
+    "peering_degree": 4,
+    "max_peering_degree": 8,
+    "monitor": {
+      "time_window": "20s",
+      "expected_effective_messages": 0.0,
+      "effective_message_tolerance": 0.0,
+      "expected_drop_messages": 0.0,
+      "drop_message_tolerance": 0.0
+    }
+  },
   "epoch_duration": "432000s",
   "slot_duration": "20s",
   "slots_per_epoch": 21600,

@@ -18,12 +18,12 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter", "tracing-log"] }
 netrunner = { path = "../netrunner" }
 nomos-tracing = { git = "https://github.com/logos-co/nomos-node.git" }
-nomos-mix = { git = "https://github.com/logos-co/nomos-node", package = "nomos-mix" }
-nomos-mix-message = { git = "https://github.com/logos-co/nomos-node", package = "nomos-mix-message" }
+nomos-mix = { git = "https://github.com/logos-co/nomos-node", branch = "mix-conn-monitor-sim", package = "nomos-mix" }
+nomos-mix-message = { git = "https://github.com/logos-co/nomos-node", branch = "mix-conn-monitor-sim", package = "nomos-mix-message" }
 futures = "0.3.31"
 rand_chacha = "0.3"
-multiaddr = "0.18"
 sha2 = "0.10"
 uuid = { version = "1", features = ["fast-rng", "v4"] }
 tracing-appender = "0.2"
 cached = "0.54.0"
+polars = "0.44"
