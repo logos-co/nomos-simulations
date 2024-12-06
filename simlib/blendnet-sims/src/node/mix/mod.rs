@@ -315,13 +315,15 @@ impl MixNode {
         tracing::info!("Emission: {}", serde_json::to_string(log).unwrap());
     }
 
-    fn log_monitor(&self, effective_messages_series: &Series) {
+    fn log_monitors(&self, effective_messages_series: &Series) {
         if effective_messages_series.is_empty() {
             return;
         }
 
-        let log = SeriesLog {
-            series_type: "EffectiveMessages".to_string(),
+        let log = MonitorsLog {
+            node_id: self.id.index(),
+            message_type: "EffectiveMessage".to_string(),
+            num_conns: effective_messages_series.len(),
             min: effective_messages_series.min().unwrap().unwrap(),
             avg: effective_messages_series.mean().unwrap(),
             median: effective_messages_series.median().unwrap(),
@@ -378,7 +380,7 @@ impl Node for MixNode {
                     .values()
                     .map(|monitor| monitor.effective_messages as u64),
             );
-            self.log_monitor(&effective_messages_series);
+            self.log_monitors(&effective_messages_series);
         }
 
         // Handle incoming messages
@@ -459,8 +461,10 @@ struct EmissionLog {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct SeriesLog {
-    series_type: String,
+struct MonitorsLog {
+    node_id: usize,
+    message_type: String,
+    num_conns: usize,
     min: u64,
     avg: f64,
     median: f64,
