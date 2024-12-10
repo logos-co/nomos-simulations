@@ -15,6 +15,9 @@ def analyze_monitors(input_stream: Iterable[str]) -> None:
         "min": df["min"].min(),
         "avg": (df["num_conns"] * df["avg"]).sum() / df["num_conns"].sum(),
         "max": df["max"].max(),
+        "std_min": df["std"].min(),
+        "std_avg": df["std"].mean(),
+        "std_max": df["std"].max(),
     }
     print(result)
 

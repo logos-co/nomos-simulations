@@ -333,6 +333,7 @@ impl MixNode {
             avg: effective_messages_series.mean().unwrap(),
             median: effective_messages_series.median().unwrap(),
             max: effective_messages_series.max().unwrap().unwrap(),
+            std: effective_messages_series.std(0).unwrap(),
         };
         tracing::info!("Monitor: {}", serde_json::to_string(&log).unwrap());
     }
@@ -474,4 +475,5 @@ struct MonitorsLog {
     avg: f64,
     median: f64,
     max: u64,
+    std: f64,
 }
