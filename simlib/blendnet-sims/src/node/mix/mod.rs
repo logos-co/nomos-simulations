@@ -4,6 +4,7 @@ mod message;
 pub mod scheduler;
 pub mod state;
 pub mod stream_wrapper;
+pub mod topology;
 
 use crate::node::mix::consensus_streams::{Epoch, Slot};
 use cached::{Cached, TimedCache};
@@ -39,6 +40,7 @@ use sha2::{Digest, Sha256};
 use state::MixnodeState;
 use std::{pin::pin, task::Poll, time::Duration};
 use stream_wrapper::CrossbeamReceiverStream;
+use topology::Topology;
 
 #[derive(Debug, Clone)]
 pub struct MixMessage(Vec<u8>);
@@ -52,6 +54,7 @@ impl PayloadSize for MixMessage {
 #[derive(Deserialize)]
 pub struct MixnodeSettings {
     pub membership: Vec<NodeId>,
+    pub topology: Topology,
     pub data_message_lottery_interval: Duration,
     pub stake_proportion: f64,
     pub seed: u64,
@@ -144,10 +147,12 @@ impl MixNode {
             membership.clone(),
             ChaCha12Rng::from_rng(&mut rng_generator).unwrap(),
         );
-        conn_maintenance
-            .bootstrap()
-            .into_iter()
-            .for_each(|peer| conn_maintenance.add_connected_peer(peer));
+        settings
+            .topology
+            .get(&id)
+            .unwrap()
+            .iter()
+            .for_each(|peer| conn_maintenance.add_connected_peer(*peer));
         let (conn_maintenance_update_time_sender, conn_maintenance_update_time_receiver) =
             channel::unbounded();
         let (persistent_sender, persistent_receiver) = channel::unbounded();
@@ -378,7 +383,7 @@ impl Node for MixNode {
             let effective_messages_series = Series::from_iter(
                 monitors
                     .values()
-                    .map(|monitor| monitor.effective_messages as u64),
+                    .map(|monitor| monitor.effective_messages.to_num::<u64>()),
             );
             self.log_monitors(&effective_messages_series);
         }

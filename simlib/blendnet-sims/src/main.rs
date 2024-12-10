@@ -16,6 +16,7 @@ use netrunner::node::{NodeId, NodeIdExt};
 use netrunner::output_processors::Record;
 use netrunner::runner::{BoxedNode, SimulationRunnerHandle};
 use netrunner::streaming::{io::IOSubscriber, naive::NaiveSubscriber, StreamType};
+use node::mix::topology::build_topology;
 use nomos_mix::cover_traffic::CoverTrafficSettings;
 use nomos_mix::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
@@ -88,6 +89,12 @@ impl SimulationApp {
 
         let network = Arc::new(Mutex::new(Network::<MixMessage>::new(regions_data, seed)));
 
+        let topology = build_topology(
+            &node_ids,
+            settings.conn_maintenance.peering_degree,
+            &mut rng,
+        );
+
         let nodes: Vec<_> = node_ids
             .iter()
             .copied()
@@ -100,6 +107,7 @@ impl SimulationApp {
                     no_netcap,
                     MixnodeSettings {
                         membership: node_ids.clone(),
+                        topology: topology.clone(),
                         data_message_lottery_interval: settings.data_message_lottery_interval,
                         stake_proportion: settings.stake_proportion / node_ids.len() as f64,
                         seed: rng.next_u64(),
