@@ -38,6 +38,7 @@ use scheduler::{Interval, TemporalRelease};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use state::MixnodeState;
+use std::collections::HashSet;
 use std::{pin::pin, task::Poll, time::Duration};
 use stream_wrapper::CrossbeamReceiverStream;
 use topology::Topology;
@@ -147,10 +148,9 @@ impl MixNode {
             membership.clone(),
             ChaCha12Rng::from_rng(&mut rng_generator).unwrap(),
         );
-        settings
-            .topology
-            .get(&id)
-            .unwrap()
+        let peers = settings.topology.get(&id).unwrap();
+        Self::log_topology(id, peers);
+        peers
             .iter()
             .for_each(|peer| conn_maintenance.add_connected_peer(*peer));
         let (conn_maintenance_update_time_sender, conn_maintenance_update_time_receiver) =
@@ -320,6 +320,14 @@ impl MixNode {
         tracing::info!("Emission: {}", serde_json::to_string(log).unwrap());
     }
 
+    fn new_emission_log(&self, emission_type: &str) -> EmissionLog {
+        EmissionLog {
+            emission_type: emission_type.to_string(),
+            step_id: self.state.step_id,
+            node_id: self.id.index(),
+        }
+    }
+
     fn log_monitors(&self, effective_messages_series: &Series) {
         if effective_messages_series.is_empty() {
             return;
@@ -327,6 +335,7 @@ impl MixNode {
 
         let log = MonitorsLog {
             node_id: self.id.index(),
+            step_id: self.state.step_id,
             message_type: "EffectiveMessage".to_string(),
             num_conns: effective_messages_series.len(),
             min: effective_messages_series.min().unwrap().unwrap(),
@@ -338,12 +347,13 @@ impl MixNode {
         tracing::info!("Monitor: {}", serde_json::to_string(&log).unwrap());
     }
 
-    fn new_emission_log(&self, emission_type: &str) -> EmissionLog {
-        EmissionLog {
-            emission_type: emission_type.to_string(),
-            step_id: self.state.step_id,
-            node_id: self.id.index(),
-        }
+    fn log_topology(node_id: NodeId, peers: &HashSet<NodeId>) {
+        let log = TopologyLog {
+            node_id: node_id.index(),
+            num_peers: peers.len(),
+            peers: peers.iter().map(|peer| peer.index()).collect(),
+        };
+        tracing::info!("Topology: {}", serde_json::to_string(&log).unwrap());
     }
 }
 
@@ -469,6 +479,7 @@ struct EmissionLog {
 #[derive(Debug, Serialize, Deserialize)]
 struct MonitorsLog {
     node_id: usize,
+    step_id: usize,
     message_type: String,
     num_conns: usize,
     min: u64,
@@ -476,4 +487,11 @@ struct MonitorsLog {
     median: f64,
     max: u64,
     std: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TopologyLog {
+    node_id: usize,
+    num_peers: usize,
+    peers: Vec<usize>,
 }
