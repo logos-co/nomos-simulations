@@ -6,6 +6,7 @@ use rand::{seq::SliceRandom, RngCore};
 pub type Topology = HashMap<NodeId, HashSet<NodeId>>;
 
 pub fn build_topology<R: RngCore>(nodes: &[NodeId], peering_degree: usize, mut rng: R) -> Topology {
+    tracing::info!("Building topology: peering_degree:{}", peering_degree);
     loop {
         let mut topology = nodes
             .iter()
@@ -36,13 +37,22 @@ pub fn build_topology<R: RngCore>(nodes: &[NodeId], peering_degree: usize, mut r
             });
         }
 
-        if are_all_nodes_connected(&topology) {
+        let all_connected = check_all_connected(&topology);
+        let all_have_peering_degree = check_peering_degree(&topology, peering_degree);
+        if all_connected && all_have_peering_degree {
+            tracing::info!("Topology built successfully");
             return topology;
+        } else {
+            tracing::info!(
+                "Retrying to build topology: all_connected:{}, all_have_peering_degree:{}",
+                all_connected,
+                all_have_peering_degree
+            );
         }
     }
 }
 
-fn are_all_nodes_connected(topology: &Topology) -> bool {
+fn check_all_connected(topology: &Topology) -> bool {
     let visited = dfs(topology, *topology.keys().next().unwrap());
     visited.len() == topology.len()
 }
@@ -60,4 +70,34 @@ fn dfs(topology: &Topology, start_node: NodeId) -> HashSet<NodeId> {
         }
     }
     visited
+}
+
+fn check_peering_degree(topology: &Topology, peering_degree: usize) -> bool {
+    topology
+        .iter()
+        .all(|(_, peers)| peers.len() == peering_degree)
+}
+
+#[cfg(test)]
+mod tests {
+    use netrunner::node::NodeIdExt;
+
+    use super::*;
+
+    #[test]
+    fn test_build_topology() {
+        tracing_subscriber::fmt::init();
+
+        let nodes = (0..100).map(NodeId::from_index).collect::<Vec<_>>();
+        let peering_degree = 3;
+        let mut rng = rand::rngs::OsRng;
+        let topology = build_topology(&nodes, peering_degree, &mut rng);
+        assert_eq!(topology.len(), nodes.len());
+        for (node, peers) in topology.iter() {
+            assert!(peers.len() == peering_degree);
+            for peer in peers.iter() {
+                assert!(topology.get(peer).unwrap().contains(node));
+            }
+        }
+    }
 }
