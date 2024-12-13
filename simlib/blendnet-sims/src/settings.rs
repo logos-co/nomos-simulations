@@ -1,5 +1,5 @@
 use netrunner::settings::SimulationSettings;
-use nomos_mix::persistent_transmission::PersistentTransmissionSettings;
+use nomos_blend::persistent_transmission::PersistentTransmissionSettings;
 use serde::{Deserialize, Deserializer};
 use std::time::Duration;
 
@@ -21,7 +21,7 @@ pub struct SimSettings {
     // For tier 1
     pub persistent_transmission: PersistentTransmissionSettings,
     // For tier 2
-    pub number_of_mix_layers: usize,
+    pub number_of_blend_layers: usize,
     pub max_delay_seconds: u64,
 }
 

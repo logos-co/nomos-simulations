@@ -44,6 +44,6 @@
     "max_emission_frequency": 1.0,
     "drop_message_probability": 0.0
   },
-  "number_of_mix_layers": 2,
+  "number_of_blend_layers": 2,
   "max_delay_seconds": 10
 }
