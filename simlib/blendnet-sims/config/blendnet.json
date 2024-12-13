@@ -4,7 +4,7 @@
       "north america:north america": "50ms",
       "north america:europe": "100ms",
       "north america:asia": "120ms",
-      "europe:europe": "50ms",
+      "europe:europe": "10ms",
       "europe:asia": "100ms",
       "europe:north america": "120ms",
       "asia:north america": "100ms",
@@ -12,43 +12,43 @@
       "asia:asia": "40ms"
     },
     "regions": {
-      "north america": 0.4,
-      "europe": 0.4,
-      "asia": 0.3
+      "north america": 0.0,
+      "europe": 1.0,
+      "asia": 0.0
     }
   },
   "node_settings": {
     "timeout": "1000ms"
   },
-  "step_time": "40ms",
+  "step_time": "10ms",
   "runner_settings": "Sync",
   "stream_settings": {
     "path": "test.json"
   },
-  "node_count": 10,
+  "node_count": 100,
   "seed": 0,
   "record_settings": {},
   "wards": [
     {
-      "sum": 10
+      "sum": 1000
     }
   ],
   "data_message_lottery_interval": "20s",
-  "stake_proportion": 1.0,
+  "stake_proportion": 0.0,
   "conn_maintenance": {
-    "peering_degree": 4,
-    "max_peering_degree": 8,
+    "peering_degree": 2,
+    "max_peering_degree": 2,
     "monitor": {
-      "time_window": "20s",
-      "expected_effective_messages": 0.0,
-      "effective_message_tolerance": 0.0,
-      "expected_drop_messages": 0.0,
-      "drop_message_tolerance": 0.0
+      "time_window": "200s",
+      "expected_effective_messages": "0.0",
+      "effective_message_tolerance": "0.0",
+      "expected_drop_messages": "0.0",
+      "drop_message_tolerance": "0.0"
     }
   },
-  "epoch_duration": "432000s",
-  "slot_duration": "20s",
-  "slots_per_epoch": 21600,
+  "epoch_duration": "200s",
+  "slot_duration": "1s",
+  "slots_per_epoch": 200,
   "number_of_hops": 2,
   "persistent_transmission": {
     "max_emission_frequency": 1.0,

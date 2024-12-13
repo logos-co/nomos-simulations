@@ -106,6 +106,7 @@ impl SimulationApp {
                     settings.simulation_settings.clone(),
                     no_netcap,
                     MixnodeSettings {
+                        step_time: settings.simulation_settings.step_time,
                         membership: node_ids.clone(),
                         topology: topology.clone(),
                         data_message_lottery_interval: settings.data_message_lottery_interval,

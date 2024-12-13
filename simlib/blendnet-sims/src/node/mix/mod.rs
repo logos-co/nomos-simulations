@@ -8,6 +8,7 @@ pub mod topology;
 
 use crate::node::mix::consensus_streams::{Epoch, Slot};
 use cached::{Cached, TimedCache};
+use consensus_streams::CounterInterval;
 use crossbeam::channel;
 use futures::Stream;
 use lottery::StakeLottery;
@@ -39,6 +40,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use state::MixnodeState;
 use std::collections::HashSet;
+use std::ops::Mul;
 use std::{pin::pin, task::Poll, time::Duration};
 use stream_wrapper::CrossbeamReceiverStream;
 use topology::Topology;
@@ -54,6 +56,7 @@ impl PayloadSize for MixMessage {
 
 #[derive(Deserialize)]
 pub struct MixnodeSettings {
+    pub step_time: Duration,
     pub membership: Vec<NodeId>,
     pub topology: Topology,
     pub data_message_lottery_interval: Duration,
@@ -71,6 +74,7 @@ type Sha256Hash = [u8; 32];
 
 /// This node implementation only used for testing different streaming implementation purposes.
 pub struct MixNode {
+    step_time: Duration,
     id: NodeId,
     state: MixnodeState,
     network_interface: InMemoryNetworkInterface<MixMessage>,
@@ -82,7 +86,7 @@ pub struct MixNode {
 
     conn_maintenance: ConnectionMaintenance<NodeId, MockMixMessage, ChaCha12Rng>,
     conn_maintenance_update_time_sender: channel::Sender<Duration>,
-    conn_maintenance_interval: Interval,
+    conn_maintenance_interval: CounterInterval,
     persistent_sender: channel::Sender<Vec<u8>>,
     persistent_update_time_sender: channel::Sender<Duration>,
     persistent_transmission_messages: PersistentTransmissionStream<
@@ -103,7 +107,9 @@ pub struct MixNode {
     >,
     epoch_update_sender: channel::Sender<Duration>,
     slot_update_sender: channel::Sender<Duration>,
+    slot_update_sender_new: channel::Sender<Duration>,
     cover_traffic: CoverTraffic<Epoch, Slot, MockMixMessage>,
+    slot_scheduler: Slot,
 }
 
 impl MixNode {
@@ -156,7 +162,7 @@ impl MixNode {
         let (conn_maintenance_update_time_sender, conn_maintenance_update_time_receiver) =
             channel::unbounded();
         let (persistent_sender, persistent_receiver) = channel::unbounded();
-        let conn_maintenance_interval = Interval::new(
+        let conn_maintenance_interval = CounterInterval::new(
             settings.conn_maintenance.monitor.unwrap().time_window,
             conn_maintenance_update_time_receiver,
         );
@@ -186,8 +192,8 @@ impl MixNode {
             ChaCha12Rng::from_rng(&mut rng_generator).unwrap(),
             blend_update_time_receiver,
             (
-                1,
-                settings.message_blend.temporal_processor.max_delay_seconds,
+                0,
+                settings.message_blend.temporal_processor.max_delay_seconds / 2,
             ),
         );
         let blend_messages = CrossbeamReceiverStream::new(blend_receiver).blend(
@@ -200,6 +206,7 @@ impl MixNode {
         // tier 3 cover traffic
         let (epoch_update_sender, epoch_updater_update_receiver) = channel::unbounded();
         let (slot_update_sender, slot_updater_update_receiver) = channel::unbounded();
+        let (slot_update_sender_new, slot_updater_update_receiver_new) = channel::unbounded();
         let cover_traffic: CoverTraffic<Epoch, Slot, MockMixMessage> = CoverTraffic::new(
             settings.cover_traffic_settings,
             Epoch::new(settings.epoch_duration, epoch_updater_update_receiver),
@@ -209,8 +216,14 @@ impl MixNode {
                 slot_updater_update_receiver,
             ),
         );
+        let slot_scheduler = Slot::new(
+            settings.cover_traffic_settings.slots_per_epoch,
+            settings.slot_duration,
+            slot_updater_update_receiver_new,
+        );
 
         Self {
+            step_time: settings.step_time,
             id,
             network_interface,
             // We're not coupling this lifespan with the steps now, but it's okay
@@ -236,7 +249,9 @@ impl MixNode {
             blend_messages,
             epoch_update_sender,
             slot_update_sender,
+            slot_update_sender_new,
             cover_traffic,
+            slot_scheduler,
         }
     }
 
@@ -270,6 +285,16 @@ impl MixNode {
             .into_iter()
             .inspect(|msg| {
                 self.conn_maintenance.record_effective_message(&msg.from);
+                let log = MessageLog {
+                    payload_id: "received".to_string(),
+                    step_id: self.state.step_id,
+                    elapsed: self.step_time.mul(self.state.step_id.try_into().unwrap()),
+                    node_id: self.id.index(),
+                };
+                tracing::info!(
+                    "CoverMessageReceived {}",
+                    serde_json::to_string(&log).unwrap()
+                );
             })
             // Retain only messages that have not been seen before
             .filter(|msg| {
@@ -297,6 +322,7 @@ impl MixNode {
         self.blend_update_time_sender.send(elapsed).unwrap();
         self.epoch_update_sender.send(elapsed).unwrap();
         self.slot_update_sender.send(elapsed).unwrap();
+        self.slot_update_sender_new.send(elapsed).unwrap();
     }
 
     fn log_message_generated(&self, msg_type: &str, payload: &Payload) {
@@ -311,6 +337,7 @@ impl MixNode {
         let log = MessageLog {
             payload_id: payload.id(),
             step_id: self.state.step_id,
+            elapsed: self.step_time.mul(self.state.step_id.try_into().unwrap()),
             node_id: self.id.index(),
         };
         tracing::info!("{}: {}", tag, serde_json::to_string(&log).unwrap());
@@ -389,14 +416,16 @@ impl Node for MixNode {
         }
 
         // Proceed connection maintenance if interval is reached.
-        if let Poll::Ready(Some(_)) = pin!(&mut self.conn_maintenance_interval).poll_next(&mut cx) {
-            let (monitors, _, _) = self.conn_maintenance.reset().unwrap();
-            let effective_messages_series = Series::from_iter(
-                monitors
-                    .values()
-                    .map(|monitor| monitor.effective_messages.to_num::<u64>()),
-            );
-            self.log_monitors(&effective_messages_series);
+        if let Poll::Ready(Some(i)) = pin!(&mut self.conn_maintenance_interval).poll_next(&mut cx) {
+            if i > 0 {
+                let (monitors, _, _) = self.conn_maintenance.reset().unwrap();
+                let effective_messages_series = Series::from_iter(
+                    monitors
+                        .values()
+                        .map(|monitor| monitor.effective_messages.to_num::<u64>()),
+                );
+                self.log_monitors(&effective_messages_series);
+            }
         }
 
         // Handle incoming messages
@@ -415,6 +444,13 @@ impl Node for MixNode {
         if let Poll::Ready(Some(msg)) = pin!(&mut self.blend_messages).poll_next(&mut cx) {
             match msg {
                 MixOutgoingMessage::Outbound(msg) => {
+                    let log = MessageLog {
+                        payload_id: "after_blend".to_string(),
+                        step_id: self.state.step_id,
+                        elapsed: self.step_time.mul(self.state.step_id.try_into().unwrap()),
+                        node_id: self.id.index(),
+                    };
+                    tracing::info!("CoverAfterBlend: {}", serde_json::to_string(&log).unwrap());
                     self.persistent_sender.send(msg).unwrap();
                 }
                 MixOutgoingMessage::FullyUnwrapped(payload) => {
@@ -427,6 +463,18 @@ impl Node for MixNode {
         }
 
         // Generate a cover message probabilistically
+        // if let Poll::Ready(Some(slot)) = pin!(&mut self.slot_scheduler).poll_next(&mut cx) {
+        //     // if slot == self.id.index() {
+        //     if slot == 0 {
+        //         let payload = Payload::new();
+        //         self.log_message_generated("Cover", &payload);
+        //         let message = self
+        //             .crypto_processor
+        //             .wrap_message(payload.as_bytes())
+        //             .unwrap();
+        //         self.persistent_sender.send(message).unwrap();
+        //     }
+        // }
         if let Poll::Ready(Some(_)) = pin!(&mut self.cover_traffic).poll_next(&mut cx) {
             let payload = Payload::new();
             self.log_message_generated("Cover", &payload);
@@ -466,6 +514,8 @@ impl Node for MixNode {
 struct MessageLog {
     payload_id: PayloadId,
     step_id: usize,
+    #[serde(with = "humantime_serde")]
+    elapsed: Duration,
     node_id: usize,
 }
 

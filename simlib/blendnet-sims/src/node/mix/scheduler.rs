@@ -58,7 +58,12 @@ impl TemporalRelease {
         (min_delay, max_delay): (u64, u64),
     ) -> Self {
         let mut random_sleeps = Box::new(std::iter::repeat_with(move || {
-            Duration::from_secs((rng.next_u64() % (max_delay + 1)).max(min_delay))
+            if min_delay == max_delay {
+                tracing::info!("Temporal release: fixed delay: {}", min_delay);
+                Duration::from_secs(min_delay)
+            } else {
+                Duration::from_secs(rng.next_u64() % (max_delay - min_delay) + min_delay)
+            }
         }));
         let current_sleep = random_sleeps.next().unwrap();
         Self {
@@ -71,6 +76,11 @@ impl TemporalRelease {
     pub fn update(&mut self, elapsed: Duration) -> bool {
         self.elapsed += elapsed;
         if self.elapsed >= self.current_sleep {
+            tracing::info!(
+                "Temporal update: elapsed:{:?}, current_sleep:{:?}",
+                self.elapsed,
+                self.current_sleep
+            );
             self.elapsed = Duration::from_secs(0);
             self.current_sleep = self.random_sleeps.next().unwrap();
             true
