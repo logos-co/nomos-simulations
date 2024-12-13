@@ -6,7 +6,8 @@ use rand::{seq::SliceRandom, RngCore};
 pub type Topology = HashMap<NodeId, HashSet<NodeId>>;
 
 /// Builds a topology with the given nodes and peering degree
-/// by ensuring that all nodes are connected (no partition) and have the same peering degree.
+/// by ensuring that all nodes are connected (no partition)
+/// and all nodes have the same number of connections (only if possible).
 pub fn build_topology<R: RngCore>(nodes: &[NodeId], peering_degree: usize, mut rng: R) -> Topology {
     tracing::info!("Building topology: peering_degree:{}", peering_degree);
     loop {
@@ -40,19 +41,16 @@ pub fn build_topology<R: RngCore>(nodes: &[NodeId], peering_degree: usize, mut r
             });
         }
 
-        // Check constraints
-        let all_connected = check_all_connected(&topology);
-        let all_have_peering_degree = check_peering_degree(&topology, peering_degree);
-        if all_connected && all_have_peering_degree {
-            tracing::info!("Topology built successfully");
+        // Check constraints:
+        // - All nodes are connected (no partition)
+        // - All nodes have the same number of connections (if possible)
+        let can_have_equal_conns = (nodes.len() * peering_degree) % 2 == 0;
+        if check_all_connected(&topology)
+            && (!can_have_equal_conns || check_equal_conns(&topology, peering_degree))
+        {
             return topology;
-        } else {
-            tracing::info!(
-                "Retrying to build topology: all_connected:{}, all_have_peering_degree:{}",
-                all_connected,
-                all_have_peering_degree
-            );
         }
+        tracing::info!("Topology doesn't meet constraints. Retrying...");
     }
 }
 
@@ -78,8 +76,8 @@ fn dfs(topology: &Topology, start_node: NodeId) -> HashSet<NodeId> {
     visited
 }
 
-/// Checks if all nodes have the same peering degree in the topology.
-fn check_peering_degree(topology: &Topology, peering_degree: usize) -> bool {
+/// Checks if all nodes have the same number of connections.
+fn check_equal_conns(topology: &Topology, peering_degree: usize) -> bool {
     topology
         .iter()
         .all(|(_, peers)| peers.len() == peering_degree)
@@ -92,16 +90,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_build_topology() {
-        tracing_subscriber::fmt::init();
+    fn test_build_topology_with_equal_conns() {
+        // If num_nodes * peering_degree is even,
+        // it is possible that all nodes can have the same number of connections
+        let nodes = (0..7).map(NodeId::from_index).collect::<Vec<_>>();
+        let peering_degree = 4;
 
-        let nodes = (0..100).map(NodeId::from_index).collect::<Vec<_>>();
-        let peering_degree = 3;
         let mut rng = rand::rngs::OsRng;
         let topology = build_topology(&nodes, peering_degree, &mut rng);
         assert_eq!(topology.len(), nodes.len());
         for (node, peers) in topology.iter() {
             assert!(peers.len() == peering_degree);
+            for peer in peers.iter() {
+                assert!(topology.get(peer).unwrap().contains(node));
+            }
+        }
+    }
+
+    #[test]
+    fn test_build_topology_with_inequal_conns() {
+        // If num_nodes * peering_degree is odd,
+        // it is impossible that all nodes can have the same number of connections
+        let nodes = (0..7).map(NodeId::from_index).collect::<Vec<_>>();
+        let peering_degree = 3;
+
+        let mut rng = rand::rngs::OsRng;
+        let topology = build_topology(&nodes, peering_degree, &mut rng);
+        assert_eq!(topology.len(), nodes.len());
+        for (node, peers) in topology.iter() {
+            assert!(peers.len() <= peering_degree);
             for peer in peers.iter() {
                 assert!(topology.get(peer).unwrap().contains(node));
             }
