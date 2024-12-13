@@ -16,12 +16,12 @@ use netrunner::node::{NodeId, NodeIdExt};
 use netrunner::output_processors::Record;
 use netrunner::runner::{BoxedNode, SimulationRunnerHandle};
 use netrunner::streaming::{io::IOSubscriber, naive::NaiveSubscriber, StreamType};
+use node::blend::topology::build_topology;
 use nomos_blend::cover_traffic::CoverTrafficSettings;
 use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
 use parking_lot::Mutex;
-use rand::prelude::IteratorRandom;
 use rand::seq::SliceRandom;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha12Rng;
@@ -87,8 +87,9 @@ impl SimulationApp {
         let behaviours = create_behaviours(&settings.simulation_settings.network_settings);
         let regions_data = RegionsData::new(regions, behaviours);
 
-        let ids = node_ids.clone();
         let network = Arc::new(Mutex::new(Network::<BlendMessage>::new(regions_data, seed)));
+
+        let topology = build_topology(&node_ids, settings.connected_peers_count, &mut rng);
 
         let nodes: Vec<_> = node_ids
             .iter()
@@ -101,11 +102,7 @@ impl SimulationApp {
                     settings.simulation_settings.clone(),
                     no_netcap,
                     BlendnodeSettings {
-                        connected_peers: ids
-                            .iter()
-                            .filter(|&id| id != &node_id)
-                            .copied()
-                            .choose_multiple(&mut rng, settings.connected_peers_count),
+                        connected_peers: topology.get(&node_id).unwrap().iter().copied().collect(),
                         data_message_lottery_interval: settings.data_message_lottery_interval,
                         stake_proportion: settings.stake_proportion / node_ids.len() as f64,
                         seed: rng.next_u64(),
@@ -174,7 +171,11 @@ fn create_boxed_blendnode(
         node_message_sender,
         network_message_receiver,
     );
-    Box::new(BlendNode::new(node_id, blendnode_settings, network_interface))
+    Box::new(BlendNode::new(
+        node_id,
+        blendnode_settings,
+        network_interface,
+    ))
 }
 
 fn run<M, S, T>(

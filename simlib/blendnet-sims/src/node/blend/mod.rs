@@ -4,6 +4,7 @@ mod message;
 pub mod scheduler;
 pub mod state;
 pub mod stream_wrapper;
+pub mod topology;
 
 use crate::node::blend::consensus_streams::{Epoch, Slot};
 use cached::{Cached, TimedCache};
