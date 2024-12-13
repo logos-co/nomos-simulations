@@ -117,8 +117,6 @@ where
 mod tests {
     use std::{collections::HashMap, time::Duration};
 
-    use consensus_engine::View;
-
     use crate::{
         network::{
             behaviour::NetworkBehaviour,
@@ -135,12 +133,13 @@ mod tests {
     };
 
     use super::*;
+
     #[derive(Debug, Clone, Serialize)]
-    struct IORecord {
-        states: HashMap<NodeId, View>,
+    struct IORecord<T> {
+        states: HashMap<NodeId, T>,
     }
 
-    impl<S, T: Serialize> TryFrom<&SimulationState<S, T>> for IORecord {
+    impl<S, T: Serialize + Clone> TryFrom<&SimulationState<S, T>> for IORecord<T> {
         type Error = anyhow::Error;
 
         fn try_from(value: &SimulationState<S, T>) -> Result<Self, Self::Error> {
@@ -148,7 +147,7 @@ mod tests {
             Ok(Self {
                 states: nodes
                     .iter()
-                    .map(|node| (node.id(), node.current_view()))
+                    .map(|node| (node.id(), node.state().clone()))
                     .collect(),
             })
         }
