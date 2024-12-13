@@ -5,7 +5,7 @@ pub mod scheduler;
 pub mod state;
 pub mod stream_wrapper;
 
-use crate::node::mix::consensus_streams::{Epoch, Slot};
+use crate::node::blend::consensus_streams::{Epoch, Slot};
 use cached::{Cached, TimedCache};
 use crossbeam::channel;
 use futures::Stream;
@@ -18,7 +18,7 @@ use netrunner::{
     network::{InMemoryNetworkInterface, NetworkInterface, PayloadSize},
     warding::WardCondition,
 };
-use nomos_mix::{
+use nomos_blend::{
     cover_traffic::{CoverTraffic, CoverTrafficSettings},
     membership::Membership,
     message_blend::{
@@ -27,29 +27,29 @@ use nomos_mix::{
     persistent_transmission::{
         PersistentTransmissionExt, PersistentTransmissionSettings, PersistentTransmissionStream,
     },
-    MixOutgoingMessage,
+    BlendOutgoingMessage,
 };
-use nomos_mix_message::mock::MockMixMessage;
+use nomos_blend_message::mock::MockBlendMessage;
 use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use scheduler::{Interval, TemporalRelease};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use state::MixnodeState;
+use state::BlendnodeState;
 use std::{pin::pin, task::Poll, time::Duration};
 use stream_wrapper::CrossbeamReceiverStream;
 
 #[derive(Debug, Clone)]
-pub struct MixMessage(Vec<u8>);
+pub struct BlendMessage(Vec<u8>);
 
-impl PayloadSize for MixMessage {
+impl PayloadSize for BlendMessage {
     fn size_bytes(&self) -> u32 {
         2208
     }
 }
 
 #[derive(Deserialize)]
-pub struct MixnodeSettings {
+pub struct BlendnodeSettings {
     pub connected_peers: Vec<NodeId>,
     pub data_message_lottery_interval: Duration,
     pub stake_proportion: f64,
@@ -57,19 +57,19 @@ pub struct MixnodeSettings {
     pub epoch_duration: Duration,
     pub slot_duration: Duration,
     pub persistent_transmission: PersistentTransmissionSettings,
-    pub message_blend: MessageBlendSettings<MockMixMessage>,
+    pub message_blend: MessageBlendSettings<MockBlendMessage>,
     pub cover_traffic_settings: CoverTrafficSettings,
-    pub membership: Vec<<MockMixMessage as nomos_mix_message::MixMessage>::PublicKey>,
+    pub membership: Vec<<MockBlendMessage as nomos_blend_message::BlendMessage>::PublicKey>,
 }
 
 type Sha256Hash = [u8; 32];
 
 /// This node implementation only used for testing different streaming implementation purposes.
-pub struct MixNode {
+pub struct BlendNode {
     id: NodeId,
-    state: MixnodeState,
-    settings: MixnodeSettings,
-    network_interface: InMemoryNetworkInterface<MixMessage>,
+    state: BlendnodeState,
+    settings: BlendnodeSettings,
+    network_interface: InMemoryNetworkInterface<BlendMessage>,
     message_cache: TimedCache<Sha256Hash, ()>,
 
     data_msg_lottery_update_time_sender: channel::Sender<Duration>,
@@ -81,28 +81,28 @@ pub struct MixNode {
     persistent_transmission_messages: PersistentTransmissionStream<
         CrossbeamReceiverStream<Vec<u8>>,
         ChaCha12Rng,
-        MockMixMessage,
+        MockBlendMessage,
         Interval,
     >,
-    crypto_processor: CryptographicProcessor<ChaCha12Rng, MockMixMessage>,
+    crypto_processor: CryptographicProcessor<ChaCha12Rng, MockBlendMessage>,
     blend_sender: channel::Sender<Vec<u8>>,
     blend_update_time_sender: channel::Sender<Duration>,
     blend_messages: MessageBlendStream<
         CrossbeamReceiverStream<Vec<u8>>,
         ChaCha12Rng,
-        MockMixMessage,
+        MockBlendMessage,
         TemporalRelease,
     >,
     epoch_update_sender: channel::Sender<Duration>,
     slot_update_sender: channel::Sender<Duration>,
-    cover_traffic: CoverTraffic<Epoch, Slot, MockMixMessage>,
+    cover_traffic: CoverTraffic<Epoch, Slot, MockBlendMessage>,
 }
 
-impl MixNode {
+impl BlendNode {
     pub fn new(
         id: NodeId,
-        settings: MixnodeSettings,
-        network_interface: InMemoryNetworkInterface<MixMessage>,
+        settings: BlendnodeSettings,
+        network_interface: InMemoryNetworkInterface<BlendMessage>,
     ) -> Self {
         let mut rng_generator = ChaCha12Rng::seed_from_u64(settings.seed);
 
@@ -137,18 +137,18 @@ impl MixNode {
         let (blend_sender, blend_receiver) = channel::unbounded();
         let (blend_update_time_sender, blend_update_time_receiver) = channel::unbounded();
         let nodes: Vec<
-            nomos_mix::membership::Node<
-                <MockMixMessage as nomos_mix_message::MixMessage>::PublicKey,
+            nomos_blend::membership::Node<
+                <MockBlendMessage as nomos_blend_message::BlendMessage>::PublicKey,
             >,
         > = settings
             .membership
             .iter()
-            .map(|&public_key| nomos_mix::membership::Node {
+            .map(|&public_key| nomos_blend::membership::Node {
                 address: Multiaddr::empty(),
                 public_key,
             })
             .collect();
-        let membership = Membership::<MockMixMessage>::new(nodes, id.into());
+        let membership = Membership::<MockBlendMessage>::new(nodes, id.into());
         let crypto_processor = CryptographicProcessor::new(
             settings.message_blend.cryptographic_processor.clone(),
             membership.clone(),
@@ -172,7 +172,7 @@ impl MixNode {
         // tier 3 cover traffic
         let (epoch_update_sender, epoch_updater_update_receiver) = channel::unbounded();
         let (slot_update_sender, slot_updater_update_receiver) = channel::unbounded();
-        let cover_traffic: CoverTraffic<Epoch, Slot, MockMixMessage> = CoverTraffic::new(
+        let cover_traffic: CoverTraffic<Epoch, Slot, MockBlendMessage> = CoverTraffic::new(
             settings.cover_traffic_settings,
             Epoch::new(settings.epoch_duration, epoch_updater_update_receiver),
             Slot::new(
@@ -189,7 +189,7 @@ impl MixNode {
             // We expected that a message will be delivered to most of nodes within 60s.
             message_cache: TimedCache::with_lifespan(60),
             settings,
-            state: MixnodeState {
+            state: BlendnodeState {
                 node_id: id,
                 step_id: 0,
                 num_messages_fully_unwrapped: 0,
@@ -212,7 +212,7 @@ impl MixNode {
 
     fn forward(
         &mut self,
-        message: MixMessage,
+        message: BlendMessage,
         exclude_node: Option<NodeId>,
         log: Option<EmissionLog>,
     ) {
@@ -234,7 +234,7 @@ impl MixNode {
         self.message_cache.cache_set(Self::sha256(&message.0), ());
     }
 
-    fn receive(&mut self) -> Vec<NetworkMessage<MixMessage>> {
+    fn receive(&mut self) -> Vec<NetworkMessage<BlendMessage>> {
         self.network_interface
             .receive_messages()
             .into_iter()
@@ -293,10 +293,10 @@ impl MixNode {
     }
 }
 
-impl Node for MixNode {
-    type Settings = MixnodeSettings;
+impl Node for BlendNode {
+    type Settings = BlendnodeSettings;
 
-    type State = MixnodeState;
+    type State = BlendnodeState;
 
     fn id(&self) -> NodeId {
         self.id
@@ -339,10 +339,10 @@ impl Node for MixNode {
         // Proceed message blend
         if let Poll::Ready(Some(msg)) = pin!(&mut self.blend_messages).poll_next(&mut cx) {
             match msg {
-                MixOutgoingMessage::Outbound(msg) => {
+                BlendOutgoingMessage::Outbound(msg) => {
                     self.persistent_sender.send(msg).unwrap();
                 }
-                MixOutgoingMessage::FullyUnwrapped(payload) => {
+                BlendOutgoingMessage::FullyUnwrapped(payload) => {
                     let payload = Payload::load(payload);
                     self.log_message_fully_unwrapped(&payload);
                     self.state.num_messages_fully_unwrapped += 1;
@@ -367,7 +367,7 @@ impl Node for MixNode {
             pin!(&mut self.persistent_transmission_messages).poll_next(&mut cx)
         {
             self.forward(
-                MixMessage(msg),
+                BlendMessage(msg),
                 None,
                 Some(self.new_emission_log("FromPersistent")),
             );

@@ -1,4 +1,4 @@
-use crate::node::mix::scheduler::Interval;
+use crate::node::blend::scheduler::Interval;
 use crossbeam::channel;
 use futures::stream::iter;
 use futures::{Stream, StreamExt};

@@ -10,7 +10,7 @@ use netrunner::{
 };
 
 #[derive(Debug, Clone, Serialize)]
-pub struct MixnodeState {
+pub struct BlendnodeState {
     #[serde(serialize_with = "serialize_node_id_as_index")]
     pub node_id: NodeId,
     pub step_id: usize,
@@ -19,45 +19,45 @@ pub struct MixnodeState {
 
 #[derive(Serialize)]
 #[serde(untagged)]
-pub enum MixnodeRecord {
+pub enum BlendnodeRecord {
     Runtime(Runtime),
     Settings(Box<SimulationSettings>),
     #[allow(clippy::vec_box)] // we downcast stuff and we need the extra boxing
-    Data(Vec<Box<MixnodeState>>),
+    Data(Vec<Box<BlendnodeState>>),
 }
 
-impl From<Runtime> for MixnodeRecord {
+impl From<Runtime> for BlendnodeRecord {
     fn from(value: Runtime) -> Self {
         Self::Runtime(value)
     }
 }
 
-impl From<SimulationSettings> for MixnodeRecord {
+impl From<SimulationSettings> for BlendnodeRecord {
     fn from(value: SimulationSettings) -> Self {
         Self::Settings(Box::new(value))
     }
 }
 
-impl Record for MixnodeRecord {
-    type Data = MixnodeState;
+impl Record for BlendnodeRecord {
+    type Data = BlendnodeState;
 
     fn record_type(&self) -> RecordType {
         match self {
-            MixnodeRecord::Runtime(_) => RecordType::Meta,
-            MixnodeRecord::Settings(_) => RecordType::Settings,
-            MixnodeRecord::Data(_) => RecordType::Data,
+            BlendnodeRecord::Runtime(_) => RecordType::Meta,
+            BlendnodeRecord::Settings(_) => RecordType::Settings,
+            BlendnodeRecord::Data(_) => RecordType::Data,
         }
     }
 
-    fn data(&self) -> Vec<&MixnodeState> {
+    fn data(&self) -> Vec<&BlendnodeState> {
         match self {
-            MixnodeRecord::Data(d) => d.iter().map(AsRef::as_ref).collect(),
+            BlendnodeRecord::Data(d) => d.iter().map(AsRef::as_ref).collect(),
             _ => vec![],
         }
     }
 }
 
-impl<S, T: Clone + Serialize + 'static> TryFrom<&SimulationState<S, T>> for MixnodeRecord {
+impl<S, T: Clone + Serialize + 'static> TryFrom<&SimulationState<S, T>> for BlendnodeRecord {
     type Error = anyhow::Error;
 
     fn try_from(state: &SimulationState<S, T>) -> Result<Self, Self::Error> {

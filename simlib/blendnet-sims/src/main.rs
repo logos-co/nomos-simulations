@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 // crates
-use crate::node::mix::state::{MixnodeRecord, MixnodeState};
-use crate::node::mix::{MixMessage, MixnodeSettings};
+use crate::node::blend::state::{BlendnodeRecord, BlendnodeState};
+use crate::node::blend::{BlendMessage, BlendnodeSettings};
 use anyhow::Ok;
 use clap::Parser;
 use crossbeam::channel;
@@ -16,8 +16,8 @@ use netrunner::node::{NodeId, NodeIdExt};
 use netrunner::output_processors::Record;
 use netrunner::runner::{BoxedNode, SimulationRunnerHandle};
 use netrunner::streaming::{io::IOSubscriber, naive::NaiveSubscriber, StreamType};
-use nomos_mix::cover_traffic::CoverTrafficSettings;
-use nomos_mix::message_blend::{
+use nomos_blend::cover_traffic::CoverTrafficSettings;
+use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
 use parking_lot::Mutex;
@@ -28,7 +28,7 @@ use rand_chacha::ChaCha12Rng;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 // internal
-use crate::node::mix::MixNode;
+use crate::node::blend::BlendNode;
 use crate::settings::SimSettings;
 use netrunner::{runner::SimulationRunner, settings::SimulationSettings};
 
@@ -88,19 +88,19 @@ impl SimulationApp {
         let regions_data = RegionsData::new(regions, behaviours);
 
         let ids = node_ids.clone();
-        let network = Arc::new(Mutex::new(Network::<MixMessage>::new(regions_data, seed)));
+        let network = Arc::new(Mutex::new(Network::<BlendMessage>::new(regions_data, seed)));
 
         let nodes: Vec<_> = node_ids
             .iter()
             .copied()
             .map(|node_id| {
                 let mut network = network.lock();
-                create_boxed_mixnode(
+                create_boxed_blendnode(
                     node_id,
                     &mut network,
                     settings.simulation_settings.clone(),
                     no_netcap,
-                    MixnodeSettings {
+                    BlendnodeSettings {
                         connected_peers: ids
                             .iter()
                             .filter(|&id| id != &node_id)
@@ -115,7 +115,7 @@ impl SimulationApp {
                         message_blend: MessageBlendSettings {
                             cryptographic_processor: CryptographicProcessorSettings {
                                 private_key: node_id.into(),
-                                num_mix_layers: settings.number_of_mix_layers,
+                                num_blend_layers: settings.number_of_blend_layers,
                             },
                             temporal_processor: TemporalSchedulerSettings {
                                 max_delay_seconds: settings.max_delay_seconds,
@@ -140,13 +140,13 @@ impl SimulationApp {
     }
 }
 
-fn create_boxed_mixnode(
+fn create_boxed_blendnode(
     node_id: NodeId,
-    network: &mut Network<MixMessage>,
+    network: &mut Network<BlendMessage>,
     simulation_settings: SimulationSettings,
     no_netcap: bool,
-    mixnode_settings: MixnodeSettings,
-) -> BoxedNode<MixnodeSettings, MixnodeState> {
+    blendnode_settings: BlendnodeSettings,
+) -> BoxedNode<BlendnodeSettings, BlendnodeState> {
     let (node_message_broadcast_sender, node_message_broadcast_receiver) = channel::unbounded();
     let (node_message_sender, node_message_receiver) = channel::unbounded();
     // Dividing milliseconds in second by milliseconds in the step.
@@ -174,7 +174,7 @@ fn create_boxed_mixnode(
         node_message_sender,
         network_message_receiver,
     );
-    Box::new(MixNode::new(node_id, mixnode_settings, network_interface))
+    Box::new(BlendNode::new(node_id, blendnode_settings, network_interface))
 }
 
 fn run<M, S, T>(
@@ -189,7 +189,7 @@ where
     T: Serialize + Clone + 'static,
 {
     let stream_settings = settings.stream_settings.clone();
-    let runner = SimulationRunner::<_, MixnodeRecord, S, T>::new(
+    let runner = SimulationRunner::<_, BlendnodeRecord, S, T>::new(
         network,
         nodes,
         Default::default(),
@@ -199,11 +199,11 @@ where
     let handle = match stream_type {
         Some(StreamType::Naive) => {
             let settings = stream_settings.unwrap_naive();
-            runner.simulate_and_subscribe::<NaiveSubscriber<MixnodeRecord>>(settings)?
+            runner.simulate_and_subscribe::<NaiveSubscriber<BlendnodeRecord>>(settings)?
         }
         Some(StreamType::IO) => {
             let settings = stream_settings.unwrap_io();
-            runner.simulate_and_subscribe::<IOSubscriber<MixnodeRecord>>(settings)?
+            runner.simulate_and_subscribe::<IOSubscriber<BlendnodeRecord>>(settings)?
         }
         None => runner.simulate()?,
     };
