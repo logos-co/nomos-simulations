@@ -12,3 +12,4 @@ simlib/**/target
 simlib/**/Cargo.lock
 simlib/test.json
 *.ignore*
+*.png
