@@ -74,7 +74,8 @@ def run_simulation(params: SimulationParameters) -> Tuple[pd.DataFrame, pd.DataF
             selected_transactions, to_be_purged_transactions = tfm.select_transactions(
                 pool, 
                 stop_below_gas_limit=stop_below_gas_limit, 
-                scale_block_size=scale_block_size
+                scale_block_size=scale_block_size,
+                purge_after=params.purge_after
             )
 
             # selected transactions are added to the blockchain
