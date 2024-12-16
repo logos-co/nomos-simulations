@@ -234,21 +234,26 @@ class EIP1559(TransactionFeeMechanism):
     
     def __init__(self):
         self.base_factor:float = 1./8.
+        self.base_fee:List[float] = []
+        self.base_fee.append(PROTOCOL_CONSTANTS["INITIAL_BASEFEE"])
         super().__init__()
 
     def update_price(self, blockchain:Blockchain) -> float:
-        base_fee:float = self.get_current_price()
-        gas_used:float = sum([tx.gas_used for tx in blockchain.get_last_block().txs])
+        base_fee:float = self.base_fee[-1]
+        last_txs:List[Transaction] = blockchain.get_last_block().txs
+        gas_used:float = sum([tx.gas_used for tx in last_txs])
         delta:float = (gas_used - PROTOCOL_CONSTANTS["TARGET_GAS_USED"])/PROTOCOL_CONSTANTS["TARGET_GAS_USED"]
-        self.price.append(
+        self.base_fee.append(
             base_fee * np.exp(delta * self.base_factor)  # (1. + delta * self.base_factor)
         )
+        sum_price:float = sum([min(tx.fee_cap, base_fee+tx.tip) for tx in last_txs])
+        self.price.append(sum_price/float(len(last_txs)))
 
     def select_transactions(
         self, mempool: MemPool, stop_below_gas_limit:bool=False, scale_block_size:float=1.0
     ) -> Tuple[List[Transaction], List[Transaction]]:
 
-        base_fee:float = self.get_current_price()
+        base_fee:float = self.base_fee[-1]
 
         # Sort transactions by fee cap
         sorted_txs:List[Transaction] = sorted(
@@ -260,7 +265,7 @@ class EIP1559(TransactionFeeMechanism):
         return self._select_from_sorted_txs(sorted_txs, stop_below_gas_limit, scale_block_size)
 
     def total_paid_fees(self, txs: List[Transaction]) -> float:
-        base_fee:float = self.get_current_price()
+        base_fee:float = self.base_fee[-1]
         return sum([min(tx.fee_cap, base_fee+tx.tip) * tx.gas_used for tx in txs])
 
 
