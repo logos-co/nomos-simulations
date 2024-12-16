@@ -9,7 +9,8 @@ import copy
 PROTOCOL_CONSTANTS = {
     "TARGET_GAS_USED": 12500000.0,  # 12.5 million gas
     "MAX_GAS_ALLOWED": 25000000.0,  # 25 million gas
-    "INITIAL_BASEFEE": 1.0,  # 10^9 wei
+    "INITIAL_BASEFEE": 1.0,  # 10^9 wei = 1 Gwei
+    "MIN_PRICE": 0.1,  # 10^8 wei = 0.1 Gwei
 }
 
 
@@ -120,7 +121,8 @@ def create_demand(
     ) -> List[Transaction]:
     
     # these are levels that need to be scaled by the price/base fee of the specific transaction fee model
-    fee_caps = (1. + np.random.uniform(fee_cap_range[0], fee_cap_range[1], num_txs))
+    fee_caps = 1. + np.random.normal(fee_cap_range[0], fee_cap_range[1], num_txs)
+    #fee_caps = (1. + np.random.uniform(fee_cap_range[0], fee_cap_range[1], num_txs))
     tip = np.random.uniform(0., max_tip_pct, num_txs)  # 0.1 is the max gas premium factor
 
     if variable_gas:
@@ -196,7 +198,7 @@ class TransactionFeeMechanism:
         return scaled_demand
 
     def _select_from_sorted_txs(
-        self, sorted_txs:List[Transaction], stop_below_gas_limit:bool=False, scale_block_size:float=1.0
+        self, sorted_txs:List[Transaction], stop_below_gas_limit:bool=False, scale_block_size:float=1.0, purge_after:int=4
     ) -> Tuple[List[Transaction], List[Transaction]]:
 
         # select transactions so that the sum of gas used is less than the block gas limit
@@ -213,7 +215,7 @@ class TransactionFeeMechanism:
         for tx in sorted_txs:
             if gas_used + tx.gas_used < fac * PROTOCOL_CONSTANTS["TARGET_GAS_USED"]:
                 selected_txs_idx += 1
-            if gas_used + tx.gas_used < 4 * PROTOCOL_CONSTANTS["MAX_GAS_ALLOWED"]:  # enough space for 4 full blocks
+            if gas_used + tx.gas_used < purge_after * PROTOCOL_CONSTANTS["MAX_GAS_ALLOWED"]:  # enough space for X full blocks
                 to_be_purged_txs_idx += 1
             else:
                 break
@@ -222,7 +224,7 @@ class TransactionFeeMechanism:
         return sorted_txs[:selected_txs_idx], sorted_txs[to_be_purged_txs_idx:]
 
     def select_transactions(
-        self, mempool: MemPool, stop_below_gas_limit:bool=False, scale_block_size:float=1.0
+        self, mempool: MemPool, stop_below_gas_limit:bool=False, scale_block_size:float=1.0, purge_after:int=4
     ) -> Tuple[List[Transaction], List[Transaction]]:
         raise NotImplementedError
 
@@ -247,10 +249,10 @@ class EIP1559(TransactionFeeMechanism):
             base_fee * np.exp(delta * self.base_factor)  # (1. + delta * self.base_factor)
         )
         sum_price:float = sum([min(tx.fee_cap, base_fee+tx.tip) for tx in last_txs])
-        self.price.append(sum_price/float(len(last_txs)))
+        self.price.append( max(sum_price/float(len(last_txs)), PROTOCOL_CONSTANTS["MIN_PRICE"]) )
 
     def select_transactions(
-        self, mempool: MemPool, stop_below_gas_limit:bool=False, scale_block_size:float=1.0
+        self, mempool: MemPool, stop_below_gas_limit:bool=False, scale_block_size:float=1.0, purge_after:int=4
     ) -> Tuple[List[Transaction], List[Transaction]]:
 
         base_fee:float = self.base_fee[-1]
@@ -262,7 +264,12 @@ class EIP1559(TransactionFeeMechanism):
             reverse=True
         )
 
-        return self._select_from_sorted_txs(sorted_txs, stop_below_gas_limit, scale_block_size)
+        return self._select_from_sorted_txs(
+            sorted_txs, 
+            stop_below_gas_limit=stop_below_gas_limit, 
+            scale_block_size=scale_block_size, 
+            purge_after=purge_after
+        )
 
     def total_paid_fees(self, txs: List[Transaction]) -> float:
         base_fee:float = self.base_fee[-1]
@@ -276,10 +283,10 @@ class StableFee(TransactionFeeMechanism):
 
     def update_price(self, blockchain:Blockchain):
         new_price:float = np.min([tx.fee_cap for tx in blockchain.get_last_block().txs])
-        self.price.append(new_price)
+        self.price.append(max(new_price, PROTOCOL_CONSTANTS["MIN_PRICE"]))
 
     def select_transactions(
-        self, mempool: MemPool, stop_below_gas_limit:bool=False, scale_block_size:float=1.0
+        self, mempool: MemPool, stop_below_gas_limit:bool=False, scale_block_size:float=1.0, purge_after:int=4
     ) -> Tuple[List[Transaction], List[Transaction]]:
 
         # Sort transactions by fee cap
@@ -289,8 +296,13 @@ class StableFee(TransactionFeeMechanism):
             reverse=True
         )
 
-        return self._select_from_sorted_txs(sorted_txs, stop_below_gas_limit, scale_block_size)
-    
+        return self._select_from_sorted_txs(
+            sorted_txs, 
+            stop_below_gas_limit=stop_below_gas_limit, 
+            scale_block_size=scale_block_size,
+            purge_after=purge_after
+        )
+
     def total_paid_fees(self, txs: List[Transaction]) -> float:
         price:float = self.get_current_price()
         return sum([price * tx.gas_used for tx in txs])
