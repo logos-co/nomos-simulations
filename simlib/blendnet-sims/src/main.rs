@@ -16,7 +16,7 @@ use netrunner::node::{NodeId, NodeIdExt};
 use netrunner::output_processors::Record;
 use netrunner::runner::{BoxedNode, SimulationRunnerHandle};
 use netrunner::streaming::{io::IOSubscriber, naive::NaiveSubscriber, StreamType};
-use node::blend::topology::build_topology;
+use node::blend::topology::{build_topology, longest_path_len, Topology};
 use nomos_blend::cover_traffic::CoverTrafficSettings;
 use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
@@ -26,7 +26,7 @@ use rand::seq::SliceRandom;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha12Rng;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 // internal
 use crate::node::blend::BlendNode;
 use crate::settings::SimSettings;
@@ -90,6 +90,7 @@ impl SimulationApp {
         let network = Arc::new(Mutex::new(Network::<BlendMessage>::new(regions_data, seed)));
 
         let topology = build_topology(&node_ids, settings.connected_peers_count, &mut rng);
+        log_topology(&topology);
 
         let nodes: Vec<_> = node_ids
             .iter()
@@ -241,6 +242,33 @@ fn signal<R: Record>(handle: SimulationRunnerHandle<R>) -> anyhow::Result<()> {
 fn load_json_from_file<T: DeserializeOwned>(path: &Path) -> anyhow::Result<T> {
     let f = File::open(path).map_err(Box::new)?;
     Ok(serde_json::from_reader(f)?)
+}
+
+fn log_topology(topology: &Topology) {
+    topology.iter().for_each(|(node, peers)| {
+        let log = TopologyEntryLog {
+            node_id: node.index(),
+            num_peers: peers.len(),
+            peers: peers.iter().map(|peer| peer.index()).collect(),
+        };
+        tracing::info!("TopologyEntry: {}", serde_json::to_string(&log).unwrap());
+    });
+    let log = TopologyInfoLog {
+        longest_path_len: longest_path_len(topology),
+    };
+    tracing::info!("TopologyInfo: {}", serde_json::to_string(&log).unwrap());
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TopologyEntryLog {
+    node_id: usize,
+    num_peers: usize,
+    peers: Vec<usize>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TopologyInfoLog {
+    longest_path_len: usize,
 }
 
 fn main() -> anyhow::Result<()> {

@@ -84,7 +84,7 @@ fn check_equal_conns(topology: &Topology, peering_degree: usize) -> bool {
 }
 
 /// Returns the longest path length in the topology.
-fn longest_path_len(topology: &Topology) -> usize {
+pub fn longest_path_len(topology: &Topology) -> usize {
     let mut max_len = 0;
     topology.keys().for_each(|&node| {
         let len = longest_path_len_from(topology, node);
@@ -166,6 +166,8 @@ mod tests {
         let peering_degree = 4;
         let mut rng = ChaCha8Rng::seed_from_u64(0);
         let topology = build_topology(&nodes, peering_degree, &mut rng);
-        assert!(longest_path_len(&topology) > 0);
+        let len = longest_path_len(&topology);
+        assert!(len > 0);
+        assert!(len <= nodes.len());
     }
 }
