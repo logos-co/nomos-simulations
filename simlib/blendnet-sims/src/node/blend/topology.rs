@@ -83,9 +83,44 @@ fn check_equal_conns(topology: &Topology, peering_degree: usize) -> bool {
         .all(|(_, peers)| peers.len() == peering_degree)
 }
 
+/// Returns the longest path length in the topology.
+fn longest_path_len(topology: &Topology) -> usize {
+    let mut max_len = 0;
+    topology.keys().for_each(|&node| {
+        let len = longest_path_len_from(topology, node);
+        max_len = std::cmp::max(max_len, len);
+    });
+    max_len
+}
+
+/// Returns the longest path length from the start node in the topology.
+fn longest_path_len_from(topology: &Topology, start_node: NodeId) -> usize {
+    let mut visited: HashSet<NodeId> = HashSet::from_iter(std::iter::once(start_node));
+    let mut step: HashSet<NodeId> = topology.get(&start_node).unwrap().iter().copied().collect();
+
+    let mut step_count = 0;
+    while visited.len() < topology.len() {
+        let mut next_step = HashSet::new();
+        for &node in step.iter() {
+            if visited.insert(node) {
+                for peer in topology.get(&node).unwrap().iter() {
+                    if !visited.contains(peer) {
+                        next_step.insert(*peer);
+                    }
+                }
+            }
+        }
+        step = next_step;
+        step_count += 1;
+    }
+    step_count
+}
+
 #[cfg(test)]
 mod tests {
     use netrunner::node::NodeIdExt;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     use super::*;
 
@@ -123,5 +158,14 @@ mod tests {
                 assert!(topology.get(peer).unwrap().contains(node));
             }
         }
+    }
+
+    #[test]
+    fn test_longest_path_len() {
+        let nodes = (0..100).map(NodeId::from_index).collect::<Vec<_>>();
+        let peering_degree = 4;
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+        let topology = build_topology(&nodes, peering_degree, &mut rng);
+        assert!(longest_path_len(&topology) > 0);
     }
 }
