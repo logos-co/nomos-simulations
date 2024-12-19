@@ -5,7 +5,7 @@ from typing import Optional
 
 def line_to_json_stream(record_stream: Iterable[str]) -> Iterable[str]:
     for record in record_stream:
-        bracket_pos = record.rfind("{")
+        bracket_pos = record.find("{")
         yield record[bracket_pos:]
 
 
