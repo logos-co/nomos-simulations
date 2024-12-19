@@ -29,7 +29,9 @@ class Message:
 MessageStorage = Dict[str, Message]
 
 
-def compute_results(message_storage: MessageStorage, step_duration: int) -> str:
+def compute_results(
+    message_storage: MessageStorage, step_duration: int
+) -> dict[str, int | float | str]:
     latencies = [message_record.latency for message_record in message_storage.values()]
     valued_latencies = [latency for latency in latencies if latency is not None]
     incomplete_latencies = sum((1 for latency in latencies if latency is None))
@@ -38,30 +40,27 @@ def compute_results(message_storage: MessageStorage, step_duration: int) -> str:
     total_messages_full_latency = len(valued_latencies)
     total_messages_incomplete_latency = incomplete_latencies
     latency_average_steps = statistics.mean(valued_latencies)
-    latency_average_ms = "{:.2f}ms".format(latency_average_steps * step_duration)
+    latency_average_ms = "{:.2f}".format(latency_average_steps * step_duration)
     latency_median_steps = statistics.median(valued_latencies)
-    latency_median_ms = "{:.2f}ms".format(latency_median_steps * step_duration)
+    latency_median_ms = "{:.2f}".format(latency_median_steps * step_duration)
     max_latency_steps = max(valued_latencies)
-    max_latency_ms = "{:.2f}ms".format(max_latency_steps * step_duration)
+    max_latency_ms = "{:.2f}".format(max_latency_steps * step_duration)
     min_latency_steps = min(valued_latencies)
-    min_latency_ms = "{:.2f}ms".format(min_latency_steps * step_duration)
+    min_latency_ms = "{:.2f}".format(min_latency_steps * step_duration)
 
-    return f"""[Results]
-- Total messages: {total_messages}
-    - Full latencies: {total_messages_full_latency}
-    - Incomplete latencies: {total_messages_incomplete_latency}
-- Averages
-    - Steps: {latency_average_steps}
-    - Duration: {latency_average_ms}
-- Median
-    - Steps: {latency_median_steps}
-    - Duration: {latency_median_ms}
-- Max
-    - Steps: {max_latency_steps}
-    - Duration: {max_latency_ms}
-- Min
-    - Steps: {min_latency_steps}
-    - Duration: {min_latency_ms}"""
+    return {
+        "total_messages": total_messages,
+        "total_messages_full_latency": total_messages_full_latency,
+        "total_messages_incomplete_latency": total_messages_incomplete_latency,
+        "latency_average_steps": latency_average_steps,
+        "latency_average_ms": latency_average_ms,
+        "latency_median_steps": latency_median_steps,
+        "latency_median_ms": latency_median_ms,
+        "max_latency_steps": max_latency_steps,
+        "max_latency_ms": max_latency_ms,
+        "min_latency_steps": min_latency_steps,
+        "min_latency_ms": min_latency_ms,
+    }
 
 
 def parse_record_stream(record_stream: Iterable[str]) -> MessageStorage:
@@ -109,4 +108,4 @@ if __name__ == "__main__":
     messages = parse_record_stream(input_stream)
 
     results = compute_results(messages, arguments.step_duration)
-    print(results)
+    print(json.dumps(results, indent=4))
