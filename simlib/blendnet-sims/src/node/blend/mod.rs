@@ -20,6 +20,7 @@ use netrunner::{
     network::{InMemoryNetworkInterface, NetworkInterface, PayloadSize},
     warding::WardCondition,
 };
+use nomos_blend::message_blend::crypto::WrappedMessage;
 use nomos_blend::{
     cover_traffic::{CoverTraffic, CoverTrafficSettings},
     membership::Membership,
@@ -267,17 +268,32 @@ impl BlendNode {
         self.slot_update_sender.send(elapsed).unwrap();
     }
 
-    fn log_message_generated(&self, msg_type: &str, payload: &Payload) {
-        self.log_message(format!("{}MessageGenerated", msg_type).as_str(), payload);
+    fn log_message_generated(
+        &self,
+        msg_type: &str,
+        payload: &Payload,
+        public_keys: &[<MockBlendMessage as nomos_blend_message::BlendMessage>::PublicKey],
+    ) {
+        self.log_message(
+            format!("{}MessageGenerated", msg_type).as_str(),
+            payload,
+            Some(public_keys),
+        );
     }
 
     fn log_message_fully_unwrapped(&self, payload: &Payload) {
-        self.log_message("MessageFullyUnwrapped", payload);
+        self.log_message("MessageFullyUnwrapped", payload, None);
     }
 
-    fn log_message(&self, tag: &str, payload: &Payload) {
+    fn log_message(
+        &self,
+        tag: &str,
+        payload: &Payload,
+        public_keys: Option<&[<MockBlendMessage as nomos_blend_message::BlendMessage>::PublicKey]>,
+    ) {
         let log = MessageLog {
             payload_id: payload.id(),
+            path: public_keys.map(|keys| keys.iter().map(|k| NodeId::from(k).index()).collect()),
             step_id: self.state.step_id,
             node_id: self.id.index(),
         };
@@ -319,11 +335,14 @@ impl Node for BlendNode {
         if let Poll::Ready(Some(_)) = pin!(&mut self.data_msg_lottery_interval).poll_next(&mut cx) {
             if self.data_msg_lottery.run() {
                 let payload = Payload::new();
-                self.log_message_generated("Data", &payload);
-                let message = self
+                let WrappedMessage {
+                    message,
+                    public_keys,
+                } = self
                     .crypto_processor
                     .wrap_message(payload.as_bytes())
                     .unwrap();
+                self.log_message_generated("Data", &payload, &public_keys);
                 self.persistent_sender.send(message).unwrap();
             }
         }
@@ -358,11 +377,14 @@ impl Node for BlendNode {
         // Generate a cover message probabilistically
         if let Poll::Ready(Some(_)) = pin!(&mut self.cover_traffic).poll_next(&mut cx) {
             let payload = Payload::new();
-            self.log_message_generated("Cover", &payload);
-            let message = self
+            let WrappedMessage {
+                message,
+                public_keys,
+            } = self
                 .crypto_processor
                 .wrap_message(payload.as_bytes())
                 .unwrap();
+            self.log_message_generated("Cover", &payload, &public_keys);
             self.persistent_sender.send(message).unwrap();
         }
 
@@ -394,6 +416,7 @@ impl Node for BlendNode {
 #[derive(Debug, Serialize, Deserialize)]
 struct MessageLog {
     payload_id: PayloadId,
+    path: Option<Vec<usize>>,
     step_id: usize,
     node_id: usize,
 }
