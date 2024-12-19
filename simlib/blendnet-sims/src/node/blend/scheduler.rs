@@ -76,6 +76,7 @@ impl TemporalRelease {
             let temporal_delay = Delay {
                 expected: self.current_sleep,
                 actual: self.elapsed,
+                as_expected: self.current_sleep == self.elapsed,
             };
             self.elapsed = Duration::from_secs(0);
             self.current_sleep = self.random_sleeps.next().unwrap();
@@ -108,6 +109,7 @@ impl Stream for TemporalRelease {
 struct Delay {
     expected: Duration,
     actual: Duration,
+    as_expected: bool,
 }
 
 #[cfg(test)]
@@ -160,6 +162,7 @@ mod tests {
             Some(Delay {
                 expected: Duration::from_secs(1),
                 actual: Duration::from_millis(1999),
+                as_expected: false,
             })
         );
         assert_eq!(
@@ -167,6 +170,7 @@ mod tests {
             Some(Delay {
                 expected: Duration::from_secs(1),
                 actual: Duration::from_secs(3),
+                as_expected: false,
             })
         );
     }
