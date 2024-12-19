@@ -1,6 +1,7 @@
 use crossbeam::channel;
 use futures::Stream;
 use rand::RngCore;
+use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -68,15 +69,24 @@ impl TemporalRelease {
             update_time,
         }
     }
-    pub fn update(&mut self, elapsed: Duration) -> bool {
+
+    fn update(&mut self, elapsed: Duration) -> Option<Delay> {
         self.elapsed += elapsed;
         if self.elapsed >= self.current_sleep {
+            let temporal_delay = Delay {
+                expected: self.current_sleep,
+                actual: self.elapsed,
+            };
             self.elapsed = Duration::from_secs(0);
             self.current_sleep = self.random_sleeps.next().unwrap();
-            true
+            Some(temporal_delay)
         } else {
-            false
+            None
         }
+    }
+
+    fn log_delay(delay: &Delay) {
+        tracing::info!("TemporalDelay: {}", serde_json::to_string(delay).unwrap());
     }
 }
 
@@ -85,12 +95,19 @@ impl Stream for TemporalRelease {
 
     fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if let Ok(elapsed) = self.update_time.recv() {
-            if self.update(elapsed) {
+            if let Some(delay) = self.update(elapsed) {
+                Self::log_delay(&delay);
                 return Poll::Ready(Some(()));
             }
         }
         Poll::Pending
     }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct Delay {
+    expected: Duration,
+    actual: Duration,
 }
 
 #[cfg(test)]
@@ -136,10 +153,22 @@ mod tests {
         let mut temporal_release =
             TemporalRelease::new(rand_chacha::ChaCha8Rng::from_entropy(), rx, (1, 1));
 
-        assert!(!temporal_release.update(Duration::from_secs(0)));
-        assert!(!temporal_release.update(Duration::from_millis(999)));
-        assert!(temporal_release.update(Duration::from_secs(1)));
-        assert!(temporal_release.update(Duration::from_secs(3)));
+        assert_eq!(temporal_release.update(Duration::from_secs(0)), None);
+        assert_eq!(temporal_release.update(Duration::from_millis(999)), None);
+        assert_eq!(
+            temporal_release.update(Duration::from_secs(1)),
+            Some(Delay {
+                expected: Duration::from_secs(1),
+                actual: Duration::from_millis(1999),
+            })
+        );
+        assert_eq!(
+            temporal_release.update(Duration::from_secs(3)),
+            Some(Delay {
+                expected: Duration::from_secs(1),
+                actual: Duration::from_secs(3),
+            })
+        );
     }
 
     #[test]

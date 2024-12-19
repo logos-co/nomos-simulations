@@ -2,6 +2,7 @@ pub mod consensus_streams;
 pub mod lottery;
 mod message;
 pub mod scheduler;
+mod sender_wrapper;
 pub mod state;
 pub mod stream_wrapper;
 pub mod topology;
@@ -34,6 +35,7 @@ use nomos_blend_message::mock::MockBlendMessage;
 use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use scheduler::{Interval, TemporalRelease};
+use sender_wrapper::CrossbeamSenderWrapper;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use state::BlendnodeState;
@@ -77,7 +79,7 @@ pub struct BlendNode {
     data_msg_lottery_interval: Interval,
     data_msg_lottery: StakeLottery<ChaCha12Rng>,
 
-    persistent_sender: channel::Sender<Vec<u8>>,
+    persistent_sender: CrossbeamSenderWrapper<Vec<u8>>,
     persistent_update_time_sender: channel::Sender<Duration>,
     persistent_transmission_messages: PersistentTransmissionStream<
         CrossbeamReceiverStream<Vec<u8>>,
@@ -122,17 +124,18 @@ impl BlendNode {
         // Init Tier-1: Persistent transmission
         let (persistent_sender, persistent_receiver) = channel::unbounded();
         let (persistent_update_time_sender, persistent_update_time_receiver) = channel::unbounded();
-        let persistent_transmission_messages = CrossbeamReceiverStream::new(persistent_receiver)
-            .persistent_transmission(
-                settings.persistent_transmission,
-                ChaCha12Rng::from_rng(&mut rng_generator).unwrap(),
-                Interval::new(
-                    Duration::from_secs_f64(
-                        1.0 / settings.persistent_transmission.max_emission_frequency,
+        let persistent_transmission_messages =
+            CrossbeamReceiverStream::new("PersistentReceiver", persistent_receiver)
+                .persistent_transmission(
+                    settings.persistent_transmission,
+                    ChaCha12Rng::from_rng(&mut rng_generator).unwrap(),
+                    Interval::new(
+                        Duration::from_secs_f64(
+                            1.0 / settings.persistent_transmission.max_emission_frequency,
+                        ),
+                        persistent_update_time_receiver,
                     ),
-                    persistent_update_time_receiver,
-                ),
-            );
+                );
 
         // Init Tier-2: message blend
         let (blend_sender, blend_receiver) = channel::unbounded();
@@ -163,7 +166,7 @@ impl BlendNode {
                 settings.message_blend.temporal_processor.max_delay_seconds,
             ),
         );
-        let blend_messages = CrossbeamReceiverStream::new(blend_receiver).blend(
+        let blend_messages = CrossbeamReceiverStream::new("BlendReceiver", blend_receiver).blend(
             settings.message_blend.clone(),
             membership,
             temporal_release,
@@ -198,7 +201,7 @@ impl BlendNode {
             data_msg_lottery_update_time_sender,
             data_msg_lottery_interval,
             data_msg_lottery,
-            persistent_sender,
+            persistent_sender: CrossbeamSenderWrapper::new("PersistentSender", persistent_sender),
             persistent_update_time_sender,
             persistent_transmission_messages,
             crypto_processor,
