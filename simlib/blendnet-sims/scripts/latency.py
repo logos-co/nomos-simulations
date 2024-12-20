@@ -90,18 +90,20 @@ def compute_results(
     }
 
 
-def parse_record_stream(record_stream: Iterable[str]) -> MessageStorage:
+def parse_record_stream(record_stream: Iterable[tuple[str, dict]]) -> MessageStorage:
     storage: MessageStorage = {}
 
-    for record in record_stream:
-        try:
-            json_record = json.loads(record)
-        except json.decoder.JSONDecodeError:
-            continue
-
-        if (payload_id := json_record.get("payload_id")) is None:
-            continue
-        step_id = json_record["step_id"]
+    for _, record in filter(
+        lambda x: x[0]
+        in (
+            "DataMessageGenerated",
+            "CoverMessageGenerated",
+            "MessageFullyUnwrapped",
+        ),
+        record_stream,
+    ):
+        payload_id = record["payload_id"]
+        step_id = record["step_id"]
 
         if (stored_message := storage.get(payload_id)) is None:
             storage[payload_id] = Message(payload_id, step_id)

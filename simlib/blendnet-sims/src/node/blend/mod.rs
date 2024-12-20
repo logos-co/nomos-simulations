@@ -1,4 +1,6 @@
 pub mod consensus_streams;
+#[macro_use]
+pub mod log;
 pub mod lottery;
 mod message;
 pub mod scheduler;
@@ -293,17 +295,19 @@ impl BlendNode {
         self.log_message("MessageFullyUnwrapped", payload);
     }
 
-    fn log_message(&self, tag: &str, payload: &Payload) {
-        let log = MessageLog {
-            payload_id: payload.id(),
-            step_id: self.state.step_id,
-            node_id: self.id.index(),
-        };
-        tracing::info!("{}: {}", tag, serde_json::to_string(&log).unwrap());
+    fn log_message(&self, topic: &str, payload: &Payload) {
+        log!(
+            topic,
+            MessageLog {
+                payload_id: payload.id(),
+                step_id: self.state.step_id,
+                node_id: self.id.index(),
+            }
+        );
     }
 
     fn log_emission(log: &EmissionLog) {
-        tracing::info!("Emission: {}", serde_json::to_string(log).unwrap());
+        log!("Emission", log);
     }
 
     fn new_emission_log(&self, emission_type: &str) -> EmissionLog {

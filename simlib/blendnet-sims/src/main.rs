@@ -246,11 +246,13 @@ fn load_json_from_file<T: DeserializeOwned>(path: &Path) -> anyhow::Result<T> {
 }
 
 fn log_topology(topology: &Topology) {
-    let log = TopologyLog {
-        topology: topology.to_node_indices(),
-        diameter: topology.diameter(),
-    };
-    tracing::info!("Topology: {}", serde_json::to_string(&log).unwrap());
+    log!(
+        "Topology",
+        TopologyLog {
+            topology: topology.to_node_indices(),
+            diameter: topology.diameter(),
+        }
+    );
 }
 
 #[derive(Debug, Serialize, Deserialize)]
