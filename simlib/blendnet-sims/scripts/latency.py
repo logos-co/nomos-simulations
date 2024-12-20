@@ -21,20 +21,16 @@ class Event:
 class Latency:
     start_event: Event
     end_event: Optional[Event] = None
+    steps: Optional[int] = None
 
     def finish(self, event: Event):
         assert self.end_event is None
         assert event.step_id >= self.start_event.step_id
         self.end_event = event
+        self.steps = self.end_event.step_id - self.start_event.step_id
 
     def finished(self) -> bool:
         return self.end_event is not None
-
-    @property
-    def value(self) -> Optional[int]:
-        if self.end_event is None:
-            return None
-        return self.end_event.step_id - self.start_event.step_id
 
 
 @dataclass
@@ -77,7 +73,7 @@ class Message:
 
     @property
     def latency(self) -> Optional[int]:
-        return self.total_latency.value
+        return self.total_latency.steps
 
     def __eq__(self, other):
         if not isinstance(other, Message):
