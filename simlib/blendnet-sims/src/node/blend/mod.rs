@@ -254,6 +254,23 @@ impl BlendNode {
         hasher.finalize().into()
     }
 
+    fn schedule_persistent_transmission(&mut self, message: Vec<u8>) {
+        self.log_message(
+            "PersistentTransmissionScheduled",
+            &Self::parse_payload(&message),
+        );
+        self.persistent_sender.send(message).unwrap();
+    }
+
+    fn schedule_blend(&mut self, message: Vec<u8>) {
+        self.log_message("BlendScheduled", &Self::parse_payload(&message));
+        self.blend_sender.send(message).unwrap();
+    }
+
+    fn parse_payload(message: &[u8]) -> Payload {
+        Payload::load(MockBlendMessage::payload(message).unwrap())
+    }
+
     fn update_time(&mut self, elapsed: Duration) {
         self.data_msg_lottery_update_time_sender
             .send(elapsed)
@@ -266,6 +283,10 @@ impl BlendNode {
 
     fn log_message_generated(&self, msg_type: &str, payload: &Payload) {
         self.log_message(format!("{}MessageGenerated", msg_type).as_str(), payload);
+    }
+
+    fn log_message_released_from(&self, from: &str, payload: &Payload) {
+        self.log_message(format!("MessageReleasedFrom{}", from).as_str(), payload);
     }
 
     fn log_message_fully_unwrapped(&self, payload: &Payload) {
@@ -321,7 +342,7 @@ impl Node for BlendNode {
                     .crypto_processor
                     .wrap_message(payload.as_bytes())
                     .unwrap();
-                self.persistent_sender.send(message).unwrap();
+                self.schedule_persistent_transmission(message);
             }
         }
 
@@ -332,19 +353,19 @@ impl Node for BlendNode {
                 Some(network_message.from),
                 None,
             );
-            self.blend_sender
-                .send(network_message.into_payload().0)
-                .unwrap();
+            self.schedule_blend(network_message.into_payload().0);
         }
 
         // Proceed message blend
         if let Poll::Ready(Some(msg)) = pin!(&mut self.blend_messages).poll_next(&mut cx) {
             match msg {
                 BlendOutgoingMessage::Outbound(msg) => {
-                    self.persistent_sender.send(msg).unwrap();
+                    self.log_message_released_from("Blend", &Self::parse_payload(&msg));
+                    self.schedule_persistent_transmission(msg);
                 }
                 BlendOutgoingMessage::FullyUnwrapped(payload) => {
                     let payload = Payload::load(payload);
+                    self.log_message_released_from("Blend", &payload);
                     self.log_message_fully_unwrapped(&payload);
                     self.state.num_messages_fully_unwrapped += 1;
                     //TODO: create a tracing event
@@ -360,13 +381,14 @@ impl Node for BlendNode {
                 .crypto_processor
                 .wrap_message(payload.as_bytes())
                 .unwrap();
-            self.persistent_sender.send(message).unwrap();
+            self.schedule_persistent_transmission(message);
         }
 
         // Proceed persistent transmission
         if let Poll::Ready(Some(msg)) =
             pin!(&mut self.persistent_transmission_messages).poll_next(&mut cx)
         {
+            self.log_message_released_from("PersistentTransmission", &Self::parse_payload(&msg));
             self.forward(
                 BlendMessage(msg),
                 None,
