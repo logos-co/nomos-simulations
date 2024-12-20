@@ -11,33 +11,35 @@ STEP_DURATION_MS = 50
 
 
 def bandwidth_result(log_path: str) -> dict[str, float]:
-    step_id = 0
+    max_step_id = 0
+    for _, json_msg in mixlog.get_input_stream(log_path):
+        if (step_id := json_msg.get("step_id")) is not None:
+            max_step_id = max(max_step_id, step_id)
 
-    for line in mixlog.get_input_stream(log_path):
-        if '"payload_id"' in line and '"step_id"' in line:
-            step_id = max(step_id, json.loads(line)["step_id"])
+    with open(log_path, "r") as file:
+        for line in file:
+            if "total_outbound_bandwidth" in line:
+                line = line[line.find("{") :]
+                line = line.replace("{ ", '{"')
+                line = line.replace(": ", '": ')
+                line = line.replace(", ", ', "')
+                record = json.loads(line)
 
-        if "total_outbound_bandwidth" in line:
-            line = line.replace("{ ", '{"')
-            line = line.replace(": ", '": ')
-            line = line.replace(", ", ', "')
-            record = json.loads(line)
-
-            elapsed = (step_id * STEP_DURATION_MS) / 1000.0
-            return {
-                "min": float(record["min_node_total_bandwidth"]) / elapsed,
-                "avg": float(record["avg_node_total_bandwidth"]) / elapsed,
-                "max": float(record["max_node_total_bandwidth"]) / elapsed,
-            }
+                elapsed = (max_step_id * STEP_DURATION_MS) / 1000.0
+                return {
+                    "min": float(record["min_node_total_bandwidth"]) / elapsed,
+                    "avg": float(record["avg_node_total_bandwidth"]) / elapsed,
+                    "max": float(record["max_node_total_bandwidth"]) / elapsed,
+                }
 
     raise Exception("No bandwidth data found in log file")
 
 
 def topology_result(log_path: str) -> dict[str, int]:
-    for line in mixlog.get_input_stream(log_path):
-        if "diameter" in line:
-            return json.loads(line)
-    raise Exception("No bandwidth data found in log file")
+    for topic, json_msg in mixlog.get_input_stream(log_path):
+        if topic == "Topology":
+            return json_msg
+    raise Exception("No topology found in log file")
 
 
 # Read the CSV data
