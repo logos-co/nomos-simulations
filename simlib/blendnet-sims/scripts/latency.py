@@ -3,21 +3,22 @@ import argparse
 import json
 import statistics
 from collections.abc import Iterable
+from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 import mixlog
 
 
+@dataclass
 class Event:
-    def __init__(self, step_id: int, node_id: int):
-        self.step_id = step_id
-        self.node_id = node_id
+    step_id: int
+    node_id: int
 
 
+@dataclass
 class Latency:
-    def __init__(self, start_event: Event):
-        self.start_event = start_event
-        self.end_event = None
+    start_event: Event
+    end_event: Optional[Event] = None
 
     def finish(self, event: Event):
         assert self.end_event is None
@@ -34,12 +35,12 @@ class Latency:
         return self.end_event.step_id - self.start_event.step_id
 
 
+@dataclass
 class Message:
-    def __init__(self, message_id: str, msg_gen_event: Event):
-        self.id = message_id
-        self.total_latency = Latency(msg_gen_event)
-        self.persistent_transmission_latencies: list[Latency] = []
-        self.blend_latencies: list[Latency] = []
+    id: str
+    total_latency: Latency
+    persistent_transmission_latencies: list[Latency] = field(default_factory=list)
+    blend_latencies: list[Latency] = field(default_factory=list)
 
     def __hash__(self):
         return self.id
@@ -147,20 +148,22 @@ def parse_record_stream(record_stream: Iterable[tuple[str, dict]]) -> MessageSto
     for topic, record in record_stream:
         if topic in ("DataMessageGenerated", "CoverMessageGenerated"):
             payload_id = record["payload_id"]
-            storage[payload_id] = Message(payload_id, event_from_record(record))
+            storage[payload_id] = Message(
+                payload_id, Latency(event_from_record(record))
+            )
         elif topic == "MessageFullyUnwrapped":
             storage[record["payload_id"]].fully_unwrapped(event_from_record(record))
         elif topic == "PersistentTransmissionScheduled":
             storage[record["payload_id"]].persistent_transmission_scheduled(
                 event_from_record(record)
             )
-        elif topic == "PersistentTransmissionReleased":
+        elif topic == "MessageReleasedFromPersistentTransmission":
             storage[record["payload_id"]].persistent_transmission_released(
                 event_from_record(record)
             )
         elif topic == "BlendScheduled":
             storage[record["payload_id"]].blend_scheduled(event_from_record(record))
-        elif topic == "BlendReleased":
+        elif topic == "MessageReleasedFromBlend":
             storage[record["payload_id"]].blend_released(event_from_record(record))
 
     return storage

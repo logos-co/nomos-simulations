@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 from collections import OrderedDict
+from dataclasses import asdict
 
 import latency
 import mixlog
@@ -113,9 +114,15 @@ print(
 )
 for idx, log_path in enumerate(log_paths):
     network_diameter = topology_result(log_path)["diameter"]
-    latency_res = latency.compute_results(
-        latency.parse_record_stream(mixlog.get_input_stream(log_path)), STEP_DURATION_MS
-    )
+    message_stroage = latency.parse_record_stream(mixlog.get_input_stream(log_path))
+    with open(f"{log_dir}/msgs-{idx}.json", "w") as file:
+        json.dump(
+            {msg_id: asdict(msg) for msg_id, msg in message_stroage.items()},
+            file,
+            indent=2,
+        )
+
+    latency_res = latency.compute_results(message_stroage, STEP_DURATION_MS)
     msg_count = latency_res["total_complete_messages"]
     min_latency = float(latency_res["min_latency_ms"]) / 1000.0
     min_latency_msg_id = latency_res["min_latency_message_id"]
