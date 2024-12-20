@@ -114,15 +114,19 @@ print(
 )
 for idx, log_path in enumerate(log_paths):
     network_diameter = topology_result(log_path)["diameter"]
-    message_stroage = latency.parse_record_stream(mixlog.get_input_stream(log_path))
+    message_storage, node_storage = latency.parse_record_stream(
+        mixlog.get_input_stream(log_path)
+    )
     with open(f"{log_dir}/msgs-{idx}.json", "w") as file:
         json.dump(
-            {msg_id: asdict(msg) for msg_id, msg in message_stroage.items()},
+            {msg_id: asdict(msg) for msg_id, msg in message_storage.items()},
             file,
             indent=2,
         )
+    with open(f"{log_dir}/nodes-{idx}.json", "w") as file:
+        json.dump(node_storage.to_dict(), file, indent=2)
 
-    latency_res = latency.compute_results(message_stroage, STEP_DURATION_MS)
+    latency_res = latency.compute_results(message_storage, STEP_DURATION_MS)
     msg_count = latency_res["total_complete_messages"]
     min_latency = float(latency_res["min_latency_ms"]) / 1000.0
     min_latency_msg_id = latency_res["min_latency_message_id"]
