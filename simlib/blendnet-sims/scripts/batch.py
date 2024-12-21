@@ -2,6 +2,7 @@ import csv
 import json
 import os
 import subprocess
+import sys
 from collections import OrderedDict
 from dataclasses import asdict
 
@@ -109,11 +110,36 @@ for idx, config_path in enumerate(config_paths):
 
 print("Analyzing logs...")
 print("=================")
-print(
-    "network_diameter,msg_count,min_latency_msg_id,max_latency_msg_id,min_latency,avg_latency,median_latency,max_latency,min_bandwidth_kbps,avg_bandwidth_kbps,max_bandwidth_kbps"
+
+csv_writer = csv.writer(sys.stdout)
+csv_writer.writerow(
+    [
+        "network_diameter",
+        "msg_count",
+        "min_latency",
+        "avg_latency",
+        "median_latency",
+        "max_latency",
+        "min_latency_msg_id",
+        "min_latency_msg_persistent_latencies",
+        "min_latency_msg_persistent_queue_sizes",
+        "min_latency_msg_temporal_latencies",
+        "min_latency_msg_temporal_queue_sizes",
+        "max_latency_msg_id",
+        "max_latency_msg_persistent_latencies",
+        "max_latency_msg_persistent_queue_sizes",
+        "max_latency_msg_temporal_latencies",
+        "max_latency_msg_temporal_queue_sizes",
+        "min_bandwidth_kbps",
+        "avg_bandwidth_kbps",
+        "max_bandwidth_kbps",
+    ]
 )
+
 for idx, log_path in enumerate(log_paths):
-    network_diameter = topology_result(log_path)["diameter"]
+    csv_row = []
+    csv_row.append(topology_result(log_path)["diameter"])
+
     message_storage, node_storage = latency.parse_record_stream(
         mixlog.get_input_stream(log_path)
     )
@@ -126,20 +152,44 @@ for idx, log_path in enumerate(log_paths):
     with open(f"{log_dir}/nodes-{idx}.json", "w") as file:
         json.dump(node_storage.to_dict(), file, indent=2)
 
-    latency_res = latency.compute_results(message_storage, STEP_DURATION_MS)
-    msg_count = latency_res["total_complete_messages"]
-    min_latency = float(latency_res["min_latency_ms"]) / 1000.0
-    min_latency_msg_id = latency_res["min_latency_message_id"]
-    avg_latency = float(latency_res["latency_average_ms"]) / 1000.0
-    median_latency = float(latency_res["latency_median_ms"]) / 1000.0
-    max_latency = float(latency_res["max_latency_ms"]) / 1000.0
-    max_latency_msg_id = latency_res["max_latency_message_id"]
+    latency_analysis = latency.LatencyAnalysis.build(
+        message_storage, node_storage, STEP_DURATION_MS
+    )
+    csv_row.append(latency_analysis.total_complete_messages)
+    csv_row.append(float(latency_analysis.min_latency_ms) / 1000.0)
+    csv_row.append(float(latency_analysis.avg_latency_ms) / 1000.0)
+    csv_row.append(float(latency_analysis.median_latency_ms) / 1000.0)
+    csv_row.append(float(latency_analysis.max_latency_ms) / 1000.0)
+    csv_row.append(latency_analysis.min_latency_analysis.message_id)
+    csv_row.append(
+        ",".join(map(str, latency_analysis.min_latency_analysis.persistent_latencies))
+    )
+    csv_row.append(
+        ",".join(map(str, latency_analysis.min_latency_analysis.persistent_queue_sizes))
+    )
+    csv_row.append(
+        ",".join(map(str, latency_analysis.min_latency_analysis.temporal_latencies))
+    )
+    csv_row.append(
+        ",".join(map(str, latency_analysis.min_latency_analysis.temporal_queue_sizes))
+    )
+    csv_row.append(latency_analysis.max_latency_analysis.message_id)
+    csv_row.append(
+        ",".join(map(str, latency_analysis.max_latency_analysis.persistent_latencies))
+    )
+    csv_row.append(
+        ",".join(map(str, latency_analysis.max_latency_analysis.persistent_queue_sizes))
+    )
+    csv_row.append(
+        ",".join(map(str, latency_analysis.max_latency_analysis.temporal_latencies))
+    )
+    csv_row.append(
+        ",".join(map(str, latency_analysis.max_latency_analysis.temporal_queue_sizes))
+    )
 
     bandwidth_res = bandwidth_result(log_path)
-    min_bandwidth_kpbs = bandwidth_res["min"] * 8 / 1000.0
-    avg_bandwidth_kpbs = bandwidth_res["avg"] * 8 / 1000.0
-    max_bandwidth_kpbs = bandwidth_res["max"] * 8 / 1000.0
+    csv_row.append(bandwidth_res["min"] * 8 / 1000.0)
+    csv_row.append(bandwidth_res["avg"] * 8 / 1000.0)
+    csv_row.append(bandwidth_res["max"] * 8 / 1000.0)
 
-    print(
-        f"{network_diameter},{msg_count},{min_latency_msg_id},{max_latency_msg_id},{min_latency},{avg_latency},{median_latency},{max_latency},{min_bandwidth_kpbs},{avg_bandwidth_kpbs},{max_bandwidth_kpbs}"
-    )
+    csv_writer.writerow(csv_row)
