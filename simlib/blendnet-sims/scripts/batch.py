@@ -163,14 +163,28 @@ for idx, log_path in enumerate(log_paths):
     csv_row.append(latency_analysis.min_latency_analysis.message_id)
     csv_row.append(
         ",".join(
-            map(str, latency_analysis.min_latency_analysis.persistent_latencies_step)
+            map(
+                str,
+                [
+                    ms / 1000.0
+                    for ms in latency_analysis.min_latency_analysis.persistent_latencies_ms
+                ],
+            )
         )
     )
     csv_row.append(
         ",".join(map(str, latency_analysis.min_latency_analysis.persistent_queue_sizes))
     )
     csv_row.append(
-        ",".join(map(str, latency_analysis.min_latency_analysis.temporal_latencies_ms))
+        ",".join(
+            map(
+                str,
+                [
+                    ms / 1000.0
+                    for ms in latency_analysis.min_latency_analysis.temporal_latencies_ms
+                ],
+            )
+        )
     )
     csv_row.append(
         ",".join(map(str, latency_analysis.min_latency_analysis.temporal_queue_sizes))
@@ -178,14 +192,28 @@ for idx, log_path in enumerate(log_paths):
     csv_row.append(latency_analysis.max_latency_analysis.message_id)
     csv_row.append(
         ",".join(
-            map(str, latency_analysis.max_latency_analysis.persistent_latencies_step)
+            map(
+                str,
+                [
+                    ms / 1000.0
+                    for ms in latency_analysis.max_latency_analysis.persistent_latencies_ms
+                ],
+            )
         )
     )
     csv_row.append(
         ",".join(map(str, latency_analysis.max_latency_analysis.persistent_queue_sizes))
     )
     csv_row.append(
-        ",".join(map(str, latency_analysis.max_latency_analysis.temporal_latencies_ms))
+        ",".join(
+            map(
+                str,
+                [
+                    ms / 1000.0
+                    for ms in latency_analysis.max_latency_analysis.temporal_latencies_ms
+                ],
+            )
+        )
     )
     csv_row.append(
         ",".join(map(str, latency_analysis.max_latency_analysis.temporal_queue_sizes))
