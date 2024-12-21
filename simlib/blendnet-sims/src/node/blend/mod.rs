@@ -265,7 +265,7 @@ impl BlendNode {
                 self.schedule_temporal_processor(temporal_message);
             }
             Err(e) => {
-                tracing::error!("Failed to unwrap message: {:?}", e);
+                tracing::debug!("Failed to unwrap message: {:?}", e);
             }
         }
     }
@@ -273,7 +273,7 @@ impl BlendNode {
     fn schedule_temporal_processor(&mut self, message: BlendOutgoingMessage) {
         let payload = match &message {
             BlendOutgoingMessage::FullyUnwrapped(payload) => Payload::load(payload.clone()),
-            BlendOutgoingMessage::Outbound(msg) => Self::parse_payload(&msg),
+            BlendOutgoingMessage::Outbound(msg) => Self::parse_payload(msg),
         };
         self.log_message("TemporalProcessorScheduled", &payload);
         self.temporal_sender.send(message).unwrap();
