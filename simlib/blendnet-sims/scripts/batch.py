@@ -112,6 +112,7 @@ print("Analyzing logs...")
 print("=================")
 
 with open("output.csv", "w", newline="") as file:
+    print(f"Writing results to: {file.name}")
     csv_writer = csv.writer(file)
     csv_writer.writerow(
         [
@@ -234,3 +235,5 @@ with open("output.csv", "w", newline="") as file:
         csv_row.append(bandwidth_res["max"] * 8 / 1000.0)
 
         csv_writer.writerow(csv_row)
+
+    print(f"The outputs have been successfully written to {file.name}")
