@@ -54,7 +54,7 @@ def run_simulation(params: SimulationParameters) -> Tuple[pd.DataFrame, pd.DataF
             demand_size, 
             fee_cap_range=params.fee_cap_range, 
             max_tip_pct=params.max_tip_pct,
-            variable_gas=True
+            variable_gas=params.variable_gas_limits
         )
         
         stop_below_gas_limit:bool = _generate_random_bool(params.probability_stop_below_gas_limit)
