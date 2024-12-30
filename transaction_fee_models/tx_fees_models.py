@@ -10,7 +10,8 @@ PROTOCOL_CONSTANTS = {
     "TARGET_GAS_USED": 12500000.0,  # 12.5 million gas
     "MAX_GAS_ALLOWED": 25000000.0,  # 25 million gas
     "INITIAL_BASEFEE": 1.0,  # 10^9 wei = 1 Gwei
-    "MIN_PRICE": 0.1,  # 10^8 wei = 0.1 Gwei
+    "MIN_PRICE": 0.5,  # 10^8 wei = 0.1 Gwei
+    "MAX_PRICE": 10.0  # 10^11 wei = 100 Gwei
 }
 
 
@@ -249,7 +250,13 @@ class EIP1559(TransactionFeeMechanism):
             base_fee * np.exp(delta * self.base_factor)  # (1. + delta * self.base_factor)
         )
         sum_price:float = sum([min(tx.fee_cap, base_fee+tx.tip) for tx in last_txs])
-        self.price.append( max(sum_price/float(len(last_txs)), PROTOCOL_CONSTANTS["MIN_PRICE"]) )
+        self.price.append( 
+            np.clip(
+                sum_price/float(len(last_txs)), 
+                a_min=PROTOCOL_CONSTANTS["MIN_PRICE"],
+                a_max=PROTOCOL_CONSTANTS["MAX_PRICE"]
+            )
+        )
 
     def select_transactions(
         self, mempool: MemPool, stop_below_gas_limit:bool=False, scale_block_size:float=1.0, purge_after:int=4
@@ -282,8 +289,15 @@ class StableFee(TransactionFeeMechanism):
         super().__init__()
 
     def update_price(self, blockchain:Blockchain):
-        new_price:float = np.min([tx.fee_cap for tx in blockchain.get_last_block().txs])
-        self.price.append(max(new_price, PROTOCOL_CONSTANTS["MIN_PRICE"]))
+        last_txs:List[Transaction] = blockchain.get_last_block().txs
+        new_price:float = np.min([tx.fee_cap for tx in last_txs])
+        self.price.append(
+            np.clip(
+                new_price, 
+                a_min=PROTOCOL_CONSTANTS["MIN_PRICE"],
+                a_max=PROTOCOL_CONSTANTS["MAX_PRICE"]
+            )
+        )
 
     def select_transactions(
         self, mempool: MemPool, stop_below_gas_limit:bool=False, scale_block_size:float=1.0, purge_after:int=4
