@@ -135,7 +135,16 @@ def create_demand(
 def _create_demand_const_gas(fee_caps:np.ndarray, tip:np.ndarray) -> List[Transaction]:
     
     demand: List[Transaction] = []
-    gas_used = 21000
+    gas_used = np.mean([  # 73_850 gas limit
+        21_000 * 0.3,   # eth transfer
+        45_000 * 0.3,   # erc20 transfer
+        50_000 * 0.1,   # token approval
+        200_000 * 0.2,  # token swap 
+        150_000 * 0.03,  # NFT (ERC721) minting
+        75_000* 0.03,   # NFT transfer
+        120_000 * 0.03,  # NFT (ERC1155) minting
+        500_000 * 0.01,  # smart contract deployment
+    ])
 
     for fc, tp in zip(fee_caps, tip):
         tx = Transaction(
