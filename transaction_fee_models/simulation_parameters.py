@@ -14,6 +14,7 @@ class SimulationParameters:
         scale_block_size_limits: Tuple[float] = (0.0, 0.2),
         probability_stop_below_gas_limit: float = 0.5,
         purge_after: int = 4,
+        variable_gas_limits: bool = True
     ):
         assert len(demand_sizes) == len(demand_probabilities), "demand_sizes and demand_probabilities must have the same length"
         assert abs(sum(demand_probabilities) - 1.0) < 1.e-12, "demand_probabilities must sum to 1.0"
@@ -36,3 +37,4 @@ class SimulationParameters:
         self.scale_block_size_limits = scale_block_size_limits
         self.probability_stop_below_gas_limit = probability_stop_below_gas_limit
         self.purge_after = purge_after
+        self.variable_gas_limits = variable_gas_limits
