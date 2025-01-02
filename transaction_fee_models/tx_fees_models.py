@@ -208,7 +208,10 @@ class TransactionFeeMechanism:
         return scaled_demand
 
     def _select_from_sorted_txs(
-        self, sorted_txs:List[Transaction], stop_below_gas_limit:bool=False, scale_block_size:float=1.0, purge_after:int=4
+        self, 
+        sorted_txs:List[Transaction], 
+        stop_below_gas_limit:bool=False, 
+        scale_block_size:float=1.0, purge_after:int=4
     ) -> Tuple[List[Transaction], List[Transaction]]:
 
         # select transactions so that the sum of gas used is less than the block gas limit
