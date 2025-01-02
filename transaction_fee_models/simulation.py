@@ -60,7 +60,7 @@ def run_simulation(params: SimulationParameters) -> Tuple[pd.DataFrame, pd.DataF
         stop_below_gas_limit:bool = _generate_random_bool(params.probability_stop_below_gas_limit)
 
         scale_block_size = np.random.uniform(
-            params.scale_block_size_limits[0], params.scale_block_size_limits[1]
+            0., params.scale_block_size
         )
 
         for chain, pool, tfm, stats in zip(
